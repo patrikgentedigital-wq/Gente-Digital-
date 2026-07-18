@@ -16,6 +16,8 @@ export function DashboardView() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [dateFilter, setDateFilter] = useState('all');
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -59,8 +61,28 @@ export function DashboardView() {
     fetchData();
   }, []);
 
-  const totalLeads = leads.length;
-  const conversões = leads.filter(l => l.status === 'Ganho').length;
+  const now = new Date();
+  const filteredLeads = leads.filter(l => {
+    if (dateFilter === 'all') return true;
+    if (!l.created_at) return false;
+    const d = new Date(l.created_at);
+    
+    if (dateFilter === 'this_month') {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    if (dateFilter === 'last_month') {
+      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      return d.getMonth() === lastMonth && d.getFullYear() === lastYear;
+    }
+    if (dateFilter === 'this_year') {
+      return d.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+
+  const totalLeads = filteredLeads.length;
+  const conversões = filteredLeads.filter(l => l.status === 'Ganho').length;
   const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
   const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + totalLeads * 4;
 
@@ -99,7 +121,7 @@ export function DashboardView() {
         const normColabName = normalizeStr(colab.name);
         const normColabId = normalizeStr(colab.id);
 
-        const referredLeads = leads.filter(l => {
+        const referredLeads = filteredLeads.filter(l => {
           const normRef = normalizeStr(l.ref);
           return normRef === normColabId || normRef === normColabName;
         });
@@ -129,7 +151,7 @@ export function DashboardView() {
   };
 
   const getTopClientes = () => {
-    const clientRefs = leads.map(l => l.ref).filter(ref => {
+    const clientRefs = filteredLeads.map(l => l.ref).filter(ref => {
        const normRef = normalizeStr(ref);
        if (!normRef || normRef === "organico" || normRef === "") return false;
        
@@ -145,7 +167,7 @@ export function DashboardView() {
     
     return uniqueRefs.map(uRef => {
       const originalName = clientRefs.find(r => normalizeStr(r) === uRef) || uRef;
-      const referredLeads = leads.filter(l => normalizeStr(l.ref) === uRef);
+      const referredLeads = filteredLeads.filter(l => normalizeStr(l.ref) === uRef);
       const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
       const points = referredLeads.length * 20 + conversions * 50;
       
@@ -267,9 +289,22 @@ export function DashboardView() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300 pb-12">
-      <div>
-        <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Dashboard</h2>
-        <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Dashboard</h2>
+          <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
+        </div>
+        
+        <select 
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none"
+        >
+          <option value="all">Todo o Período</option>
+          <option value="this_month">Este Mês</option>
+          <option value="last_month">Mês Passado</option>
+          <option value="this_year">Este Ano</option>
+        </select>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
