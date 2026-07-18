@@ -11,6 +11,25 @@ export function IntegracoesView() {
   const [ixcLoading, setIxcLoading] = useState(false);
   const [ixcError, setIxcError] = useState<string | null>(null);
 
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const response = await fetch('/api/integrations/ixc/config');
+        const data = await response.json();
+        if (data.success) {
+          setIxcDomain(data.domain || '');
+          setIxcToken(data.token || '');
+          if (data.domain && data.token && !data.tableMissing) {
+            setIxcSaved(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading IXC config:', err);
+      }
+    }
+    loadConfig();
+  }, []);
+
   const handleTestIxc = async () => {
     if (!ixcDomain || !ixcToken) {
       setIxcError('Por favor, preencha o domínio e o token.');
@@ -28,7 +47,18 @@ export function IntegracoesView() {
       });
       const data = await response.json();
       if (data.success) {
-        setIxcSaved(true);
+        // Save config to database
+        const saveResponse = await fetch('/api/integrations/ixc/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: ixcDomain, token: ixcToken })
+        });
+        const saveData = await saveResponse.json();
+        if (saveData.success) {
+          setIxcSaved(true);
+        } else {
+          setIxcError(saveData.error || 'Conectado com sucesso, mas falhou ao salvar credenciais.');
+        }
       } else {
         setIxcError(data.error || 'Falha ao conectar com o IXC.');
       }

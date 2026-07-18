@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy } from 'lucide-react';
+import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from 'boring-avatars';
@@ -79,6 +79,29 @@ export function LeadsView() {
   const [selectedColabFilter, setSelectedColabFilter] = useState<string>('');
   const [minValueFilter, setMinValueFilter] = useState<number | ''>('');
   const [maxValueFilter, setMaxValueFilter] = useState<number | ''>('');
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncIxc = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/integrations/ixc/sync', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(data.message);
+        await fetchLeads();
+      } else {
+        alert(`Erro na sincronização: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error syncing with IXC:', error);
+      alert('Erro de rede ao tentar sincronizar com o IXC.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleExportCSV = () => {
     const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Status', 'Valor (R$)', 'Ultima Interacao'];
@@ -720,6 +743,16 @@ export function LeadsView() {
         title="Novo Lead"
       >
         <Plus className="w-6 h-6" />
+      </button>
+
+      {/* Floating Action Button for IXC Sync (bottom left next to New Lead) */}
+      <button 
+        onClick={handleSyncIxc} 
+        disabled={isSyncing}
+        className={`fixed bottom-8 left-24 w-14 h-14 bg-brand-yellow hover:bg-brand-yellow/80 text-brand-charcoal rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+        title="Sincronizar com IXC Soft"
+      >
+        <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
       </button>
 
       {/* New Lead Modal */}
