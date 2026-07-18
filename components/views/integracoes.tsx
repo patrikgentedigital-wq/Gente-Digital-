@@ -50,39 +50,39 @@ export function IntegracoesView() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
       <div>
-        <h2 className="font-display text-3xl font-bold text-brand-charcoal">Integrações</h2>
-        <p className="text-brand-muted mt-1">Conecte o Gente Digital a outras plataformas de mercado (IXC Soft e Microsoft Forms).</p>
+        <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Integrações</h2>
+        <p className="text-brand-muted dark:text-gray-400 mt-1">Conecte o Gente Digital a outras plataformas de mercado (IXC Soft e Microsoft Forms).</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-brand-border shadow-level-1 p-8">
+      <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 p-8 transition-colors">
         <div className="flex items-center gap-4 mb-6">
           <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl">
             <Database className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="font-bold text-xl text-brand-charcoal">Integração IXC Soft</h3>
-            <p className="text-sm text-brand-muted mt-1">Sincronize clientes e status de fatura automaticamente com seu provedor.</p>
+            <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Integração IXC Soft</h3>
+            <p className="text-sm text-brand-muted dark:text-gray-400 mt-1">Sincronize clientes e status de fatura automaticamente com seu provedor.</p>
           </div>
         </div>
-        <div className="space-y-5 bg-gray-50 p-6 rounded-xl border border-brand-border">
+        <div className="space-y-5 bg-gray-50 dark:bg-gray-800/40 p-6 rounded-xl border border-brand-border dark:border-gray-700">
           <div>
-            <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Domínio IXC</label>
+            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white mb-1.5">Domínio IXC</label>
             <input 
               type="text" 
               value={ixcDomain}
               onChange={e => setIxcDomain(e.target.value)}
               placeholder="ex: ixc.suaempresa.com.br" 
-              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+              className="w-full px-4 py-3 bg-white dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-white focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Token de Acesso (API)</label>
+            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white mb-1.5">Token de Acesso (API)</label>
             <input 
               type="password" 
               value={ixcToken}
               onChange={e => setIxcToken(e.target.value)}
               placeholder="••••••••••••••••" 
-              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+              className="w-full px-4 py-3 bg-white dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-white focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
             />
           </div>
           
@@ -114,33 +114,33 @@ export function IntegracoesView() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-brand-border shadow-level-1 p-8">
+      <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 p-8 transition-colors">
         <div className="flex items-center gap-4 mb-6">
           <div className="p-4 bg-green-50 text-green-600 rounded-2xl">
             <Network className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="font-bold text-xl text-brand-charcoal">Integração Microsoft Forms</h3>
-            <p className="text-sm text-brand-muted mt-1">Receba leads diretamente de formulários externos via Webhook automatizado.</p>
+            <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Integração Microsoft Forms</h3>
+            <p className="text-sm text-brand-muted dark:text-gray-400 mt-1">Receba leads diretamente de formulários externos via Webhook automatizado.</p>
           </div>
         </div>
-        <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-brand-border">
+        <div className="space-y-4 bg-gray-50 dark:bg-gray-800/40 p-6 rounded-xl border border-brand-border dark:border-gray-700">
           <div>
-            <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">URL do Webhook (Gerada pelo Gente Digital)</label>
+            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white mb-1.5">URL do Webhook (Gerada pelo Gente Digital)</label>
             <div className="flex gap-2">
-              <input readOnly value={webhookUrl} className="w-full bg-white px-4 py-3 border border-brand-border rounded-xl text-sm text-brand-muted outline-none font-mono" />
+              <input readOnly value={webhookUrl} className="w-full bg-white dark:bg-[#27272a] px-4 py-3 border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-muted dark:text-gray-400 outline-none font-mono" />
               <button 
                 onClick={() => {
                   navigator.clipboard.writeText(webhookUrl);
                   setFormsSaved(true);
                   setTimeout(() => setFormsSaved(false), 2000);
                 }}
-                className="px-6 py-3 border border-brand-border bg-white text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-100 transition-colors"
+                className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-white dark:bg-gray-850 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {formsSaved ? 'Copiado!' : 'Copiar'}
               </button>
             </div>
-            <p className="text-sm text-brand-muted mt-3">Cole esta URL no <span className="font-semibold text-brand-charcoal">Microsoft Power Automate</span> para direcionar as respostas do Forms para sua base de leads.</p>
+            <p className="text-sm text-brand-muted dark:text-gray-400 mt-3">Cole esta URL no <span className="font-semibold text-brand-charcoal dark:text-white">Microsoft Power Automate</span> para direcionar as respostas do Forms para sua base de leads.</p>
           </div>
         </div>
       </div>

@@ -377,7 +377,7 @@ export function LeadsView() {
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 h-[calc(100vh-140px)] flex flex-col relative pb-8 overflow-hidden">
       {/* Breadcrumb Header */}
       <div className="shrink-0">
-        <div className="text-xs text-brand-muted font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
+        <div className="text-xs text-brand-muted dark:text-gray-400 font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
           <span>Marketing de indicações</span>
           <span className="text-gray-300 text-sm">›</span>
           <span className="text-brand-charcoal dark:text-gray-300 font-extrabold">Acompanhamento de leads</span>
@@ -520,7 +520,7 @@ export function LeadsView() {
       {viewMode === 'list' ? (
         <div className="bg-white rounded-2xl border border-brand-border shadow-level-1 overflow-hidden shrink-0 flex-1 flex flex-col">
           <div className="px-6 py-5 border-b border-brand-border flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
-            <h3 className="font-bold text-xl text-brand-charcoal">Todos os Leads</h3>
+            <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Todos os Leads</h3>
             <div className="relative w-full sm:w-72 text-brand-muted focus-within:text-brand-charcoal transition-colors">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
               <input type="text" placeholder="Buscar por nome ou telefone..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-brand-border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
@@ -607,13 +607,13 @@ export function LeadsView() {
                 key={status} 
                 onDrop={(e) => handleDrop(e, status)}
                 onDragOver={handleDragOver}
-                className="flex-shrink-0 w-[300px] flex flex-col bg-gray-50 border border-brand-border rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
+                className="flex-shrink-0 w-[300px] flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-3.5 h-3.5 rounded-full border-2 ${getStatusCircleColor(status)}`} />
-                    <h3 className="font-bold text-brand-charcoal text-[14px]">{status}</h3>
+                    <h3 className="font-bold text-brand-charcoal dark:text-white text-[14px]">{status}</h3>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${getStatusBadgeClass(status)}`}>
                       {columnLeads.length}
                     </span>
@@ -727,7 +727,7 @@ export function LeadsView() {
         <div className="fixed inset-0 bg-brand-charcoal/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-2xl text-brand-charcoal">Novo Lead</h3>
+              <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Lead</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted" /></button>
             </div>
             <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
@@ -808,7 +808,7 @@ export function LeadsView() {
               <div className="flex items-center gap-4">
                 <Avatar size={48} name={selectedLead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
                 <div>
-                  <h3 className="font-display text-2xl font-bold text-brand-charcoal">{selectedLead.name}</h3>
+                  <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{selectedLead.name}</h3>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(selectedLead.status)}`}>{selectedLead.status}</span>
                     <span className="text-sm font-medium text-brand-muted flex items-center gap-1.5 bg-white border border-brand-border px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {selectedLead.phone}</span>

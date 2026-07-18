@@ -107,8 +107,8 @@ export function ColaboradoresView() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal">Gestão de Links de Indicação</h2>
-          <p className="text-brand-muted mt-1">Configure e monitore os links de compartilhamento dos seus colaboradores.</p>
+          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Links de Indicação</h2>
+          <p className="text-brand-muted dark:text-gray-400 mt-1">Configure e monitore os links de compartilhamento dos seus colaboradores.</p>
         </div>
         <button onClick={() => setIsModalOpen(true)} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
           <UserPlus className="w-5 h-5" />
@@ -118,8 +118,8 @@ export function ColaboradoresView() {
 
       {/* Grid Info Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-brand-border shadow-level-1 p-6">
-          <div className="flex items-center gap-2 mb-4 text-brand-charcoal">
+        <div className="lg:col-span-2 bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 p-6 transition-colors">
+          <div className="flex items-center gap-2 mb-4 text-brand-charcoal dark:text-white">
             <LinkIcon className="w-5 h-5" />
             <h3 className="font-bold text-lg">Link Base Principal</h3>
           </div>
@@ -130,7 +130,7 @@ export function ColaboradoresView() {
                   type="text"
                   value={tempBaseLink}
                   onChange={(e) => setTempBaseLink(e.target.value)}
-                  className="w-full bg-white border border-brand-yellow rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-yellow/20"
+                  className="w-full bg-white dark:bg-[#27272a] border border-brand-yellow rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-yellow/20"
                   autoFocus
                 />
                 <button
@@ -145,7 +145,7 @@ export function ColaboradoresView() {
               </div>
             ) : (
               <>
-                <div className="flex-1 w-full bg-gray-50 border border-brand-border rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal">
+                <div className="flex-1 w-full bg-gray-50 dark:bg-gray-800/60 border border-brand-border dark:border-gray-700 rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal dark:text-white">
                   {baseLink}
                 </div>
                 <button 
@@ -153,7 +153,7 @@ export function ColaboradoresView() {
                     setTempBaseLink(baseLink);
                     setIsEditingBase(true);
                   }}
-                  className="w-full sm:w-auto px-6 py-3 border-2 border-brand-charcoal text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 border-2 border-brand-charcoal dark:border-gray-700 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
                 >
                   <Edit2 className="w-4 h-4" />
                   Alterar Base
@@ -161,26 +161,26 @@ export function ColaboradoresView() {
               </>
             )}
           </div>
-          <p className="text-xs text-brand-muted mt-4">
-            Este é o endereço raiz para todas as indicações. O ID do colaborador será anexado automaticamente como parâmetro <span className="font-bold text-brand-charcoal">?ref=ID</span>.
+          <p className="text-xs text-brand-muted dark:text-gray-400 mt-4">
+            Este é o endereço raiz para todas as indicações. O ID do colaborador será anexado automaticamente como parâmetro <span className="font-bold text-brand-charcoal dark:text-white">?ref=ID</span>.
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-2xl border-l-4 border-brand-yellow p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-3 text-brand-charcoal">
+        <div className="bg-gray-50 dark:bg-gray-800/40 rounded-2xl border-l-4 border-brand-yellow p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-3 text-brand-charcoal dark:text-white">
             <HelpCircle className="w-5 h-5" />
             <h4 className="font-bold">Como funciona?</h4>
           </div>
-          <p className="text-sm text-brand-muted leading-relaxed">
-            Cada colaborador possui um <span className="font-bold text-brand-charcoal">ID Único</span>. Quando alguém acessa o link com esse ID, o sistema armazena um cookie por 30 dias para garantir o rastreamento da conversão.
+          <p className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed">
+            Cada colaborador possui um <span className="font-bold text-brand-charcoal dark:text-white">ID Único</span>. Quando alguém acessa o link com esse ID, o sistema armazena um cookie por 30 dias para garantir o rastreamento da conversão.
           </p>
         </div>
       </div>
 
       {/* Table Section */}
-      <div className="bg-white rounded-2xl border border-brand-border shadow-level-1 overflow-hidden">
-        <div className="px-6 py-5 border-b border-brand-border flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-          <h3 className="font-bold text-xl text-brand-charcoal">Colaboradores Ativos</h3>
+      <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 overflow-hidden transition-colors">
+        <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Colaboradores Ativos</h3>
           <div className="relative w-full sm:w-64 text-brand-muted focus-within:text-brand-charcoal transition-colors">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
             <input
@@ -196,39 +196,39 @@ export function ColaboradoresView() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-brand-border">
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted uppercase tracking-wider">Colaborador</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted uppercase tracking-wider text-center">ID</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted uppercase tracking-wider">Link Único</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted uppercase tracking-wider text-center">Indicações</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted uppercase tracking-wider text-right">Ações</th>
+              <tr className="bg-gray-50 dark:bg-gray-800/40 border-b border-brand-border dark:border-gray-800">
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider">Colaborador</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-center">ID</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider">Link Único</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-center">Indicações</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-brand-border">
+            <tbody className="divide-y divide-brand-border dark:divide-gray-800">
               {filteredColabs.map((colab) => (
-                <tr key={colab.id} className="hover:bg-gray-50 transition-colors group">
+                <tr key={colab.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <Avatar size={36} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
                       <div>
-                        <p className="font-semibold text-brand-charcoal text-sm">{colab.name}</p>
-                        <p className="text-xs text-brand-muted">{colab.email}</p>
+                        <p className="font-semibold text-brand-charcoal dark:text-white text-sm">{colab.name}</p>
+                        <p className="text-xs text-brand-muted dark:text-gray-400">{colab.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="px-2.5 py-1 bg-gray-100 border border-brand-border rounded-md text-xs font-mono text-brand-charcoal">
+                    <span className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-md text-xs font-mono text-brand-charcoal dark:text-white">
                       {colab.id}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-brand-link hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={`${baseLink}?ref=${colab.id}`}>
+                      <span className="text-sm text-brand-link dark:text-blue-400 hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={`${baseLink}?ref=${colab.id}`}>
                         {baseLink}?ref={colab.id}
                       </span>
                       <button 
                         onClick={() => navigator.clipboard.writeText(`${baseLink}?ref=${colab.id}`)}
-                        className="text-brand-muted hover:text-brand-charcoal opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-brand-muted hover:text-brand-charcoal dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Copiar link"
                       >
                         <Copy className="w-4 h-4" />
@@ -236,7 +236,7 @@ export function ColaboradoresView() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-brand-charcoal text-base">{colab.count.toString().padStart(2, '0')}</span>
+                    <span className="font-bold text-brand-charcoal dark:text-white text-base">{colab.count.toString().padStart(2, '0')}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">

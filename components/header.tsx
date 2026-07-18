@@ -1,6 +1,8 @@
 'use client';
 
-import { ChevronRight, Search, Menu } from 'lucide-react';
+import { ChevronRight, Search, Menu, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useState, useEffect } from 'react';
 
 interface HeaderProps {
   activeTabName: string;
@@ -8,6 +10,13 @@ interface HeaderProps {
 }
 
 export function Header({ activeTabName, onMenuClick }: HeaderProps) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-white dark:bg-[#18181b] border-b border-brand-border dark:border-gray-800 h-[72px] flex items-center justify-between px-4 md:px-10 shadow-sm transition-colors">
       <div className="flex items-center gap-3">
@@ -27,6 +36,16 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4 md:gap-6">
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-2 text-brand-muted hover:text-brand-charcoal dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="Alternar Tema"
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5 text-brand-yellow" /> : <Moon className="w-5 h-5" />}
+          </button>
+        )}
+        
         <div className="relative hidden lg:block text-brand-muted dark:text-gray-400 focus-within:text-brand-charcoal dark:focus-within:text-white transition-colors">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" />
           <input
@@ -35,8 +54,6 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
             className="pl-10 pr-4 py-2 bg-gray-50 dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-full text-sm focus:outline-none focus:border-brand-yellow dark:focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow dark:text-white transition-all w-64"
           />
         </div>
-
-
       </div>
     </header>
   );
