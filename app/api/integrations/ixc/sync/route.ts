@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const { data: leads, error: leadsError } = await supabase
       .from('leads')
       .select('*')
-      .not('status', 'in', '("Instalado","Cancelado")');
+      .not('status', 'in', '("Ganho","Cancelado")');
 
     if (leadsError) {
       return NextResponse.json({ success: false, error: leadsError.message }, { status: 500 });
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
           // Update lead status in Supabase
           const { error: updateError } = await supabase
             .from('leads')
-            .update({ status: 'Instalado' })
+            .update({ status: 'Ganho' })
             .eq('id', lead.id);
 
           if (updateError) {
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${updatedCount} lead(s) atualizados com sucesso para o status Instalado!`,
+      message: `${updatedCount} lead(s) atualizados com sucesso para o status Ganho!`,
       updatedCount,
       details: syncResults
     });
