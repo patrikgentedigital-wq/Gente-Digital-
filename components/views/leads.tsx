@@ -736,20 +736,20 @@ export function LeadsView() {
         </div>
       )}
 
-      {/* Floating Action Button for New Lead (bottom left) */}
+      {/* Floating Action Button for New Lead (bottom right) */}
       <button 
         onClick={() => setIsModalOpen(true)} 
-        className="fixed bottom-8 left-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
+        className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
         title="Novo Lead"
       >
         <Plus className="w-6 h-6" />
       </button>
 
-      {/* Floating Action Button for IXC Sync (bottom left next to New Lead) */}
+      {/* Floating Action Button for IXC Sync (bottom right next to New Lead) */}
       <button 
         onClick={handleSyncIxc} 
         disabled={isSyncing}
-        className={`fixed bottom-8 left-24 w-14 h-14 bg-brand-yellow hover:bg-brand-yellow/80 text-brand-charcoal rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`fixed bottom-8 right-24 w-14 h-14 bg-brand-yellow hover:bg-brand-yellow/80 text-brand-charcoal rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
         title="Sincronizar com IXC Soft"
       >
         <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
