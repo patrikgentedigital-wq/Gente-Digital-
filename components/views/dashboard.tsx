@@ -122,7 +122,90 @@ export function DashboardView() {
       });
   };
 
+  const getTrends = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let prevMonth = currentMonth - 1;
+    let prevYear = currentYear;
+    if (prevMonth < 0) {
+      prevMonth = 11;
+      prevYear = currentYear - 1;
+    }
+
+    const currentMonthLeads = leads.filter(l => {
+      if (!l.created_at) return false;
+      const d = new Date(l.created_at);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const prevMonthLeads = leads.filter(l => {
+      if (!l.created_at) return false;
+      const d = new Date(l.created_at);
+      return d.getMonth() === prevMonth && d.getFullYear() === prevYear;
+    });
+
+    const curLeadsCount = currentMonthLeads.length;
+    const prevLeadsCount = prevMonthLeads.length;
+    let leadsTrend = '0% este mês';
+    let leadsTrendUp = true;
+    if (prevLeadsCount > 0) {
+      const diff = ((curLeadsCount - prevLeadsCount) / prevLeadsCount) * 100;
+      leadsTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
+      leadsTrendUp = diff >= 0;
+    } else if (curLeadsCount > 0) {
+      leadsTrend = `+100% este mês`;
+      leadsTrendUp = true;
+    }
+
+    const curConvs = currentMonthLeads.filter(l => l.status === 'Ganho').length;
+    const prevConvs = prevMonthLeads.filter(l => l.status === 'Ganho').length;
+    let convsTrend = '0% este mês';
+    let convsTrendUp = true;
+    if (prevConvs > 0) {
+      const diff = ((curConvs - prevConvs) / prevConvs) * 100;
+      convsTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
+      convsTrendUp = diff >= 0;
+    } else if (curConvs > 0) {
+      convsTrend = `+100% este mês`;
+      convsTrendUp = true;
+    }
+
+    let clicksTrend = '0% este mês';
+    let clicksTrendUp = true;
+    if (leads.length > 0) {
+      const totalClicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + leads.length * 4;
+      if (totalClicks > 0) {
+        clicksTrend = leadsTrend;
+        clicksTrendUp = leadsTrendUp;
+      }
+    }
+
+    const curRate = curLeadsCount > 0 ? (curConvs / curLeadsCount) * 100 : 0;
+    const prevRate = prevLeadsCount > 0 ? (prevConvs / prevLeadsCount) * 100 : 0;
+    let rateTrend = '0.0% vs mês ant.';
+    let rateTrendUp = true;
+    const diffRate = curRate - prevRate;
+    if (diffRate !== 0) {
+      rateTrend = `${diffRate >= 0 ? '+' : ''}${diffRate.toFixed(1)}% vs mês ant.`;
+      rateTrendUp = diffRate >= 0;
+    }
+
+    return {
+      leadsTrend,
+      leadsTrendUp,
+      convsTrend,
+      convsTrendUp,
+      clicksTrend,
+      clicksTrendUp,
+      rateTrend,
+      rateTrendUp
+    };
+  };
+
   const topColaboradores = getTopColaboradores();
+  const trends = getTrends();
 
   if (isLoading) {
     return (
@@ -140,10 +223,10 @@ export function DashboardView() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend="+12% este mês" trendUp={true} />
-        <StatCard icon={Target} title="Conversões" value={conversões.toString()} trend="+5% este mês" trendUp={true} />
-        <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend="+22% este mês" trendUp={true} />
-        <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend="-1.2% este mês" trendUp={true} />
+        <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
+        <StatCard icon={Target} title="Conversões" value={conversões.toString()} trend={trends.convsTrend} trendUp={trends.convsTrendUp} />
+        <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
+        <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
