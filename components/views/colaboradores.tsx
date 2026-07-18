@@ -88,7 +88,16 @@ export function ColaboradoresView() {
         const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         if (data) {
-           setColaboradores(data);
+           // Calcula dinamicamente a contagem de indicações baseada nos leads reais
+           const { data: leadsData } = await supabase.from('leads').select('ref');
+           const colabsWithCount = data.map(colab => {
+             const colabCount = leadsData ? leadsData.filter(lead => 
+               lead.ref === colab.id || 
+               (lead.ref && lead.ref.toLowerCase() === colab.name.toLowerCase())
+             ).length : (colab.count || 0);
+             return { ...colab, count: colabCount };
+           });
+           setColaboradores(colabsWithCount);
         }
       } else {
         setColaboradores(initialColaboradores);
