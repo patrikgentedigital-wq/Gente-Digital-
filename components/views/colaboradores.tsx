@@ -90,13 +90,22 @@ export function ColaboradoresView() {
         if (data) {
            // Calcula dinamicamente a contagem de indicações baseada nos leads reais
            const { data: leadsData } = await supabase.from('leads').select('ref');
+           
+           const normalizeStr = (str: string) => 
+             str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+
            const colabsWithCount = data.map(colab => {
-             const colabCount = leadsData ? leadsData.filter(lead => 
-               lead.ref === colab.id || 
-               (lead.ref && lead.ref.toLowerCase() === colab.name.toLowerCase())
-             ).length : (colab.count || 0);
+             const normColabName = normalizeStr(colab.name);
+             const normColabId = normalizeStr(colab.id);
+             
+             const colabCount = leadsData ? leadsData.filter(lead => {
+               const normRef = normalizeStr(lead.ref);
+               return normRef === normColabId || normRef === normColabName;
+             }).length : (colab.count || 0);
+             
              return { ...colab, count: colabCount };
            });
+           
            setColaboradores(colabsWithCount);
         }
       } else {
