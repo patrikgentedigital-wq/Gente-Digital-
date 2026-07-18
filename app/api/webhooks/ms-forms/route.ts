@@ -42,6 +42,85 @@ function findField(body: any, keywords: string[], defaultValue: string = ''): st
   return defaultValue;
 }
 
+async function createIxcProspect(name: string, phone: string, ref: string) {
+  try {
+    // 1. Fetch credentials from settings
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('settings')
+      .select('*')
+      .in('key', ['ixc_domain', 'ixc_token']);
+
+    if (settingsError) {
+      console.warn("Could not read IXC credentials for webhook sync:", settingsError.message);
+      return { success: false, error: 'Tabela settings não disponível no banco de dados' };
+    }
+
+    const config: Record<string, string> = {
+      ixc_domain: 'ixc.gentedigital.com.br',
+      ixc_token: '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb'
+    };
+
+    if (settingsData && settingsData.length > 0) {
+      settingsData.forEach(row => {
+        config[row.key] = row.value;
+      });
+    }
+
+    const domain = config['ixc_domain'];
+    const token = config['ixc_token'];
+
+    if (!domain || !token) {
+      return { success: false, error: 'Credenciais IXC não configuradas' };
+    }
+
+    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
+    const base64Token = Buffer.from(token).toString('base64');
+    
+    // Formatar data atual para o formato IXC (YYYY-MM-DD HH:MM:SS)
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 19).replace('T', ' ');
+
+    const payload = {
+      nome: name,
+      razao: name, // Necessário para salvar como Lead no IXC
+      fone_celular: phone,
+      id_filial: '1',
+      data_cadastro: localISOTime,
+      lead: 'S',
+      tipo_pessoa: 'F',
+      origem: 'outros',
+      obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
+    };
+
+    const ixcResponse = await fetch(`https://${cleanDomain}/webservice/v1/contato`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${base64Token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!ixcResponse.ok) {
+      const errorText = await ixcResponse.text();
+      return { success: false, error: `Servidor IXC respondeu com código ${ixcResponse.status}: ${errorText}` };
+    }
+
+    const ixcData = await ixcResponse.json();
+
+    if (ixcData.type === 'error') {
+      return { success: false, error: ixcData.message };
+    }
+
+    return { success: true, id: ixcData.id };
+
+  } catch (err: any) {
+    console.error('Error in createIxcProspect helper:', err);
+    return { success: false, error: err.message || err };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -105,6 +184,28 @@ export async function POST(req: NextRequest) {
 
         if (historyError) {
           console.error('Error inserting webhook history:', historyError);
+        }
+
+        // 3. Enviar para o IXC Soft como prospect
+        const ixcResult = await createIxcProspect(name, phone, ref);
+        if (ixcResult.success) {
+          await supabase
+            .from('lead_history')
+            .insert([{
+              lead_id: insertedLead.id,
+              date: new Date().toLocaleString('pt-BR').substring(0, 16),
+              action: 'Sincronizado com IXC',
+              note: `Prospect criado automaticamente no IXC com o ID: ${ixcResult.id}`
+            }]);
+        } else {
+          await supabase
+            .from('lead_history')
+            .insert([{
+              lead_id: insertedLead.id,
+              date: new Date().toLocaleString('pt-BR').substring(0, 16),
+              action: 'Falha na Sincronização IXC',
+              note: `Erro ao enviar para o IXC: ${ixcResult.error}`
+            }]);
         }
       }
     } else {
