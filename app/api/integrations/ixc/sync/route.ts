@@ -82,8 +82,56 @@ export async function POST(req: NextRequest) {
         const ixcData = await ixcResponse.json();
 
         if (ixcData.registros && ixcData.registros.length > 0) {
-          // Found a match in IXC! Let's choose the best match
-          const matchedClient = ixcData.registros[0];
+          let foundValidContract = false;
+          let matchedClient = null;
+          let activeContractId = null;
+          
+          // Calculate a threshold date (e.g. 30 days before lead creation)
+          const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
+          leadDate.setDate(leadDate.getDate() - 30);
+          
+          for (const client of ixcData.registros) {
+            // Check contracts for this client
+            const contractRes = await fetch(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${base64Token}`,
+                'Content-Type': 'application/json',
+                'ixcsoft': 'listar'
+              },
+              body: JSON.stringify({
+                qtype: 'id_cliente',
+                query: client.id,
+                oper: '=',
+                page: '1',
+                rp: '50'
+              })
+            });
+            
+            if (!contractRes.ok) continue;
+            
+            const contractData = await contractRes.json();
+            if (contractData.registros && contractData.registros.length > 0) {
+              // Look for a recent active contract
+              for (const contract of contractData.registros) {
+                if (contract.status === 'A') {
+                  const contractDate = new Date(contract.data);
+                  if (contractDate >= leadDate) {
+                    foundValidContract = true;
+                    matchedClient = client;
+                    activeContractId = contract.id;
+                    break;
+                  }
+                }
+              }
+            }
+            if (foundValidContract) break;
+          }
+          
+          if (!foundValidContract || !matchedClient) {
+            // No recent active contract found for this lead
+            continue;
+          }
           
           // Update lead status in Supabase
           const { error: updateError } = await supabase
@@ -92,7 +140,7 @@ export async function POST(req: NextRequest) {
             .eq('id', lead.id);
 
           if (updateError) {
-            console.error(`Error updating lead ${lead.id} to Instalado:`, updateError);
+            console.error(`Error updating lead ${lead.id} to Ganho:`, updateError);
             continue;
           }
 
@@ -101,7 +149,7 @@ export async function POST(req: NextRequest) {
             lead_id: lead.id,
             date: new Date().toLocaleString('pt-BR').substring(0, 16),
             action: 'Sincronizado com IXC Soft',
-            note: `Cliente ativo localizado no ERP: ${matchedClient.razao} (Código: ${matchedClient.id})`
+            note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId})`
           };
 
           await supabase.from('lead_history').insert([historyData]);
@@ -111,7 +159,8 @@ export async function POST(req: NextRequest) {
             leadId: lead.id,
             name: lead.name,
             matchedAs: matchedClient.razao,
-            code: matchedClient.id
+            code: matchedClient.id,
+            contract: activeContractId
           });
         }
       } catch (err: any) {

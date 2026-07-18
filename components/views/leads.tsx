@@ -305,6 +305,13 @@ export function LeadsView() {
             history: [{ id: Math.random(), lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
          }, ...leads]);
        }
+
+       // Send to IXC as Prospect (Fire and forget)
+       fetch('/api/integrations/ixc/prospect', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ name: newLeadData.name, phone: newLeadData.phone, ref: newLeadData.ref })
+       }).catch(err => console.error('Failed to send prospect to IXC:', err));
     } catch (error) {
       console.error("Error creating lead", error);
     }
