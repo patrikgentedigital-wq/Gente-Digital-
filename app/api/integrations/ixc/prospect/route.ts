@@ -44,11 +44,14 @@ export async function POST(req: NextRequest) {
 
     const payload = {
       nome: name,
+      razao: name, // Necessário para salvar como Lead
       fone_celular: phone,
       id_filial: '1',
       data_cadastro: localISOTime,
       lead: 'S',
       tipo_pessoa: 'F',
+      id_contato_tipo: '52', // Tipo 52 costuma ser Lead no IXC
+      id_candidato_tipo: '12', // Candidato tipo 12 costuma ser Lead
       origem: 'outros',
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
