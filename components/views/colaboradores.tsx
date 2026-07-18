@@ -10,6 +10,7 @@ import * as z from 'zod';
 const colaboradorSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('Insira um endereço de e-mail válido'),
+  photo_url: z.string().url('URL inválida').optional().or(z.literal('')),
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
@@ -129,7 +130,7 @@ export function ColaboradoresView() {
     const initials = data.name.substring(0,2).toUpperCase();
     const id = `EMP-0${Math.floor(Math.random() * 100) + 44}`;
     
-    const newColab = { id, name: data.name, email: data.email, initials, count: 0 };
+    const newColab = { id, name: data.name, email: data.email, initials, count: 0, photo_url: data.photo_url || undefined };
 
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
@@ -267,7 +268,11 @@ export function ColaboradoresView() {
                 <tr key={colab.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar size={36} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                      {colab.photo_url ? (
+                        <img src={colab.photo_url} alt={colab.name} className="w-9 h-9 rounded-full object-cover border border-brand-border" />
+                      ) : (
+                        <Avatar size={36} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                      )}
                       <div>
                         <p className="font-semibold text-brand-charcoal dark:text-white text-sm">{colab.name}</p>
                         <p className="text-xs text-brand-muted dark:text-gray-400">{colab.email}</p>
@@ -381,6 +386,20 @@ export function ColaboradoresView() {
                   }`} 
                 />
                 {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-brand-charcoal mb-1">URL da Foto (opcional)</label>
+                <input 
+                  {...register('photo_url')} 
+                  type="url" 
+                  placeholder="https://exemplo.com/foto.jpg" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
+                    errors.photo_url 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.photo_url && <p className="text-red-500 text-xs mt-1 font-medium">{errors.photo_url.message}</p>}
               </div>
               <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 transition-all">
                 Adicionar Colaborador

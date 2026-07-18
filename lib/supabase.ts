@@ -30,5 +30,6 @@ export interface Colaborador {
   email: string;
   initials: string;
   count: number;
+  photo_url?: string;
   created_at?: string;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -67,6 +67,8 @@ const initialLeads: UILead[] = [
 ];
 
 export function LeadsView() {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -669,7 +671,11 @@ export function LeadsView() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex gap-6 overflow-x-auto pb-6 scrollbar-hide items-start">
+        <div 
+          ref={scrollContainerRef} 
+          onDragOver={handleDragOver}
+          className="flex-1 flex gap-6 overflow-x-auto pb-6 scrollbar-hide items-start"
+        >
           {statuses.map(status => {
             const columnLeads = filteredLeads.filter(l => l.status === status);
             const totalValue = columnLeads.reduce((acc, lead) => acc + (lead.value || 0), 0);
