@@ -45,16 +45,6 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
         </nav>
 
-        {/* Bottom Actions */}
-        <div className="px-4 mt-auto space-y-2">
-          <button
-            onClick={() => setActiveTab('leads')}
-            className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Novo Lead
-          </button>
-        </div>
       </aside>
     </>
   );

@@ -383,12 +383,17 @@ export function LeadsView() {
     }
   };
 
+  const [dateFilter, setDateFilter] = useState('all');
+
   const uniqueRefs = Array.from(new Set(leads.map(l => l.ref).filter(Boolean)));
   
   let activeFiltersCount = 0;
   if (selectedColabFilter) activeFiltersCount++;
   if (minValueFilter !== '') activeFiltersCount++;
   if (maxValueFilter !== '') activeFiltersCount++;
+  if (dateFilter !== 'all') activeFiltersCount++;
+
+  const now = new Date();
 
   const filteredLeads = leads.filter(l => {
     const matchesSearch = 
@@ -399,8 +404,26 @@ export function LeadsView() {
     const matchesColab = selectedColabFilter ? l.ref === selectedColabFilter : true;
     const matchesMinVal = minValueFilter !== '' ? (l.value || 0) >= Number(minValueFilter) : true;
     const matchesMaxVal = maxValueFilter !== '' ? (l.value || 0) <= Number(maxValueFilter) : true;
+    
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      if (!l.created_at) {
+        matchesDate = false;
+      } else {
+        const d = new Date(l.created_at);
+        if (dateFilter === 'this_month') {
+          matchesDate = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        } else if (dateFilter === 'last_month') {
+          const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+          const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+          matchesDate = d.getMonth() === lastMonth && d.getFullYear() === lastYear;
+        } else if (dateFilter === 'this_year') {
+          matchesDate = d.getFullYear() === now.getFullYear();
+        }
+      }
+    }
 
-    return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal;
+    return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
   });
 
   return (
@@ -478,12 +501,30 @@ export function LeadsView() {
                         setSelectedColabFilter('');
                         setMinValueFilter('');
                         setMaxValueFilter('');
+                        setDateFilter('all');
                       }}
                       className="text-xs text-red-500 hover:text-red-600 font-bold"
                     >
                       Limpar
                     </button>
                   )}
+                </div>
+
+                {/* Filter: Date */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                    Período
+                  </label>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                  >
+                    <option value="all">Todo o Período</option>
+                    <option value="this_month">Este Mês</option>
+                    <option value="last_month">Mês Passado</option>
+                    <option value="this_year">Este Ano</option>
+                  </select>
                 </div>
 
                 {/* Filter 1: Collaborator */}
