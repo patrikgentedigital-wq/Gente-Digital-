@@ -171,6 +171,40 @@ export function IntegracoesView() {
               </button>
             </div>
             <p className="text-sm text-brand-muted dark:text-gray-400 mt-3">Cole esta URL no <span className="font-semibold text-brand-charcoal dark:text-white">Microsoft Power Automate</span> para direcionar as respostas do Forms para sua base de leads.</p>
+            
+            <div className="mt-6 pt-5 border-t border-brand-border dark:border-gray-700">
+              <h4 className="text-sm font-bold text-brand-charcoal dark:text-white mb-3">🏷️ Mapeamento Inteligente de Campos</h4>
+              <p className="text-xs text-brand-muted dark:text-gray-400 mb-4 leading-relaxed">
+                O Gente Digital analisa as perguntas do seu formulário no Microsoft Forms e faz a associação automática. 
+                Você pode nomear as perguntas da forma que preferir, desde que contenham as seguintes palavras-chave:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
+                  <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Nome do Lead</span>
+                  <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">nome</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">name</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">cliente</code>.</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual seu nome completo?"</span>
+                </div>
+                <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
+                  <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">WhatsApp / Telefone</span>
+                  <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">telefone</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">celular</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">whatsapp</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">contato</code>.</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual o seu WhatsApp com DDD?"</span>
+                </div>
+                <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
+                  <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Indicador / Colaborador</span>
+                  <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">colaborador</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">indicador</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">codigo</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">quem</code>.</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Quem indicou você?"</span>
+                </div>
+                <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
+                  <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Valor do Contrato</span>
+                  <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">valor</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">preco</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">plano</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">mensalidade</code>.</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual o valor do plano de interesse?"</span>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20 text-xs text-blue-700 dark:text-blue-400 leading-relaxed flex flex-col gap-1">
+                <span className="font-semibold">💡 Dica de Vinculação por Link:</span>
+                <span>Você também pode passar o código do indicador direto na URL do webhook adicionando <code className="bg-blue-100/50 dark:bg-blue-900/30 px-1 py-0.5 rounded font-mono font-bold">?ref=CODIGO</code> ao final da URL (ex: <code className="font-mono text-[10px] opacity-80 break-all">{webhookUrl}?ref=EMP-042</code>). Isso serve como a indicação padrão se o formulário não tiver a pergunta de indicação.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

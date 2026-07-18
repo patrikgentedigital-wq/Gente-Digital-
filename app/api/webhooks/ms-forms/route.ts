@@ -1,46 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^a-z0-9]/g, "");     // remove caracteres especiais e espaços
+}
+
+function findField(body: any, keywords: string[], defaultValue: string = ''): string {
+  if (!body || typeof body !== 'object') return defaultValue;
+
+  const keys = Object.keys(body);
+  
+  // 1. Procura por correspondência direta de palavra-chave
+  for (const key of keys) {
+    const cleanKey = key.toLowerCase().trim();
+    if (keywords.includes(cleanKey)) {
+      const val = body[key];
+      if (val !== undefined && val !== null) {
+        return val.toString().trim();
+      }
+    }
+  }
+
+  // 2. Procura por correspondência difusa nas perguntas (substrings)
+  for (const key of keys) {
+    const normKey = normalizeString(key);
+    for (const kw of keywords) {
+      const normKw = normalizeString(kw);
+      if (normKey.includes(normKw)) {
+        const val = body[key];
+        if (val !== undefined && val !== null) {
+          return val.toString().trim();
+        }
+      }
+    }
+  }
+
+  return defaultValue;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     console.log('Received MS Forms webhook payload:', body);
 
-    // Extract fields using flexible/common naming variations from Forms/Power Automate
-    const name = (
-      body.name || 
-      body.nome || 
-      body.Name ||
-      body.Nome ||
-      body['Nome Completo'] || 
-      body['nome completo'] || 
-      body['Full Name'] ||
-      'Lead MS Forms'
-    ).toString().trim();
+    // Captura parâmetros da query URL (?ref=... ou ?colaborador=...)
+    const url = new URL(req.url);
+    const queryRef = url.searchParams.get('ref') || 
+                     url.searchParams.get('referral') || 
+                     url.searchParams.get('colaborador') || 
+                     url.searchParams.get('indicador');
 
-    const phone = (
-      body.phone || 
-      body.telefone || 
-      body.celular || 
-      body.Phone ||
-      body.Telefone ||
-      body.whatsapp ||
-      body.WhatsApp ||
-      ''
-    ).toString().trim();
+    // Mapeamento inteligente usando palavras-chave comuns em português/inglês
+    const name = findField(body, ['nome', 'name', 'cliente', 'lead', 'completo'], 'Lead MS Forms');
+    
+    const phone = findField(body, ['telefone', 'celular', 'whatsapp', 'phone', 'whats', 'fone', 'contato'], '');
+    
+    let ref = findField(body, ['colaborador', 'indicador', 'indicacao', 'ref', 'quem', 'vendedor', 'codigo', 'cod'], '');
+    if (!ref && queryRef) {
+      ref = queryRef.toString().trim();
+    }
+    if (!ref) {
+      ref = 'Orgânico';
+    }
 
-    const ref = (
-      body.ref || 
-      body.referral || 
-      body.colaborador || 
-      body.Colaborador || 
-      body['ID Indicador'] ||
-      body.indicador ||
-      'Orgânico'
-    ).toString().trim();
-
-    const rawValue = body.value || body.valor || body.Value || body.Valor || '0';
-    const value = parseFloat(rawValue.toString().replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+    const rawValue = findField(body, ['valor', 'value', 'preco', 'preço', 'plano', 'mensalidade'], '0');
+    const value = parseFloat(rawValue.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
 
     // Check if Supabase is configured (avoid crashing on local mock state)
     const isSupabaseConfigured = 
@@ -53,7 +81,7 @@ export async function POST(req: NextRequest) {
       // 1. Insert Lead into Supabase
       const { data: leadData, error: leadError } = await supabase
         .from('leads')
-        .insert([{ name, phone, ref, status: 'Novas indicações', value }])
+        .insert([{ name, phone, ref, status: 'Pendente', value }])
         .select();
 
       if (leadError) {
@@ -86,7 +114,7 @@ export async function POST(req: NextRequest) {
         name,
         phone,
         ref,
-        status: 'Novas indicações',
+        status: 'Pendente',
         value,
         created_at: new Date().toISOString()
       };
