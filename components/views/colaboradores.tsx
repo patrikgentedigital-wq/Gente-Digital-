@@ -22,7 +22,8 @@ const initialColaboradores: Colaborador[] = [
 
 export function ColaboradoresView() {
   const router = useRouter();
-  const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
+  const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>(isSupabaseConfigured ? [] : initialColaboradores);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,17 +44,16 @@ export function ColaboradoresView() {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
         const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
         if (error) throw error;
-        if (data && data.length > 0) {
+        if (data) {
            setColaboradores(data);
-        } else {
-           setColaboradores(initialColaboradores);
         }
       } else {
         setColaboradores(initialColaboradores);
       }
     } catch (error) {
       console.error("Error fetching colaboradores:", error);
-      setColaboradores(initialColaboradores);
+      const isConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      setColaboradores(isConfigured ? [] : initialColaboradores);
     } finally {
       setIsLoading(false);
     }

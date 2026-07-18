@@ -70,7 +70,8 @@ export function LeadsView() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [leads, setLeads] = useState<UILead[]>(initialLeads);
+  const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+  const [leads, setLeads] = useState<UILead[]>(isSupabaseConfigured ? [] : initialLeads);
   const [isLoading, setIsLoading] = useState(true);
   const [colaboradores, setColaboradores] = useState<{ id: string, name: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,15 +207,16 @@ export function LeadsView() {
           }));
           setLeads(uiLeads);
         } else {
-          setLeads(initialLeads);
+          setLeads([]);
         }
       } else {
          setLeads(initialLeads);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
-      // Fallback to initial local state
-      setLeads(initialLeads);
+      // Fallback to initial local state only if not configured
+      const isConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      setLeads(isConfigured ? [] : initialLeads);
     } finally {
       setIsLoading(false);
     }

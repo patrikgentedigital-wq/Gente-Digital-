@@ -23,16 +23,16 @@ export function DashboardView() {
         let leadsData: Lead[] = [];
         let colabsData: Colaborador[] = [];
 
-        if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+
+        if (isSupabaseConfigured) {
           const { data: lData } = await supabase.from('leads').select('*');
           if (lData) leadsData = lData;
 
           const { data: cData } = await supabase.from('colaboradores').select('*');
           if (cData) colabsData = cData;
-        }
-
-        // Mocks for local display if DB is empty
-        if (leadsData.length === 0) {
+        } else {
+          // Mocks for local display if DB is not configured
           leadsData = [
             { id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'Leandro Costa Silva', status: 'Em negociação', value: 0, created_at: '2026-07-10T12:00:00Z' },
             { id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(55) 91991-7195', ref: 'Claudiane de Sousa Ribeiro Melo', status: 'Ganho', value: 99.90, created_at: '2026-07-12T12:00:00Z' },
@@ -40,9 +40,7 @@ export function DashboardView() {
             { id: 4, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'Carlos Oliveira', status: 'Contato inicial', value: 850, created_at: '2026-06-14T12:00:00Z' },
             { id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500, created_at: '2026-05-17T12:00:00Z' }
           ];
-        }
 
-        if (colabsData.length === 0) {
           colabsData = [
             { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
             { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
