@@ -8,7 +8,6 @@ import { DashboardView } from '@/components/views/dashboard';
 import { LeadsView } from '@/components/views/leads';
 import { ColaboradoresView } from '@/components/views/colaboradores';
 import { IntegracoesView } from '@/components/views/integracoes';
-import { ConfiguracoesView } from '@/components/views/configuracoes';
 
 
 export default function Page() {
@@ -72,7 +71,6 @@ function PageContent() {
       case 'leads': return <LeadsView />;
       case 'colaboradores': return <ColaboradoresView />;
       case 'integracoes': return <IntegracoesView />;
-      case 'configuracoes': return <ConfiguracoesView />;
       default: return <ColaboradoresView />;
     }
   };
@@ -82,8 +80,7 @@ function PageContent() {
       dashboard: 'Dashboard',
       leads: 'Leads',
       colaboradores: 'Colaboradores',
-      integracoes: 'Integrações (IXC & MS)',
-      configuracoes: 'Configurações'
+      integracoes: 'Integrações (IXC & MS)'
     };
     return names[activeTab] || 'Painel';
   };

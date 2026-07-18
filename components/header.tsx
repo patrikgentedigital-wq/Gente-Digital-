@@ -36,12 +36,7 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
           />
         </div>
 
-        <div className="flex items-center gap-3 md:border-l md:border-brand-border dark:md:border-gray-700 md:pl-6">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-brand-charcoal dark:text-white leading-none">Admin Sistema</p>
-            <p className="text-[10px] text-brand-muted dark:text-gray-400 uppercase tracking-wider mt-1">Super Admin</p>
-          </div>
-        </div>
+
       </div>
     </header>
   );
