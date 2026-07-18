@@ -9,6 +9,14 @@ const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat
 export const metadata: Metadata = {
   title: 'Gente Digital - Gestão de Links',
   description: 'Gestão de Links de Indicação para colaboradores.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Gente Digital',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
