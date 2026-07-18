@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       nome: name,
       fone_celular: phone,
-      filial_id: '1',
+      id_filial: '1',
       data_cadastro: localISOTime,
       lead: 'S',
       tipo_pessoa: 'F',
