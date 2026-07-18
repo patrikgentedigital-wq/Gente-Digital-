@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Network, Database, CheckCircle2, Loader2 } from 'lucide-react';
+import { Network, Database, CheckCircle2, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export function IntegracoesView() {
   const [ixcSaved, setIxcSaved] = useState(false);
@@ -10,6 +11,30 @@ export function IntegracoesView() {
   const [ixcToken, setIxcToken] = useState('');
   const [ixcLoading, setIxcLoading] = useState(false);
   const [ixcError, setIxcError] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearSuccess, setClearSuccess] = useState(false);
+
+  const handleClearLeads = async () => {
+    if (!window.confirm('🚨 ATENÇÃO: Você tem certeza absoluta? Isso irá APAGAR todos os LEADS do banco de dados (Os colaboradores serão mantidos intactos). Essa ação é irreversível.')) return;
+    
+    setIsClearing(true);
+    setClearSuccess(false);
+    try {
+      // Deleta todos os leads onde id não seja 0 (basicamente todos)
+      const { error } = await supabase.from('leads').delete().neq('id', 0);
+      if (error) {
+        alert('Erro ao apagar os leads: ' + error.message);
+      } else {
+        setClearSuccess(true);
+        setTimeout(() => setClearSuccess(false), 4000);
+        alert('✅ Sucesso! Todos os leads de teste foram apagados. O sistema está pronto para produção.');
+      }
+    } catch (err) {
+      alert('Erro inesperado de conexão com o banco de dados.');
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   useEffect(() => {
     async function loadConfig() {
@@ -207,6 +232,56 @@ export function IntegracoesView() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Seção de Administração do Sistema (Zerar Leads) */}
+      <div className="bg-red-50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/50 shadow-level-1 p-8 transition-colors mt-8">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="p-4 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-2xl">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-bold text-xl text-red-800 dark:text-red-400">Administração do Sistema</h3>
+            <p className="text-sm text-red-600 dark:text-red-400/80 mt-1">Ações destrutivas para manutenção do banco de dados.</p>
+          </div>
+        </div>
+        
+        <div className="bg-white/60 dark:bg-[#18181b]/60 p-6 rounded-xl border border-red-200/50 dark:border-red-900/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex-1">
+            <h4 className="font-bold text-brand-charcoal dark:text-white text-base mb-1">Zerar Base de Leads (Modo Produção)</h4>
+            <p className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed max-w-2xl">
+              Utilize esta opção para apagar permanentemente todos os leads cadastrados (dados de teste) e iniciar o sistema "valendo". 
+              <strong> Os colaboradores cadastrados NÃO serão afetados.</strong>
+            </p>
+          </div>
+          
+          <button
+            onClick={handleClearLeads}
+            disabled={isClearing}
+            className={`shrink-0 px-6 py-3 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shadow-sm ${
+              clearSuccess
+                ? 'bg-green-100 text-green-700 border border-green-200'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            } disabled:opacity-50`}
+          >
+            {isClearing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Limpando...
+              </>
+            ) : clearSuccess ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                Banco Limpo
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" />
+                Zerar Todos os Leads
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

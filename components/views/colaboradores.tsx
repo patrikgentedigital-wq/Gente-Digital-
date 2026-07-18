@@ -21,6 +21,12 @@ const initialColaboradores: Colaborador[] = [
   { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 }
 ];
 
+let mockColabCounter = Math.floor(Math.random() * 100) + 44;
+const getNextColabId = () => {
+  mockColabCounter += 1;
+  return `EMP-0${mockColabCounter}`;
+};
+
 export function ColaboradoresView() {
   const router = useRouter();
   const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
@@ -122,13 +128,16 @@ export function ColaboradoresView() {
   };
 
   useEffect(() => {
-    fetchColaboradores();
-    loadBaseLink();
+    const timer = setTimeout(() => {
+      fetchColaboradores();
+      loadBaseLink();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleAdd = async (data: ColaboradorFormData) => {
     const initials = data.name.substring(0,2).toUpperCase();
-    const id = `EMP-0${Math.floor(Math.random() * 100) + 44}`;
+    const id = getNextColabId();
     
     const newColab = { id, name: data.name, email: data.email, initials, count: 0, photo_url: data.photo_url || undefined };
 

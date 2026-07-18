@@ -1,6 +1,6 @@
 'use client';
 
-import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal } from 'lucide-react';
+import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
@@ -86,17 +86,60 @@ export function DashboardView() {
   const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
   const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + totalLeads * 4;
 
+  const handleExportReport = () => {
+    const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
+    
+    const allData = colaboradores.map(colab => {
+      const normColabName = normalizeStr(colab.name);
+      const normColabId = normalizeStr(colab.id);
+      const referredLeads = leads.filter(l => {
+        const normRef = normalizeStr(l.ref);
+        return normRef === normColabId || normRef === normColabName;
+      });
+      const convs = referredLeads.filter(l => l.status === 'Ganho').length;
+      const points = referredLeads.length * 20 + convs * 50;
+      
+      return [
+        `"${colab.name}"`,
+        `"${colab.id}"`,
+        referredLeads.length,
+        convs,
+        points
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...allData.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_gerencial_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getDynamicChartData = () => {
-    const baseData = [
-      { name: 'Mai', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 },
-      { name: 'Jun', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 },
-      { name: 'Jul', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 }
-    ];
+    const baseData: any[] = [];
+    const d = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      baseData.push({
+        name: months[monthDate.getMonth()],
+        month: monthDate.getMonth(),
+        year: monthDate.getFullYear(),
+        pendente: 0,
+        contatoInicial: 0,
+        emNegociacao: 0,
+        ganho: 0,
+        errado: 0
+      });
+    }
 
     leads.forEach(lead => {
       const date = lead.created_at ? new Date(lead.created_at) : new Date();
-      const monthName = months[date.getMonth()];
-      const chartMonth = baseData.find(d => d.name === monthName);
+      const chartMonth = baseData.find(d => d.month === date.getMonth() && d.year === date.getFullYear());
       if (chartMonth) {
         const status = lead.status;
         if (status === 'Pendente') chartMonth.pendente++;
@@ -295,16 +338,26 @@ export function DashboardView() {
           <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
         </div>
         
-        <select 
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none"
-        >
-          <option value="all">Todo o Período</option>
-          <option value="this_month">Este Mês</option>
-          <option value="last_month">Mês Passado</option>
-          <option value="this_year">Este Ano</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportReport}
+            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </button>
+          
+          <select 
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+          >
+            <option value="all">Todo o Período</option>
+            <option value="this_month">Este Mês</option>
+            <option value="last_month">Mês Passado</option>
+            <option value="this_year">Este Ano</option>
+          </select>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -711,7 +711,7 @@ export function LeadsView() {
                           draggable
                           onDragStart={(e: any) => handleDragStart(e, lead.id)}
                           onClick={() => selectLead(lead)}
-                          className="bg-white border border-brand-border p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-500 hover:shadow-md transition-all group relative flex flex-col gap-3"
+                          className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-700 p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all group relative flex flex-col gap-3"
                         >
                           <GripVertical className="absolute right-3 top-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           
@@ -774,8 +774,8 @@ export function LeadsView() {
                         </motion.div>
                       ))
                     ) : (
-                      <div className="h-32 border-2 border-dashed border-gray-200 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white">
-                        <Inbox className="w-6 h-6 mb-2 text-gray-300" />
+                      <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white dark:bg-[#18181b]/50">
+                        <Inbox className="w-6 h-6 mb-2 text-gray-300 dark:text-gray-600" />
                         <span className="text-[11px] font-bold">Não há leads nessa etapa</span>
                       </div>
                     )}
