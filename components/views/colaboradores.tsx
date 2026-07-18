@@ -188,7 +188,7 @@ export function ColaboradoresView() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Filtrar colaborador..."
-              className="w-full pl-9 pr-4 py-2 bg-white border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
             />
           </div>
         </div>
@@ -302,7 +302,7 @@ export function ColaboradoresView() {
                   {...register('name')} 
                   type="text" 
                   placeholder="Ex: Maria Joaquina" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.name 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
                       : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
@@ -316,7 +316,7 @@ export function ColaboradoresView() {
                   {...register('email')} 
                   type="email" 
                   placeholder="maria@empresa.com" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.email 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
                       : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'

@@ -416,7 +416,7 @@ export function LeadsView() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Busque pelo nome do lead" 
-              className="pl-4 pr-10 py-2 border border-brand-border bg-white rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-60" 
+              className="pl-4 pr-10 py-2 border border-brand-border bg-white rounded-xl text-sm text-brand-charcoal focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-60" 
             />
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
@@ -523,7 +523,7 @@ export function LeadsView() {
             <h3 className="font-bold text-xl text-brand-charcoal">Todos os Leads</h3>
             <div className="relative w-full sm:w-72 text-brand-muted focus-within:text-brand-charcoal transition-colors">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
-              <input type="text" placeholder="Buscar por nome ou telefone..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+              <input type="text" placeholder="Buscar por nome ou telefone..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-brand-border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
             </div>
           </div>
           <div className="overflow-auto flex-1">
@@ -738,7 +738,7 @@ export function LeadsView() {
                   {...register('name')} 
                   type="text" 
                   placeholder="Ex: Cliente Silva" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.name 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
                       : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
@@ -752,7 +752,7 @@ export function LeadsView() {
                   {...register('phone')} 
                   type="tel" 
                   placeholder="(00) 00000-0000" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.phone 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
                       : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
@@ -766,7 +766,7 @@ export function LeadsView() {
                   {...register('value')} 
                   type="number" 
                   placeholder="Ex: 1500" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.value 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
                       : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'

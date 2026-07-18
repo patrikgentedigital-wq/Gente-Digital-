@@ -72,7 +72,7 @@ export function IntegracoesView() {
               value={ixcDomain}
               onChange={e => setIxcDomain(e.target.value)}
               placeholder="ex: ixc.suaempresa.com.br" 
-              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
             />
           </div>
           <div>
@@ -82,7 +82,7 @@ export function IntegracoesView() {
               value={ixcToken}
               onChange={e => setIxcToken(e.target.value)}
               placeholder="••••••••••••••••" 
-              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
             />
           </div>
           
