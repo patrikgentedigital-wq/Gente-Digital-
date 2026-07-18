@@ -38,6 +38,49 @@ export function ColaboradoresView() {
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [tempBaseLink, setTempBaseLink] = useState('');
 
+  const getFullReferralLink = (base: string, refId: string) => {
+    let cleanBase = base.trim();
+    if (!/^https?:\/\//i.test(cleanBase)) {
+      cleanBase = 'https://' + cleanBase;
+    }
+    const separator = cleanBase.includes('?') ? '&' : '?';
+    return `${cleanBase}${separator}ref=${refId}`;
+  };
+
+  const loadBaseLink = async () => {
+    try {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'base_link')
+          .single();
+        if (data && data.value) {
+          setBaseLink(data.value);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading base link from Supabase settings:", err);
+    }
+  };
+
+  const handleSaveBaseLink = async () => {
+    const trimmed = tempBaseLink.trim();
+    if (!trimmed) return;
+    setBaseLink(trimmed);
+    setIsEditingBase(false);
+
+    try {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        await supabase
+          .from('settings')
+          .upsert({ key: 'base_link', value: trimmed });
+      }
+    } catch (err) {
+      console.error("Error saving base link:", err);
+    }
+  };
+
   const fetchColaboradores = async () => {
     try {
       setIsLoading(true);
@@ -60,8 +103,8 @@ export function ColaboradoresView() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchColaboradores();
+    loadBaseLink();
   }, []);
 
   const handleAdd = async (data: ColaboradorFormData) => {
@@ -134,10 +177,7 @@ export function ColaboradoresView() {
                   autoFocus
                 />
                 <button
-                  onClick={() => {
-                    if (tempBaseLink.trim()) setBaseLink(tempBaseLink);
-                    setIsEditingBase(false);
-                  }}
+                  onClick={handleSaveBaseLink}
                   className="w-full sm:w-auto px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center"
                 >
                   Salvar
@@ -223,11 +263,11 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-brand-link dark:text-blue-400 hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={`${baseLink}?ref=${colab.id}`}>
-                        {baseLink}?ref={colab.id}
+                      <span className="text-sm text-brand-link dark:text-blue-400 hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={getFullReferralLink(baseLink, colab.id)}>
+                        {getFullReferralLink(baseLink, colab.id)}
                       </span>
                       <button 
-                        onClick={() => navigator.clipboard.writeText(`${baseLink}?ref=${colab.id}`)}
+                        onClick={() => navigator.clipboard.writeText(getFullReferralLink(baseLink, colab.id))}
                         className="text-brand-muted hover:text-brand-charcoal dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Copiar link"
                       >
@@ -353,7 +393,7 @@ export function ColaboradoresView() {
               {/* QR Code Container */}
               <div className="bg-gray-50 border border-brand-border rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner">
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?ref=${selectedColabForQr.id}`)}`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getFullReferralLink(baseLink, selectedColabForQr.id))}`} 
                   alt="QR Code de Indicação" 
                   className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" 
                 />
@@ -369,12 +409,12 @@ export function ColaboradoresView() {
                   <input
                     type="text"
                     readOnly
-                    value={`${window.location.origin}/?ref=${selectedColabForQr.id}`}
+                    value={getFullReferralLink(baseLink, selectedColabForQr.id)}
                     className="flex-1 bg-gray-50 border border-brand-border rounded-xl px-4 py-3 font-mono text-xs text-brand-charcoal focus:outline-none"
                   />
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/?ref=${selectedColabForQr.id}`);
+                      navigator.clipboard.writeText(getFullReferralLink(baseLink, selectedColabForQr.id));
                       setCopiedLink(true);
                       setTimeout(() => setCopiedLink(false), 2000);
                     }}
