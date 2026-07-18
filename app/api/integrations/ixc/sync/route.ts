@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            qtype: 'cliente.razao',
+            qtype: 'razao',
             query: lead.name,
             oper: 'L',
             page: '1',

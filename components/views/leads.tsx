@@ -797,8 +797,9 @@ export function LeadsView() {
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Valor (R$)</label>
                 <input 
                   {...register('value')} 
-                  type="number" 
-                  placeholder="Ex: 1500" 
+                  type="number"
+                  step="0.01" 
+                  placeholder="Ex: 1500.00" 
                   className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
                     errors.value 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
