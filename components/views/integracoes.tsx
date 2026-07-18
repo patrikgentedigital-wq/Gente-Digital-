@@ -69,9 +69,10 @@ export function IntegracoesView() {
     }
   };
 
-
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setTimeout(() => {
+      setOrigin(window.location.origin);
+    }, 0);
   }, []);
 
   const webhookUrl = origin ? `${origin}/api/webhooks/ms-forms` : 'http://localhost:3000/api/webhooks/ms-forms';
@@ -182,22 +183,22 @@ export function IntegracoesView() {
                 <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
                   <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Nome do Lead</span>
                   <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">nome</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">name</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">cliente</code>.</span>
-                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual seu nome completo?"</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: &quot;Qual seu nome completo?&quot;</span>
                 </div>
                 <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
                   <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">WhatsApp / Telefone</span>
                   <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">telefone</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">celular</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">whatsapp</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">contato</code>.</span>
-                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual o seu WhatsApp com DDD?"</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: &quot;Qual o seu WhatsApp com DDD?&quot;</span>
                 </div>
                 <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
                   <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Indicador / Colaborador</span>
                   <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">colaborador</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">indicador</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">codigo</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">quem</code>.</span>
-                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Quem indicou você?"</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: &quot;Quem indicou você?&quot;</span>
                 </div>
                 <div className="bg-white dark:bg-[#27272a]/50 p-3.5 rounded-xl border border-brand-border dark:border-gray-700">
                   <span className="font-semibold text-brand-charcoal dark:text-white block mb-1">Valor do Contrato</span>
                   <span className="text-brand-muted dark:text-gray-400">Pergunta contendo: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">valor</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">preco</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">plano</code> ou <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-red-500 font-semibold font-mono">mensalidade</code>.</span>
-                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: "Qual o valor do plano de interesse?"</span>
+                  <span className="text-[10px] text-brand-muted/70 dark:text-gray-500 block mt-1">Ex: &quot;Qual o valor do plano de interesse?&quot;</span>
                 </div>
               </div>
               <div className="mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20 text-xs text-blue-700 dark:text-blue-400 leading-relaxed flex flex-col gap-1">

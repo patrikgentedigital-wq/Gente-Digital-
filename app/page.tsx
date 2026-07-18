@@ -39,7 +39,10 @@ function PageContent() {
   // Sync state when URL changes
   useEffect(() => {
     if (tabParam && tabParam !== activeTab) {
-      setActiveTab(tabParam);
+      const timer = setTimeout(() => {
+        setActiveTab(tabParam);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [tabParam, activeTab]);
 

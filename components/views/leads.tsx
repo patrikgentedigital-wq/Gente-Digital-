@@ -71,6 +71,26 @@ export function LeadsView() {
   
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
+
+  const selectLead = (lead: UILead | null) => {
+    setSelectedLead(lead);
+    setAiResult(null);
+    setCopiedMessage(false);
+  };
+
+  // Helper to read cookie
+  const getReferralCookie = () => {
+    if (typeof document === 'undefined') return null;
+    const nameEQ = "gente_digital_ref=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
   const [leads, setLeads] = useState<UILead[]>(isSupabaseConfigured ? [] : initialLeads);
@@ -154,11 +174,7 @@ export function LeadsView() {
   } | null>(null);
   const [copiedMessage, setCopiedMessage] = useState(false);
 
-  // Clear AI results when lead changes
-  useEffect(() => {
-    setAiResult(null);
-    setCopiedMessage(false);
-  }, [selectedLead]);
+  // AI results are now cleared inside the custom selectLead handler to avoid synchronous useEffect state updates.
 
   const handleAIQualify = async () => {
     if (!selectedLead) return;
@@ -261,24 +277,16 @@ export function LeadsView() {
   };
 
   useEffect(() => {
-    fetchLeads();
-    fetchColaboradores();
+    const timer = setTimeout(() => {
+      fetchLeads();
+      fetchColaboradores();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
 
-  // Helper to read cookie
-  const getReferralCookie = () => {
-    if (typeof document === 'undefined') return null;
-    const nameEQ = "gente_digital_ref=";
-    const ca = document.cookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i];
-      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-    }
-    return null;
-  };
+  // getReferralCookie was moved to the top of the component to prevent being called before declaration.
 
   const handleAdd = async (data: LeadFormData) => {
     const referral = data.ref || getReferralCookie() || 'Manual';
@@ -297,18 +305,17 @@ export function LeadsView() {
          if (inserted && inserted[0]) {
            const historyData = { lead_id: inserted[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
            await supabase.from('lead_history').insert([historyData]);
-           setLeads([{ ...inserted[0], history: [{...historyData, id: Math.random()}] }, ...leads]);
+           setLeads([{ ...inserted[0], history: [{...historyData, id: inserted[0].id + 9999}] }, ...leads]);
          }
        } else {
          const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
          setLeads([{
             ...newLeadData,
             id: newId,
-            history: [{ id: Math.random(), lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
+            history: [{ id: newId + 5000, lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
          }, ...leads]);
        }
 
-       // Send to IXC as Prospect (Fire and forget)
        fetch('/api/integrations/ixc/prospect', {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
@@ -322,7 +329,6 @@ export function LeadsView() {
     reset();
   }
 
-  // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent, id: number) => {
     e.dataTransfer.setData('leadId', id.toString());
   };
@@ -342,7 +348,7 @@ export function LeadsView() {
       setLeads(leads.map(l => l.id === id ? { 
         ...l, 
         status, 
-        history: [{ id: Math.random(), lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
+        history: [{ id: id + 9000, lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
       } : l));
     } catch(err) {
       console.error("Error updating lead status", err);
@@ -430,7 +436,6 @@ export function LeadsView() {
 
   return (
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 h-[calc(100vh-140px)] flex flex-col relative pb-8 overflow-hidden">
-      {/* Breadcrumb Header */}
       <div className="shrink-0">
         <div className="text-xs text-brand-muted dark:text-gray-400 font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
           <span>Marketing de indicações</span>
@@ -439,7 +444,6 @@ export function LeadsView() {
         </div>
       </div>
 
-      {/* Tabs and Controls Row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border pb-2 shrink-0">
         <div className="flex gap-4">
           <button 
@@ -512,7 +516,6 @@ export function LeadsView() {
                   )}
                 </div>
 
-                {/* Filter: Date */}
                 <div className="space-y-1.5 text-left">
                   <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
                     Período
@@ -529,7 +532,6 @@ export function LeadsView() {
                   </select>
                 </div>
 
-                {/* Filter 1: Collaborator */}
                 <div className="space-y-1.5 text-left">
                   <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
                     Origem / Indicador
@@ -546,7 +548,6 @@ export function LeadsView() {
                   </select>
                 </div>
 
-                {/* Filter 2: Min Value / Max Value */}
                 <div className="space-y-1.5 text-left">
                   <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
                     Valor da Venda (R$)
@@ -589,7 +590,6 @@ export function LeadsView() {
         </div>
       </div>
 
-      {/* Main Content Area */}
       {viewMode === 'list' ? (
         <div className="bg-white rounded-2xl border border-brand-border shadow-level-1 overflow-hidden shrink-0 flex-1 flex flex-col">
           <div className="px-6 py-5 border-b border-brand-border flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
@@ -643,7 +643,7 @@ export function LeadsView() {
                     </td>
                   </tr>
                 ) : filteredLeads.map(lead => (
-                  <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-50 transition-colors cursor-pointer group font-sans">
+                  <tr key={lead.id} onClick={() => selectLead(lead)} className="hover:bg-gray-50 transition-colors cursor-pointer group font-sans">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar size={32} name={lead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
@@ -686,7 +686,6 @@ export function LeadsView() {
                 onDragOver={handleDragOver}
                 className="flex-shrink-0 w-[300px] flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
               >
-                {/* Column Header */}
                 <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-3.5 h-3.5 rounded-full border-2 ${getStatusCircleColor(status)}`} />
@@ -697,7 +696,6 @@ export function LeadsView() {
                   </div>
                 </div>
 
-                {/* Column Body / Cards */}
                 <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide space-y-3 min-h-[300px]">
                   <AnimatePresence>
                     {columnLeads.length > 0 ? (
@@ -712,12 +710,11 @@ export function LeadsView() {
                           key={lead.id}
                           draggable
                           onDragStart={(e: any) => handleDragStart(e, lead.id)}
-                          onClick={() => setSelectedLead(lead)}
+                          onClick={() => selectLead(lead)}
                           className="bg-white border border-brand-border p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-500 hover:shadow-md transition-all group relative flex flex-col gap-3"
                         >
                           <GripVertical className="absolute right-3 top-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           
-                          {/* Badge */}
                           <span className="bg-amber-50 text-amber-800 border border-amber-100 text-[10px] font-bold px-2.5 py-0.5 rounded w-fit uppercase tracking-wider">
                             Marketing de indicações
                           </span>
@@ -888,7 +885,7 @@ export function LeadsView() {
         <>
           <div 
             className="fixed inset-0 bg-brand-charcoal/20 backdrop-blur-[2px] z-[50] transition-opacity" 
-            onClick={() => setSelectedLead(null)}
+            onClick={() => selectLead(null)}
           />
           <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-white shadow-2xl z-[55] flex flex-col animate-in slide-in-from-right duration-300 border-l border-brand-border">
             {/* Sidebar Header */}
@@ -903,7 +900,7 @@ export function LeadsView() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-brand-muted shrink-0 bg-white border border-brand-border shadow-sm">
+              <button onClick={() => selectLead(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-brand-muted shrink-0 bg-white border border-brand-border shadow-sm">
                 <X className="w-5 h-5" />
               </button>
             </div>
