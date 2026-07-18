@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+const DEFAULT_DOMAIN = 'ixc.gentedigital.com.br';
+const DEFAULT_TOKEN = '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb';
+
 export async function GET() {
   try {
     // If the database configurations are loaded, fetch settings
@@ -12,7 +15,12 @@ export async function GET() {
     if (error) {
       console.warn("Error reading settings table:", error.message);
       // Suppress table missing error to allow the user time to run the SQL command
-      return NextResponse.json({ success: true, domain: '', token: '', tableMissing: true });
+      return NextResponse.json({ 
+        success: true, 
+        domain: DEFAULT_DOMAIN, 
+        token: DEFAULT_TOKEN, 
+        tableMissing: true 
+      });
     }
 
     const config: Record<string, string> = {};
@@ -22,8 +30,8 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      domain: config['ixc_domain'] || '',
-      token: config['ixc_token'] || '',
+      domain: config['ixc_domain'] || DEFAULT_DOMAIN,
+      token: config['ixc_token'] || DEFAULT_TOKEN,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

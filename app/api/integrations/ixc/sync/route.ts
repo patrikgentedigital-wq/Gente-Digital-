@@ -9,17 +9,16 @@ export async function POST(req: NextRequest) {
       .select('*')
       .in('key', ['ixc_domain', 'ixc_token']);
 
-    if (settingsError || !settingsData || settingsData.length < 2) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Credenciais do IXC Soft não encontradas no banco de dados. Configure a integração primeiro.' 
-      }, { status: 400 });
-    }
+    const config: Record<string, string> = {
+      ixc_domain: 'ixc.gentedigital.com.br',
+      ixc_token: '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb'
+    };
 
-    const config: Record<string, string> = {};
-    settingsData.forEach(row => {
-      config[row.key] = row.value;
-    });
+    if (settingsData && settingsData.length > 0) {
+      settingsData.forEach(row => {
+        config[row.key] = row.value;
+      });
+    }
 
     const domain = config['ixc_domain'];
     const token = config['ixc_token'];
