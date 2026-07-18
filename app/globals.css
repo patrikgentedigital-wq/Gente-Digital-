@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-yellow: #FFE600;
+  --color-brand-charcoal: #121212;
+  --color-brand-surface: #f7f9fc;
+  --color-brand-border: #E2E8F0;
+  --color-brand-muted: #64748B;
+  --color-brand-success: #00C853;
+  --color-brand-link: #007AFF;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+}
+
+.shadow-level-1 {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-level-2 {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
