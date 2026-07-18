@@ -1,7 +1,19 @@
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users } from 'lucide-react';
+import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase, Colaborador } from '@/lib/supabase';
 import Avatar from 'boring-avatars';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const colaboradorSchema = z.object({
+  name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
+  email: z.string().email('Insira um endereço de e-mail válido'),
+});
+
+type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
+
 
 const initialColaboradores: Colaborador[] = [
   { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
@@ -9,11 +21,18 @@ const initialColaboradores: Colaborador[] = [
 ];
 
 export function ColaboradoresView() {
+  const router = useRouter();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedColabForQr, setSelectedColabForQr] = useState<Colaborador | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ColaboradorFormData>({
+    resolver: zodResolver(colaboradorSchema)
+  });
+
   const [baseLink, setBaseLink] = useState('gentedigital.com.br/indicar');
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [tempBaseLink, setTempBaseLink] = useState('');
@@ -45,13 +64,11 @@ export function ColaboradoresView() {
     fetchColaboradores();
   }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!newName) return;
-    const initials = newName.substring(0,2).toUpperCase();
+  const handleAdd = async (data: ColaboradorFormData) => {
+    const initials = data.name.substring(0,2).toUpperCase();
     const id = `EMP-0${Math.floor(Math.random() * 100) + 44}`;
     
-    const newColab = { id, name: newName, email: newEmail, initials, count: 0 };
+    const newColab = { id, name: data.name, email: data.email, initials, count: 0 };
 
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
@@ -64,8 +81,7 @@ export function ColaboradoresView() {
     }
     
     setIsModalOpen(false);
-    setNewName('');
-    setNewEmail('');
+    reset();
   }
 
   const handleDelete = async (id: string) => {
@@ -78,7 +94,13 @@ export function ColaboradoresView() {
     } catch (error) {
       console.error("Error deleting colaborador:", error);
     }
-  }
+  };
+
+  const filteredColabs = colaboradores.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -163,6 +185,8 @@ export function ColaboradoresView() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
             <input
               type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
               placeholder="Filtrar colaborador..."
               className="w-full pl-9 pr-4 py-2 bg-white border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
             />
@@ -181,7 +205,7 @@ export function ColaboradoresView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
-              {colaboradores.map((colab) => (
+              {filteredColabs.map((colab) => (
                 <tr key={colab.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -216,8 +240,22 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
-                      <button className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 transition-colors" title="Ver Analytics">
+                      <button 
+                        onClick={() => router.push('/?tab=dashboard')}
+                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 transition-colors" 
+                        title="Ver Analytics"
+                      >
                         <BarChart2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedColabForQr(colab);
+                          setCopiedLink(false);
+                        }}
+                        className="p-2 text-brand-muted hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" 
+                        title="Gerar QR Code / Link"
+                      >
+                        <QrCode className="w-4 h-4" />
                       </button>
                       <button onClick={() => handleDelete(colab.id)} className="p-2 text-brand-muted hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Excluir">
                         <Trash2 className="w-4 h-4" />
@@ -226,7 +264,7 @@ export function ColaboradoresView() {
                   </td>
                 </tr>
               ))}
-              {colaboradores.length === 0 && (
+              {filteredColabs.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-6 py-16">
                     <div className="flex flex-col items-center justify-center text-center">
@@ -256,19 +294,108 @@ export function ColaboradoresView() {
               <h3 className="font-display font-bold text-2xl text-brand-charcoal">Novo Colaborador</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted" /></button>
             </div>
-            <form onSubmit={handleAdd} className="space-y-4">
+            <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1">Nome Completo</label>
-                <input autoFocus required value={newName} onChange={e => setNewName(e.target.value)} type="text" placeholder="Ex: Maria Joaquina" className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+                <input 
+                  autoFocus 
+                  {...register('name')} 
+                  type="text" 
+                  placeholder="Ex: Maria Joaquina" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                    errors.name 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1">E-mail Profissional</label>
-                <input required value={newEmail} onChange={e => setNewEmail(e.target.value)} type="email" placeholder="maria@empresa.com" className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+                <input 
+                  {...register('email')} 
+                  type="email" 
+                  placeholder="maria@empresa.com" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                    errors.email 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>}
               </div>
               <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 transition-all">
                 Adicionar Colaborador
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal QR Code e Link de Indicação */}
+      {selectedColabForQr && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="font-display font-bold text-2xl text-brand-charcoal">Link de Indicação</h3>
+                <p className="text-xs text-brand-muted mt-1">{selectedColabForQr.name}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedColabForQr(null)} 
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-brand-muted" />
+              </button>
+            </div>
+            
+            <div className="space-y-6 text-center">
+              {/* QR Code Container */}
+              <div className="bg-gray-50 border border-brand-border rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/?ref=${selectedColabForQr.id}`)}`} 
+                  alt="QR Code de Indicação" 
+                  className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" 
+                />
+                <p className="text-[11px] text-brand-muted font-bold mt-4 uppercase tracking-wider">
+                  Escaneie para indicar
+                </p>
+              </div>
+
+              {/* URL Input Row */}
+              <div className="space-y-2 text-left">
+                <label className="block text-sm font-semibold text-brand-charcoal">URL Única</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/?ref=${selectedColabForQr.id}`}
+                    className="flex-1 bg-gray-50 border border-brand-border rounded-xl px-4 py-3 font-mono text-xs text-brand-charcoal focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/?ref=${selectedColabForQr.id}`);
+                      setCopiedLink(true);
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    }}
+                    className={`px-4 py-3 ${copiedLink ? 'bg-green-600 text-white' : 'bg-brand-charcoal text-white hover:bg-gray-800'} font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all`}
+                  >
+                    {copiedLink ? 'Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 text-left text-xs text-blue-700 leading-relaxed font-sans">
+                💡 <strong>Dica do Sucesso:</strong> Compartilhe este link ou QR Code com seus colaboradores. Quando os novos clientes acessarem, o Gente Digital rastreará a indicação automaticamente!
+              </div>
+
+              <button 
+                onClick={() => setSelectedColabForQr(null)}
+                className="w-full py-3.5 border-2 border-brand-charcoal text-brand-charcoal font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
+              >
+                Concluído
+              </button>
+            </div>
           </div>
         </div>
       )}

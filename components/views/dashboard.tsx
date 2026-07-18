@@ -3,35 +3,149 @@
 import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Avatar from 'boring-avatars';
+import { useRouter } from 'next/navigation';
 
-const chartData = [
-  { name: 'Jan', novas: 40, emContato: 24, emNegociacao: 15, vencemos: 10, perdemos: 5 },
-  { name: 'Fev', novas: 50, emContato: 30, emNegociacao: 20, vencemos: 12, perdemos: 8 },
-  { name: 'Mar', novas: 65, emContato: 45, emNegociacao: 30, vencemos: 18, perdemos: 10 },
-  { name: 'Abr', novas: 80, emContato: 55, emNegociacao: 35, vencemos: 25, perdemos: 12 },
-  { name: 'Mai', novas: 95, emContato: 70, emNegociacao: 45, vencemos: 32, perdemos: 15 },
-  { name: 'Jun', novas: 110, emContato: 85, emNegociacao: 55, vencemos: 40, perdemos: 20 },
-];
+import { useState, useEffect } from 'react';
+import { supabase, Lead, Colaborador } from '@/lib/supabase';
+
+const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export function DashboardView() {
-  const topColaboradores = [
-    { initials: 'AC', name: 'Ana Costa', points: 120, conversions: 12, rank: 1, color: 'text-amber-500', bg: 'bg-amber-100' },
-    { initials: 'CO', name: 'Carlos Oliveira', points: 85, conversions: 8, rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
-    { initials: 'BS', name: 'Beatriz Souza', points: 60, conversions: 5, rank: 3, color: 'text-amber-700', bg: 'bg-amber-50' },
-  ];
+  const router = useRouter();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        let leadsData: Lead[] = [];
+        let colabsData: Colaborador[] = [];
+
+        if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+          const { data: lData } = await supabase.from('leads').select('*');
+          if (lData) leadsData = lData;
+
+          const { data: cData } = await supabase.from('colaboradores').select('*');
+          if (cData) colabsData = cData;
+        }
+
+        // Mocks for local display if DB is empty
+        if (leadsData.length === 0) {
+          leadsData = [
+            { id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'Leandro Costa Silva', status: 'Em negociação', value: 0, created_at: '2026-07-10T12:00:00Z' },
+            { id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(55) 91991-7195', ref: 'Claudiane de Sousa Ribeiro Melo', status: 'Ganho', value: 99.90, created_at: '2026-07-12T12:00:00Z' },
+            { id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'Ana Costa Silva', status: 'Ganho', value: 1200, created_at: '2026-06-15T12:00:00Z' },
+            { id: 4, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'Carlos Oliveira', status: 'Contato inicial', value: 850, created_at: '2026-06-14T12:00:00Z' },
+            { id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500, created_at: '2026-05-17T12:00:00Z' }
+          ];
+        }
+
+        if (colabsData.length === 0) {
+          colabsData = [
+            { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
+            { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
+            { id: 'EMP-044', name: 'Beatriz Souza', email: 'beatriz.s@empresa.com', initials: 'BS', count: 5 }
+          ];
+        }
+
+        setLeads(leadsData);
+        setColaboradores(colabsData);
+      } catch (err) {
+        console.error("Dashboard error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const totalLeads = leads.length;
+  const conversões = leads.filter(l => l.status === 'Ganho').length;
+  const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
+  const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + totalLeads * 4;
+
+  const getDynamicChartData = () => {
+    const baseData = [
+      { name: 'Mai', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 },
+      { name: 'Jun', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 },
+      { name: 'Jul', pendente: 0, contatoInicial: 0, emNegociacao: 0, ganho: 0, errado: 0 }
+    ];
+
+    leads.forEach(lead => {
+      const date = lead.created_at ? new Date(lead.created_at) : new Date();
+      const monthName = months[date.getMonth()];
+      const chartMonth = baseData.find(d => d.name === monthName);
+      if (chartMonth) {
+        const status = lead.status;
+        if (status === 'Pendente') chartMonth.pendente++;
+        else if (status === 'Contato inicial') chartMonth.contatoInicial++;
+        else if (status === 'Em negociação') chartMonth.emNegociacao++;
+        else if (status === 'Ganho') chartMonth.ganho++;
+        else if (status === 'Errado') chartMonth.errado++;
+      }
+    });
+
+    return baseData;
+  };
+
+  const chartData = getDynamicChartData();
+
+  const getTopColaboradores = () => {
+    return colaboradores
+      .map(colab => {
+        const referredLeads = leads.filter(l => 
+          l.ref === colab.id || 
+          (l.ref && l.ref.toLowerCase().includes(colab.name.toLowerCase())) ||
+          (l.ref && colab.name.toLowerCase().includes(l.ref.toLowerCase()))
+        );
+        const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
+        const points = (colab.count || 0) * 10 + referredLeads.length * 20 + colabConversions * 50;
+
+        return {
+          ...colab,
+          points: points || 10,
+          conversions: colabConversions || colab.count || 0
+        };
+      })
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3)
+      .map((colab, index) => {
+        const ranks = [
+          { rank: 1, color: 'text-amber-500', bg: 'bg-amber-100' },
+          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
+          { rank: 3, color: 'text-amber-700', bg: 'bg-amber-50' }
+        ];
+        return {
+          ...colab,
+          ...ranks[index]
+        };
+      });
+  };
+
+  const topColaboradores = getTopColaboradores();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-yellow"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300 pb-12">
       <div>
         <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Dashboard</h2>
-        <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads.</p>
+        <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={UsersIcon} title="Total de Leads" value="1,248" trend="+12% este mês" trendUp={true} />
-        <StatCard icon={Target} title="Conversões" value="384" trend="+5% este mês" trendUp={true} />
-        <StatCard icon={MousePointerClick} title="Cliques em Links" value="8,492" trend="+22% este mês" trendUp={true} />
-        <StatCard icon={TrendingUp} title="Taxa de Conversão" value="30.7%" trend="-1.2% este mês" trendUp={false} />
+        <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend="+12% este mês" trendUp={true} />
+        <StatCard icon={Target} title="Conversões" value={conversões.toString()} trend="+5% este mês" trendUp={true} />
+        <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend="+22% este mês" trendUp={true} />
+        <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend="-1.2% este mês" trendUp={true} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -52,11 +166,11 @@ export function DashboardView() {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontWeight: 500 }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px', fontWeight: 500 }} />
-                <Bar dataKey="novas" name="Novas Indicações" fill="#e5e7eb" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="emContato" name="Em Contato" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="emNegociacao" name="Em Negociação" fill="#fcd34d" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="vencemos" name="Vencemos" fill="#4ade80" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="perdemos" name="Perdemos" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="pendente" name="Pendente" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="contatoInicial" name="Contato Inicial" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="emNegociacao" name="Em Negociação" fill="#67e8f9" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="ganho" name="Ganho" fill="#4ade80" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="errado" name="Errado" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -76,7 +190,7 @@ export function DashboardView() {
           
           <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
             {topColaboradores.map((colab) => (
-              <div key={colab.rank} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-[#27272a]/50 hover:bg-gray-50 dark:hover:bg-[#27272a] transition-colors">
+              <div key={colab.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-[#27272a]/50 hover:bg-gray-50 dark:hover:bg-[#27272a] transition-colors">
                 <div className="relative">
                   <Avatar size={40} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
                   <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${colab.bg} ${colab.color} border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold shadow-sm`}>
@@ -95,7 +209,10 @@ export function DashboardView() {
             ))}
           </div>
           
-          <button className="w-full mt-4 py-3 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <button 
+            onClick={() => router.push('/?tab=colaboradores')}
+            className="w-full mt-4 py-3 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
             Ver Ranking Completo
           </button>
         </div>

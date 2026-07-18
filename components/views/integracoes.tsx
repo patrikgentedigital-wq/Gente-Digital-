@@ -1,9 +1,51 @@
-import { useState } from 'react';
-import { Network, Database, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Network, Database, CheckCircle2, Loader2 } from 'lucide-react';
 
 export function IntegracoesView() {
   const [ixcSaved, setIxcSaved] = useState(false);
   const [formsSaved, setFormsSaved] = useState(false);
+  const [origin, setOrigin] = useState('');
+  
+  const [ixcDomain, setIxcDomain] = useState('');
+  const [ixcToken, setIxcToken] = useState('');
+  const [ixcLoading, setIxcLoading] = useState(false);
+  const [ixcError, setIxcError] = useState<string | null>(null);
+
+  const handleTestIxc = async () => {
+    if (!ixcDomain || !ixcToken) {
+      setIxcError('Por favor, preencha o domínio e o token.');
+      return;
+    }
+    setIxcLoading(true);
+    setIxcError(null);
+    setIxcSaved(false);
+
+    try {
+      const response = await fetch('/api/integrations/ixc/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: ixcDomain, token: ixcToken })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setIxcSaved(true);
+      } else {
+        setIxcError(data.error || 'Falha ao conectar com o IXC.');
+      }
+    } catch (err: any) {
+      setIxcError('Erro de rede ao tentar conectar com o IXC.');
+    } finally {
+      setIxcLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const webhookUrl = origin ? `${origin}/api/webhooks/ms-forms` : 'http://localhost:3000/api/webhooks/ms-forms';
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -25,26 +67,46 @@ export function IntegracoesView() {
         <div className="space-y-5 bg-gray-50 p-6 rounded-xl border border-brand-border">
           <div>
             <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Domínio IXC</label>
-            <input type="text" placeholder="ex: ixc.suaempresa.com.br" className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" />
+            <input 
+              type="text" 
+              value={ixcDomain}
+              onChange={e => setIxcDomain(e.target.value)}
+              placeholder="ex: ixc.suaempresa.com.br" 
+              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+            />
           </div>
           <div>
             <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Token de Acesso (API)</label>
-            <input type="password" placeholder="••••••••••••••••" className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" />
+            <input 
+              type="password" 
+              value={ixcToken}
+              onChange={e => setIxcToken(e.target.value)}
+              placeholder="••••••••••••••••" 
+              className="w-full px-4 py-3 bg-white border border-brand-border rounded-xl text-sm focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow outline-none transition-all" 
+            />
           </div>
+          
+          {ixcError && (
+            <p className="text-red-500 text-xs font-semibold mt-1 leading-relaxed">{ixcError}</p>
+          )}
+
           <button
-            onClick={() => {
-              setIxcSaved(false);
-              setTimeout(() => setIxcSaved(true), 600);
-            }}
+            onClick={handleTestIxc}
+            disabled={ixcLoading}
             className={`px-8 py-3.5 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2 ${
               ixcSaved 
                 ? 'bg-green-100 text-green-700 border border-green-200'
                 : 'bg-brand-charcoal text-white hover:bg-black hover:shadow-level-2'
-            }`}
+            } disabled:opacity-50`}
           >
-            {ixcSaved ? (
+            {ixcLoading ? (
               <>
-                <CheckCircle2 className="w-5 h-5" />
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Testando Conexão...
+              </>
+            ) : ixcSaved ? (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
                 Conectado com Sucesso
               </>
             ) : 'Salvar e Testar Conexão'}
@@ -66,9 +128,13 @@ export function IntegracoesView() {
           <div>
             <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">URL do Webhook (Gerada pelo Gente Digital)</label>
             <div className="flex gap-2">
-              <input readOnly value="https://api.gentedigital.com.br/webhooks/ms-forms/x92j-8f2k-m1n4" className="w-full bg-white px-4 py-3 border border-brand-border rounded-xl text-sm text-brand-muted outline-none font-mono" />
+              <input readOnly value={webhookUrl} className="w-full bg-white px-4 py-3 border border-brand-border rounded-xl text-sm text-brand-muted outline-none font-mono" />
               <button 
-                onClick={() => setFormsSaved(true)}
+                onClick={() => {
+                  navigator.clipboard.writeText(webhookUrl);
+                  setFormsSaved(true);
+                  setTimeout(() => setFormsSaved(false), 2000);
+                }}
                 className="px-6 py-3 border border-brand-border bg-white text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-100 transition-colors"
               >
                 {formsSaved ? 'Copiado!' : 'Copiar'}

@@ -1,41 +1,67 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox } from 'lucide-react';
+import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from 'boring-avatars';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const leadSchema = z.object({
+  name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
+  phone: z.string().min(10, 'Insira um telefone válido com DDD (mínimo 10 dígitos)'),
+  value: z.string().optional().refine(val => {
+    if (!val) return true;
+    const num = Number(val);
+    return !isNaN(num) && num >= 0;
+  }, 'O valor deve ser um número positivo'),
+  ref: z.string().optional(),
+});
+
+type LeadFormData = z.infer<typeof leadSchema>;
+
 
 // Helper type for local UI rendering combining lead and history
 export type UILead = Lead & {
   history: LeadHistory[];
+  responsible?: string;
+  waitingDays?: number;
 };
 
 const initialLeads: UILead[] = [
   { 
-    id: 1, name: 'João Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Vencemos', value: 1200,
+    id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'LEANDRO COSTA SILVA', status: 'Em negociação', value: 0,
+    responsible: 'Emmyly', waitingDays: 5,
     history: [
-      { id: 101, lead_id: 1, date: '12/10/2023 14:30', action: 'Lead convertido', note: 'Assinou o plano fibra 500MB.' },
-      { id: 102, lead_id: 1, date: '10/10/2023 09:15', action: 'Em Negociação', note: 'Enviada proposta comercial.' },
-      { id: 103, lead_id: 1, date: '08/10/2023 11:20', action: 'Lead criado', note: null }
+      { id: 101, lead_id: 1, date: '12/10/2026 14:30', action: 'Lead criado por indicação', note: 'Indicado por Leandro Costa Silva.' }
     ]
   },
   { 
-    id: 2, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'EMP-043', status: 'Em contato', value: 850,
+    id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(55) 91991-7195', ref: 'CLAUDIANE DE SOUSA RIBEIRO MELO', status: 'Ganho', value: 99.90,
+    responsible: 'NIVEA',
     history: [
-      { id: 201, lead_id: 2, date: '15/10/2023 16:45', action: 'Contato realizado', note: 'Ficou de confirmar com o marido.' },
-      { id: 202, lead_id: 2, date: '14/10/2023 10:00', action: 'Lead criado', note: null }
+      { id: 201, lead_id: 2, date: '15/10/2026 16:45', action: 'Venda realizada', note: 'Plano contratado com sucesso.' }
     ]
   },
   { 
-    id: 3, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Novas indicações', value: 500,
+    id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Ganho', value: 1200,
+    responsible: 'NIVEA',
     history: [
-      { id: 301, lead_id: 3, date: '17/10/2023 08:30', action: 'Lead criado', note: 'Veio pela página inicial.' }
+      { id: 301, lead_id: 3, date: '08/10/2026 11:20', action: 'Lead convertido', note: 'Assinou o plano fibra 500MB.' }
     ]
   },
   { 
-    id: 4, name: 'Fernanda Lima', phone: '(11) 92222-3333', ref: 'EMP-042', status: 'Novas indicações', value: 1500,
+    id: 4, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'EMP-043', status: 'Contato inicial', value: 850,
+    responsible: 'Emmyly', waitingDays: 2,
     history: [
-      { id: 401, lead_id: 4, date: '18/10/2023 14:30', action: 'Contato inicial', note: 'Mandou mensagem pelo WhatsApp.' },
-      { id: 402, lead_id: 4, date: '18/10/2023 14:00', action: 'Lead criado', note: null }
+      { id: 401, lead_id: 4, date: '14/10/2026 10:00', action: 'Lead criado', note: null }
+    ]
+  },
+  { 
+    id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500,
+    responsible: 'Admin', waitingDays: 1,
+    history: [
+      { id: 501, lead_id: 5, date: '17/10/2026 08:30', action: 'Lead criado', note: 'Veio pela página inicial.' }
     ]
   }
 ];
@@ -44,11 +70,123 @@ export function LeadsView() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newValue, setNewValue] = useState('');
   const [leads, setLeads] = useState<UILead[]>(initialLeads);
   const [isLoading, setIsLoading] = useState(true);
+  const [colaboradores, setColaboradores] = useState<{ id: string, name: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedColabFilter, setSelectedColabFilter] = useState<string>('');
+  const [minValueFilter, setMinValueFilter] = useState<number | ''>('');
+  const [maxValueFilter, setMaxValueFilter] = useState<number | ''>('');
+
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Status', 'Valor (R$)', 'Ultima Interacao'];
+    const rows = leads.map(l => [
+      l.id,
+      `"${l.name.replace(/"/g, '""')}"`,
+      `"${l.phone}"`,
+      `"${l.ref}"`,
+      `"${l.status}"`,
+      l.value || 0,
+      `"${l.history[0]?.date || 'Novo'}"`
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `leads_gente_digital_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<LeadFormData>({
+    resolver: zodResolver(leadSchema)
+  });
+
+  useEffect(() => {
+    if (isModalOpen) {
+      const cookieRef = getReferralCookie();
+      reset({
+        name: '',
+        phone: '',
+        value: '',
+        ref: cookieRef || ''
+      });
+    }
+  }, [isModalOpen, reset]);
+
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    type: 'qualify' | 'generate-message';
+    qualification?: string;
+    reason?: string;
+    nextSteps?: string;
+    message?: string;
+  } | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState(false);
+
+  // Clear AI results when lead changes
+  useEffect(() => {
+    setAiResult(null);
+    setCopiedMessage(false);
+  }, [selectedLead]);
+
+  const handleAIQualify = async () => {
+    if (!selectedLead) return;
+    setIsAiLoading(true);
+    setAiResult(null);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'qualify', lead: selectedLead }),
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setAiResult({
+          type: 'qualify',
+          qualification: data.qualification,
+          reason: data.reason,
+          nextSteps: data.nextSteps,
+        });
+      } else {
+        console.error('AI Error:', data.error);
+      }
+    } catch (err) {
+      console.error('AI Request failed:', err);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleAIGenerateMessage = async () => {
+    if (!selectedLead) return;
+    setIsAiLoading(true);
+    setAiResult(null);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-message', lead: selectedLead }),
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setAiResult({
+          type: 'generate-message',
+          message: data.message,
+        });
+      } else {
+        console.error('AI Error:', data.error);
+      }
+    } catch (err) {
+      console.error('AI Request failed:', err);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const fetchLeads = async () => {
     try {
@@ -82,33 +220,57 @@ export function LeadsView() {
     }
   };
 
+  const fetchColaboradores = async () => {
+    try {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        const { data, error } = await supabase.from('colaboradores').select('id, name');
+        if (!error && data) {
+          setColaboradores(data);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching contributors in leads view:", err);
+    }
+  };
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads();
+    fetchColaboradores();
   }, []);
 
-  const statuses = ['Novas indicações', 'Em contato', 'Vencemos', 'Não vencemos'];
+  const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!newName) return;
-    
+  // Helper to read cookie
+  const getReferralCookie = () => {
+    if (typeof document === 'undefined') return null;
+    const nameEQ = "gente_digital_ref=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+  };
+
+  const handleAdd = async (data: LeadFormData) => {
+    const referral = data.ref || getReferralCookie() || 'Manual';
     const newLeadData = {
-      name: newName,
-      phone: newPhone,
-      ref: 'Manual',
-      status: 'Novas indicações',
-      value: Number(newValue) || 0
+      name: data.name,
+      phone: data.phone,
+      ref: referral,
+      status: 'Pendente',
+      value: data.value ? parseFloat(data.value) : 0
     };
 
     try {
        if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-         const { data, error } = await supabase.from('leads').insert([newLeadData]).select();
+         const { data: inserted, error } = await supabase.from('leads').insert([newLeadData]).select();
          if (error) throw error;
-         if (data && data[0]) {
-           const historyData = { lead_id: data[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
+         if (inserted && inserted[0]) {
+           const historyData = { lead_id: inserted[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
            await supabase.from('lead_history').insert([historyData]);
-           setLeads([{ ...data[0], history: [{...historyData, id: Math.random()}] }, ...leads]);
+           setLeads([{ ...inserted[0], history: [{...historyData, id: Math.random()}] }, ...leads]);
          }
        } else {
          const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
@@ -123,8 +285,7 @@ export function LeadsView() {
     }
 
     setIsModalOpen(false);
-    setNewName('');
-    setNewPhone('');
+    reset();
   }
 
   // Drag and Drop Handlers
@@ -160,34 +321,195 @@ export function LeadsView() {
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Novas indicações': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Em contato': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Vencemos': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Não vencemos': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Pendente': return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'Contato inicial': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Em negociação': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
+      case 'Errado': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Ganho': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
+  const getStatusCircleColor = (status: string) => {
+    switch(status) {
+      case 'Pendente': return 'border-gray-400';
+      case 'Contato inicial': return 'border-blue-500';
+      case 'Em negociação': return 'border-cyan-500';
+      case 'Errado': return 'border-red-500';
+      case 'Ganho': return 'border-green-500';
+      default: return 'border-gray-400';
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch(status) {
+      case 'Ganho': return 'bg-green-100 text-green-700';
+      case 'Errado': return 'bg-red-100 text-red-700';
+      case 'Contato inicial': return 'bg-blue-100 text-blue-700';
+      case 'Em negociação': return 'bg-cyan-100 text-cyan-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const uniqueRefs = Array.from(new Set(leads.map(l => l.ref).filter(Boolean)));
+  
+  let activeFiltersCount = 0;
+  if (selectedColabFilter) activeFiltersCount++;
+  if (minValueFilter !== '') activeFiltersCount++;
+  if (maxValueFilter !== '') activeFiltersCount++;
+
+  const filteredLeads = leads.filter(l => {
+    const matchesSearch = 
+      l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (l.phone && l.phone.includes(searchQuery)) ||
+      (l.ref && l.ref.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+    const matchesColab = selectedColabFilter ? l.ref === selectedColabFilter : true;
+    const matchesMinVal = minValueFilter !== '' ? (l.value || 0) >= Number(minValueFilter) : true;
+    const matchesMaxVal = maxValueFilter !== '' ? (l.value || 0) <= Number(maxValueFilter) : true;
+
+    return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal;
+  });
+
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 animate-in fade-in duration-300 h-[calc(100vh-140px)] flex flex-col">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal">Gestão de Leads</h2>
-          <p className="text-brand-muted mt-1">Acompanhe e mova os leads em seu funil de vendas.</p>
+    <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 h-[calc(100vh-140px)] flex flex-col relative pb-8 overflow-hidden">
+      {/* Breadcrumb Header */}
+      <div className="shrink-0">
+        <div className="text-xs text-brand-muted font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
+          <span>Marketing de indicações</span>
+          <span className="text-gray-300 text-sm">›</span>
+          <span className="text-brand-charcoal dark:text-gray-300 font-extrabold">Acompanhamento de leads</span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex bg-gray-100 p-1 rounded-xl">
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-brand-charcoal' : 'text-brand-muted hover:text-brand-charcoal'}`} title="Exibição em Lista">
-              <List className="w-5 h-5" />
-            </button>
-            <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-lg transition-colors ${viewMode === 'kanban' ? 'bg-white shadow-sm text-brand-charcoal' : 'text-brand-muted hover:text-brand-charcoal'}`} title="Exibição Kanban">
-              <LayoutGrid className="w-5 h-5" />
-            </button>
+      </div>
+
+      {/* Tabs and Controls Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border pb-2 shrink-0">
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setViewMode('kanban')} 
+            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
+              viewMode === 'kanban' 
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
+            }`}
+          >
+            Kanban
+          </button>
+          <button 
+            onClick={() => setViewMode('list')} 
+            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
+              viewMode === 'list' 
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
+            }`}
+          >
+            Lista
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="relative text-brand-muted focus-within:text-brand-charcoal transition-colors">
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Busque pelo nome do lead" 
+              className="pl-4 pr-10 py-2 border border-brand-border bg-white rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-60" 
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
-          <button onClick={() => setIsModalOpen(true)} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
-            <Plus className="w-5 h-5" />
-            Novo Lead
+          
+          <div className="relative">
+            <button 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-bold text-sm transition-colors shadow-sm ${
+                isFilterOpen || activeFiltersCount > 0 
+                  ? 'border-blue-500 bg-blue-50/50 text-blue-600' 
+                  : 'border-brand-border bg-white text-brand-charcoal hover:bg-gray-50'
+              }`}
+            >
+              Filtros
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            {isFilterOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-2xl shadow-xl z-50 p-5 space-y-4 animate-in zoom-in-95 duration-150">
+                <div className="flex justify-between items-center pb-2 border-b border-brand-border dark:border-gray-800">
+                  <h4 className="font-bold text-sm text-brand-charcoal dark:text-white">Filtrar Leads</h4>
+                  {activeFiltersCount > 0 && (
+                    <button 
+                      onClick={() => {
+                        setSelectedColabFilter('');
+                        setMinValueFilter('');
+                        setMaxValueFilter('');
+                      }}
+                      className="text-xs text-red-500 hover:text-red-600 font-bold"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter 1: Collaborator */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                    Origem / Indicador
+                  </label>
+                  <select
+                    value={selectedColabFilter}
+                    onChange={(e) => setSelectedColabFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                  >
+                    <option value="">Todos</option>
+                    {uniqueRefs.map(refVal => (
+                      <option key={refVal} value={refVal}>{refVal}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filter 2: Min Value / Max Value */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                    Valor da Venda (R$)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      placeholder="Mín"
+                      value={minValueFilter}
+                      onChange={(e) => setMinValueFilter(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                    />
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">até</span>
+                    <input
+                      type="number"
+                      placeholder="Máx"
+                      value={maxValueFilter}
+                      onChange={(e) => setMaxValueFilter(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsFilterOpen(false)}
+                  className="w-full py-2 bg-brand-charcoal hover:bg-gray-800 text-white font-bold text-xs rounded-xl shadow-sm transition-colors mt-2"
+                >
+                  Aplicar Filtros
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 border border-brand-border bg-white text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Exportar
           </button>
         </div>
       </div>
@@ -245,8 +567,8 @@ export function LeadsView() {
                       </div>
                     </td>
                   </tr>
-                ) : leads.map(lead => (
-                  <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-50 transition-colors cursor-pointer group">
+                ) : filteredLeads.map(lead => (
+                  <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-50 transition-colors cursor-pointer group font-sans">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar size={32} name={lead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
@@ -274,67 +596,33 @@ export function LeadsView() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex gap-6 overflow-x-auto pb-4 scrollbar-hide items-start">
+        <div className="flex-1 flex gap-6 overflow-x-auto pb-6 scrollbar-hide items-start">
           {statuses.map(status => {
-            const columnLeads = leads.filter(l => l.status === status);
+            const columnLeads = filteredLeads.filter(l => l.status === status);
             const totalValue = columnLeads.reduce((acc, lead) => acc + (lead.value || 0), 0);
             return (
-            <div 
-              key={status} 
-              onDrop={(e) => handleDrop(e, status)}
-              onDragOver={handleDragOver}
-              className="flex-shrink-0 w-[340px] flex flex-col bg-gray-50 border border-brand-border rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
-            >
-              <div className="flex items-center justify-between mb-4 px-1 shrink-0">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-bold text-brand-charcoal text-[16px]">{status}</h3>
-                  <span className="bg-white border border-brand-border text-brand-muted text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
-                    {columnLeads.length}
-                  </span>
-                  {totalValue > 0 && (
-                    <span className="text-xs font-semibold text-green-700 bg-green-100 border border-green-200 px-2 py-1 rounded-full">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
+              <div 
+                key={status} 
+                onDrop={(e) => handleDrop(e, status)}
+                onDragOver={handleDragOver}
+                className="flex-shrink-0 w-[300px] flex flex-col bg-gray-50 border border-brand-border rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
+              >
+                {/* Column Header */}
+                <div className="flex items-center justify-between mb-4 px-1 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 ${getStatusCircleColor(status)}`} />
+                    <h3 className="font-bold text-brand-charcoal text-[14px]">{status}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${getStatusBadgeClass(status)}`}>
+                      {columnLeads.length}
                     </span>
-                  )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-brand-muted hover:text-brand-charcoal hover:bg-white border border-transparent hover:border-brand-border shadow-sm transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
-                <AnimatePresence>
-                  {isLoading ? (
-                    <div className="space-y-3">
-                      {Array.from({ length: 2 }).map((_, i) => (
-                        <motion.div 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          key={`skeleton-${i}`}
-                          className="bg-white border border-brand-border p-5 rounded-[20px] shadow-sm animate-pulse flex flex-col gap-3"
-                        >
-                          <div className="flex flex-col gap-2">
-                            <div className="h-3 w-16 bg-gray-200 rounded"></div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gray-200"></div>
-                              <div className="h-4 w-24 bg-gray-200 rounded"></div>
-                            </div>
-                          </div>
-                          <div className="h-8 bg-gray-50 rounded-lg border border-gray-100"></div>
-                          <div className="flex justify-between items-center mt-1 pt-3 border-t border-gray-50">
-                            <div className="h-4 w-16 bg-gray-200 rounded"></div>
-                            <div className="h-3 w-12 bg-gray-200 rounded"></div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : columnLeads.length > 0 ? (
-                    <div className="space-y-3">
-                      {columnLeads.map(lead => (
+                {/* Column Body / Cards */}
+                <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide space-y-3 min-h-[300px]">
+                  <AnimatePresence>
+                    {columnLeads.length > 0 ? (
+                      columnLeads.map(lead => (
                         <motion.div 
                           layoutId={lead.id.toString()}
                           layout
@@ -346,62 +634,91 @@ export function LeadsView() {
                           draggable
                           onDragStart={(e: any) => handleDragStart(e, lead.id)}
                           onClick={() => setSelectedLead(lead)}
-                          className="bg-white border border-brand-border p-5 rounded-[20px] shadow-sm cursor-grab active:cursor-grabbing hover:border-brand-yellow hover:shadow-md transition-all group relative flex flex-col gap-1"
+                          className="bg-white border border-brand-border p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-500 hover:shadow-md transition-all group relative flex flex-col gap-3"
                         >
-                          <GripVertical className="absolute right-3 top-5 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <GripVertical className="absolute right-3 top-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           
-                          <div className="flex flex-col pr-6 mb-2">
-                            <span className="text-[11px] uppercase tracking-wider font-bold text-brand-muted mb-1.5 flex items-center gap-1.5">
-                              <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor(lead.status).split(' ')[0]}`}></div>
-                              Origem: {lead.ref}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <Avatar size={24} name={lead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
-                              <h4 className="font-bold text-brand-charcoal text-[16px]">{lead.name}</h4>
-                            </div>
-                          </div>
+                          {/* Badge */}
+                          <span className="bg-amber-50 text-amber-800 border border-amber-100 text-[10px] font-bold px-2.5 py-0.5 rounded w-fit uppercase tracking-wider">
+                            Marketing de indicações
+                          </span>
 
-                          <div className="flex items-center gap-2 mb-1 mt-1">
-                            <div className="flex items-center text-[13px] font-medium text-brand-charcoal w-fit bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100">
-                              <Phone className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                              {lead.phone}
+                          {/* Lead Name */}
+                          <h4 className="font-extrabold text-brand-charcoal text-[15px] -mt-1">{lead.name}</h4>
+
+                          {/* Details List */}
+                          <div className="space-y-2">
+                            {/* Phone */}
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-bold text-gray-400 tracking-wider">TELEFONE</span>
+                              <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                                <Phone className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
+                                {lead.phone}
+                              </div>
                             </div>
+
+                            {/* Responsável */}
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-bold text-gray-400 tracking-wider">RESPONSÁVEL</span>
+                              <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                                <Avatar size={16} name={lead.responsible || 'Admin'} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} className="mr-1.5" />
+                                {lead.responsible || 'Admin'}
+                              </div>
+                            </div>
+
+                            {/* Espera (only if defined) */}
+                            {lead.waitingDays !== undefined && (
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-gray-400 tracking-wider">ESPERA</span>
+                                <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                                  <Clock className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
+                                  {lead.waitingDays} dias
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Valor da Venda (if defined/greater than 0) */}
                             {lead.value !== undefined && lead.value > 0 && (
-                              <div className="flex items-center text-[13px] font-medium text-green-700 bg-green-50 px-2.5 py-1.5 rounded-lg border border-green-100">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-gray-400 tracking-wider">VALOR DA VENDA</span>
+                                <div className="flex items-center text-xs font-semibold text-green-700 mt-0.5">
+                                  <span className="text-xs font-bold mr-1.5">$</span>
+                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
+                                </div>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-50">
-                             <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-md border ${getStatusColor(lead.status)}`}>
-                                {lead.status}
-                              </span>
-                            <div className="flex items-center text-[11px] text-brand-muted font-bold tracking-wide uppercase gap-1">
-                              <Clock className="w-3 h-3" />
-                              {lead.history[0]?.date.split(' ')[0] || 'Novo'}
-                            </div>
+                          {/* Footer Colaborador */}
+                          <div className="text-[11px] text-gray-500 border-t border-gray-100 pt-2.5 flex items-center justify-between">
+                            <span className="font-semibold text-gray-600">
+                              Indicador {lead.ref.toUpperCase()}
+                            </span>
                           </div>
                         </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="h-32 border-2 border-dashed border-gray-200 rounded-[20px] flex flex-col items-center justify-center text-gray-400"
-                    >
-                      <Inbox className="w-6 h-6 mb-2 text-gray-300" />
-                      <span className="text-xs font-semibold">Nenhum lead aqui</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      ))
+                    ) : (
+                      <div className="h-32 border-2 border-dashed border-gray-200 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white">
+                        <Inbox className="w-6 h-6 mb-2 text-gray-300" />
+                        <span className="text-[11px] font-bold">Não há leads nessa etapa</span>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
             );
           })}
         </div>
       )}
+
+      {/* Floating Action Button for New Lead (bottom left) */}
+      <button 
+        onClick={() => setIsModalOpen(true)} 
+        className="fixed bottom-8 left-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
+        title="Novo Lead"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
       {/* New Lead Modal */}
       {isModalOpen && (
@@ -411,18 +728,62 @@ export function LeadsView() {
               <h3 className="font-display font-bold text-2xl text-brand-charcoal">Novo Lead</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted" /></button>
             </div>
-            <form onSubmit={handleAdd} className="space-y-4">
+            <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Nome do Lead</label>
-                <input autoFocus required value={newName} onChange={e => setNewName(e.target.value)} type="text" placeholder="Ex: Cliente Silva" className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+                <input 
+                  autoFocus 
+                  {...register('name')} 
+                  type="text" 
+                  placeholder="Ex: Cliente Silva" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                    errors.name 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Telefone / WhatsApp</label>
-                <input required value={newPhone} onChange={e => setNewPhone(e.target.value)} type="tel" placeholder="(00) 00000-0000" className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+                <input 
+                  {...register('phone')} 
+                  type="tel" 
+                  placeholder="(00) 00000-0000" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                    errors.phone 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.phone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.phone.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Valor (R$)</label>
-                <input value={newValue} onChange={e => setNewValue(e.target.value)} type="number" placeholder="Ex: 1500" className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all" />
+                <input 
+                  {...register('value')} 
+                  type="number" 
+                  placeholder="Ex: 1500" 
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-1 transition-all ${
+                    errors.value 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
+                  }`} 
+                />
+                {errors.value && <p className="text-red-500 text-xs mt-1 font-medium">{errors.value.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-brand-charcoal mb-1.5">Técnico / Indicador</label>
+                <select
+                  {...register('ref')}
+                  className="w-full px-4 py-3 bg-gray-50 border border-brand-border rounded-xl text-sm focus:outline-none focus:ring-1 focus:border-brand-yellow focus:ring-brand-yellow transition-all text-brand-charcoal"
+                >
+                  <option value="Manual">Nenhum (Venda Manual)</option>
+                  <option value="Orgânico">Orgânico (Pesquisa do Cliente)</option>
+                  {colaboradores.map(c => (
+                    <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
+                  ))}
+                </select>
               </div>
               <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 hover:scale-[1.02] active:scale-95 transition-all">
                 Adicionar Lead
@@ -485,6 +846,85 @@ export function LeadsView() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* AI Assistant Section */}
+              <div className="mt-8 pt-6 border-t border-brand-border space-y-4">
+                <h4 className="font-bold text-sm text-brand-charcoal flex items-center gap-2 uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4 text-brand-yellow animate-pulse" /> Assistente de IA Gente Digital
+                </h4>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={handleAIQualify}
+                    disabled={isAiLoading}
+                    className="flex-1 py-2.5 px-3 bg-brand-yellow/15 border border-brand-yellow/30 hover:bg-brand-yellow/25 text-brand-charcoal font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+                    Qualificar Lead
+                  </button>
+                  <button 
+                    onClick={handleAIGenerateMessage}
+                    disabled={isAiLoading}
+                    className="flex-1 py-2.5 px-3 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                    Mensagem WhatsApp
+                  </button>
+                </div>
+
+                {/* AI Output Result */}
+                {aiResult && (
+                  <div className="bg-gray-50 border border-brand-border rounded-2xl p-4 space-y-3 relative overflow-hidden animate-in fade-in duration-300">
+                    <button onClick={() => setAiResult(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    {aiResult.type === 'qualify' ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Qualificação:</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                            aiResult.qualification === 'Quente' ? 'bg-red-100 text-red-800 border-red-200' :
+                            aiResult.qualification === 'Morno' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                            'bg-blue-100 text-blue-800 border-blue-200'
+                          }`}>{aiResult.qualification}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-brand-charcoal">Motivo:</p>
+                          <p className="text-xs text-brand-muted mt-1 leading-relaxed">{aiResult.reason}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-brand-charcoal">Próximos Passos:</p>
+                          <p className="text-xs text-brand-muted mt-1 leading-relaxed">{aiResult.nextSteps}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Mensagem Recomendada:</span>
+                        <p className="text-xs text-brand-charcoal bg-white p-3 rounded-lg border border-gray-100 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap select-all">{aiResult.message}</p>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(aiResult.message || '');
+                              setCopiedMessage(true);
+                              setTimeout(() => setCopiedMessage(false), 2000);
+                            }}
+                            className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-brand-charcoal font-semibold text-[11px] rounded-lg transition-colors border border-brand-border"
+                          >
+                            {copiedMessage ? 'Copiado!' : 'Copiar Texto'}
+                          </button>
+                          <a 
+                            href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(aiResult.message || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                          >
+                            Enviar WhatsApp
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Add Note Area */}
