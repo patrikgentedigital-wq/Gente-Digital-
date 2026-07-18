@@ -90,21 +90,27 @@ export function DashboardView() {
 
   const chartData = getDynamicChartData();
 
+  const normalizeStr = (str: string) => 
+    str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+
   const getTopColaboradores = () => {
     return colaboradores
       .map(colab => {
-        const referredLeads = leads.filter(l => 
-          l.ref === colab.id || 
-          (l.ref && l.ref.toLowerCase().includes(colab.name.toLowerCase())) ||
-          (l.ref && colab.name.toLowerCase().includes(l.ref.toLowerCase()))
-        );
+        const normColabName = normalizeStr(colab.name);
+        const normColabId = normalizeStr(colab.id);
+
+        const referredLeads = leads.filter(l => {
+          const normRef = normalizeStr(l.ref);
+          return normRef === normColabId || normRef === normColabName;
+        });
+        
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
-        const points = (colab.count || 0) * 10 + referredLeads.length * 20 + colabConversions * 50;
+        const points = referredLeads.length * 20 + colabConversions * 50;
 
         return {
           ...colab,
-          points: points || 10,
-          conversions: colabConversions || colab.count || 0
+          points: points,
+          conversions: colabConversions
         };
       })
       .sort((a, b) => b.points - a.points)
@@ -120,6 +126,50 @@ export function DashboardView() {
           ...ranks[index]
         };
       });
+  };
+
+  const getTopClientes = () => {
+    const clientRefs = leads.map(l => l.ref).filter(ref => {
+       const normRef = normalizeStr(ref);
+       if (!normRef || normRef === "organico" || normRef === "") return false;
+       
+       const isColab = colaboradores.some(c => {
+         const nName = normalizeStr(c.name);
+         const nId = normalizeStr(c.id);
+         return normRef === nId || normRef === nName;
+       });
+       return !isColab;
+    });
+
+    const uniqueRefs = Array.from(new Set(clientRefs.map(r => normalizeStr(r))));
+    
+    return uniqueRefs.map(uRef => {
+      const originalName = clientRefs.find(r => normalizeStr(r) === uRef) || uRef;
+      const referredLeads = leads.filter(l => normalizeStr(l.ref) === uRef);
+      const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
+      const points = referredLeads.length * 20 + conversions * 50;
+      
+      return {
+        id: uRef,
+        name: originalName,
+        points: points,
+        conversions: conversions
+      };
+    })
+    .filter(client => client.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 3)
+    .map((client, index) => {
+        const ranks = [
+          { rank: 1, color: 'text-blue-500', bg: 'bg-blue-100' },
+          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
+          { rank: 3, color: 'text-blue-700', bg: 'bg-blue-50' }
+        ];
+        return {
+          ...client,
+          ...ranks[index]
+        };
+    });
   };
 
   const getTrends = () => {
@@ -229,34 +279,33 @@ export function DashboardView() {
         <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Gráfico */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col min-h-[420px] transition-colors">
-          <div className="mb-6">
-            <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
-            <p className="text-sm text-brand-muted dark:text-gray-400">Comparativo de status de conversão ao longo do tempo.</p>
-          </div>
-          <div className="flex-1 w-full h-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} />
-                <Tooltip 
-                  cursor={{ fill: 'transparent' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontWeight: 500 }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px', fontWeight: 500 }} />
-                <Bar dataKey="pendente" name="Pendente" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="contatoInicial" name="Contato Inicial" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="emNegociacao" name="Em Negociação" fill="#67e8f9" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="ganho" name="Ganho" fill="#4ade80" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="errado" name="Errado" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col min-h-[420px] transition-colors mb-6">
+        <div className="mb-6">
+          <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
+          <p className="text-sm text-brand-muted dark:text-gray-400">Comparativo de status de conversão ao longo do tempo.</p>
         </div>
+        <div className="flex-1 w-full h-full min-h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} />
+              <Tooltip 
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontWeight: 500 }}
+              />
+              <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px', fontWeight: 500 }} />
+              <Bar dataKey="pendente" name="Pendente" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="contatoInicial" name="Contato Inicial" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="emNegociacao" name="Em Negociação" fill="#67e8f9" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="ganho" name="Ganho" fill="#4ade80" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="errado" name="Errado" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Leaderboard - Top Colaboradores */}
         <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col h-[420px] transition-colors">
           <div className="flex items-center gap-3 mb-6">
@@ -265,7 +314,7 @@ export function DashboardView() {
             </div>
             <div>
               <h3 className="font-bold text-lg text-brand-charcoal dark:text-white leading-tight">Top Colaboradores</h3>
-              <p className="text-xs text-brand-muted dark:text-gray-400">Ranking do Mês</p>
+              <p className="text-xs text-brand-muted dark:text-gray-400">Ranking interno de indicações</p>
             </div>
           </div>
           
@@ -288,14 +337,47 @@ export function DashboardView() {
                 </div>
               </div>
             ))}
+            {topColaboradores.length === 0 && (
+              <div className="flex-1 flex items-center justify-center text-sm text-brand-muted">Nenhum colaborador ranqueado.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Leaderboard - Top Clientes */}
+        <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col h-[420px] transition-colors">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-blue-500/20 rounded-xl text-brand-charcoal dark:text-blue-500">
+              <Medal className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-brand-charcoal dark:text-white leading-tight">Top Clientes</h3>
+              <p className="text-xs text-brand-muted dark:text-gray-400">Clientes que mais indicaram</p>
+            </div>
           </div>
           
-          <button 
-            onClick={() => router.push('/?tab=colaboradores')}
-            className="w-full mt-4 py-3 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Ver Ranking Completo
-          </button>
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
+            {getTopClientes().map((cliente: any) => (
+              <div key={cliente.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-[#27272a]/50 hover:bg-gray-50 dark:hover:bg-[#27272a] transition-colors">
+                <div className="relative">
+                  <Avatar size={40} name={cliente.name} variant="marble" colors={['#3B82F6', '#2563EB', '#60A5FA', '#93C5FD', '#BFDBFE']} />
+                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${cliente.bg} ${cliente.color} border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold shadow-sm`}>
+                    {cliente.rank}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-brand-charcoal dark:text-white text-sm truncate capitalize">{cliente.name}</p>
+                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">{cliente.conversions} conversões</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-bold text-brand-charcoal dark:text-white text-sm">{cliente.points}</p>
+                  <p className="text-[10px] text-brand-muted dark:text-gray-400 font-medium uppercase">Pts</p>
+                </div>
+              </div>
+            ))}
+            {getTopClientes().length === 0 && (
+              <div className="flex-1 flex items-center justify-center text-sm text-brand-muted">Nenhum cliente ranqueado.</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
