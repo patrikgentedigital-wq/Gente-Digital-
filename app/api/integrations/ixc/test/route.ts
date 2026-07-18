@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'Authorization': `Basic ${base64Token}`,
           'Content-Type': 'application/json',
+          'ixcsoft': 'listar'
         },
         body: JSON.stringify({
           qtype: 'cliente.id',
