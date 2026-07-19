@@ -1,6 +1,6 @@
 'use client';
 
-import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download } from 'lucide-react';
+import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
@@ -17,6 +17,9 @@ export function DashboardView() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [dateFilter, setDateFilter] = useState('all');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -117,6 +120,40 @@ export function DashboardView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleGenerateAiSummary = async () => {
+    try {
+      setIsAiLoading(true);
+      setShowAiModal(true);
+      
+      const metrics = {
+        totalLeads,
+        conversões,
+        conversionRate,
+        cliques: clicks,
+        leadsTrend: trends.leadsTrend,
+        convsTrend: trends.convsTrend
+      };
+
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dashboard-summary', metrics })
+      });
+
+      const data = await res.json();
+      if (data.status === 'success') {
+        setAiSummary(data.summary);
+      } else {
+        setAiSummary('Desculpe, ocorreu um erro ao gerar a análise. Tente novamente.');
+      }
+    } catch (err) {
+      console.error(err);
+      setAiSummary('Erro de conexão ao gerar análise.');
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const getDynamicChartData = () => {
@@ -340,11 +377,19 @@ export function DashboardView() {
         
         <div className="flex items-center gap-3">
           <button
+            onClick={handleGenerateAiSummary}
+            className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden sm:inline">Resumo IA</span>
+          </button>
+
+          <button
             onClick={handleExportReport}
             className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
           >
             <Download className="w-4 h-4" />
-            Exportar CSV
+            <span className="hidden sm:inline">Exportar CSV</span>
           </button>
           
           <select 
@@ -468,6 +513,38 @@ export function DashboardView() {
           </div>
         </div>
       </div>
+
+      {showAiModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#18181b] w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Análise Inteligente</h3>
+              </div>
+              <button onClick={() => setShowAiModal(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {isAiLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-yellow"></div>
+                  <p className="text-sm text-brand-muted dark:text-gray-400 font-medium">Lendo seus gráficos...</p>
+                </div>
+              ) : (
+                <div className="prose dark:prose-invert prose-sm">
+                  <p className="text-[15px] leading-relaxed text-brand-charcoal dark:text-gray-200 whitespace-pre-wrap">
+                    {aiSummary}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -907,28 +907,29 @@ export function LeadsView() {
             
             {/* Timeline Area */}
             <div className="flex-1 overflow-y-auto p-6 bg-white">
-              <h4 className="font-bold text-sm text-brand-charcoal mb-6 flex items-center gap-2 uppercase tracking-wider">
-                <Clock className="w-4 h-4 text-brand-muted" /> Histórico de Interações
+              <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-6 flex items-center gap-2 uppercase tracking-wider">
+                <Clock className="w-4 h-4 text-brand-muted" /> Linha do Tempo
               </h4>
               
-              <div className="space-y-4">
+              <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:ml-[1.3rem] md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-brand-yellow/80 before:to-transparent">
                 {selectedLead.history.map((h, i) => (
-                  <div key={i} className="flex gap-4 group">
+                  <div key={i} className="relative flex gap-4 group items-start">
                     <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 shrink-0 rounded-full bg-white border-2 border-brand-border flex items-center justify-center text-brand-muted group-hover:border-brand-yellow group-hover:text-brand-charcoal transition-colors z-10 shadow-sm">
-                        <MessageSquare className="w-4 h-4" />
+                      <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-all z-10 shadow-sm border-2 ${
+                        i === 0 
+                          ? 'bg-brand-yellow border-white dark:border-[#18181b] text-brand-charcoal ring-4 ring-brand-yellow/20'
+                          : 'bg-white dark:bg-[#27272a] border-gray-200 dark:border-gray-700 text-brand-muted group-hover:border-brand-yellow'
+                      }`}>
+                        {i === 0 ? <Sparkles className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                       </div>
-                      {i !== selectedLead.history.length - 1 && (
-                        <div className="w-0.5 h-full bg-brand-border mt-2 rounded-full" />
-                      )}
                     </div>
-                    <div className="flex-1 pb-4">
-                      <div className="bg-gray-50 p-4 rounded-2xl border border-brand-border">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="font-bold text-sm text-brand-charcoal">{h.action}</span>
-                          <span className="text-xs font-medium text-brand-muted whitespace-nowrap bg-white px-2 py-0.5 rounded-md border border-brand-border shadow-sm">{h.date}</span>
+                    <div className="flex-1 pt-1 pb-2">
+                      <div className="bg-gray-50 dark:bg-[#27272a]/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-2 gap-2">
+                          <span className="font-bold text-[15px] text-brand-charcoal dark:text-gray-100">{h.action}</span>
+                          <span className="text-[11px] font-bold text-brand-muted dark:text-gray-400 whitespace-nowrap bg-white dark:bg-[#18181b] px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 shadow-sm">{h.date}</span>
                         </div>
-                        {h.note && <p className="text-sm text-brand-muted mt-2 leading-relaxed">{h.note}</p>}
+                        {h.note && <p className="text-[13px] text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{h.note}</p>}
                       </div>
                     </div>
                   </div>

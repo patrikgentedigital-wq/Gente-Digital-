@@ -8,6 +8,7 @@ import { DashboardView } from '@/components/views/dashboard';
 import { LeadsView } from '@/components/views/leads';
 import { ColaboradoresView } from '@/components/views/colaboradores';
 import { IntegracoesView } from '@/components/views/integracoes';
+import { AnimatePresence, motion } from 'motion/react';
 
 
 export default function Page() {
@@ -100,11 +101,21 @@ function PageContent() {
       <div className="flex-1 flex flex-col md:ml-64 min-w-0 transition-all duration-300">
         <Header activeTabName={getTabName()} onMenuClick={() => setIsSidebarOpen(true)} />
         
-        <main className="flex-1 p-4 md:p-10 overflow-y-auto overflow-x-hidden">
-          {renderView()}
+        <main className="flex-1 p-4 md:p-8 overflow-x-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="h-full w-full"
+            >
+              {renderView()}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>
   );
 }
-

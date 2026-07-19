@@ -3,11 +3,11 @@ import { GoogleGenAI } from '@google/genai';
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, lead } = await req.json();
+    const { action, lead, metrics } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!action || !lead) {
-      return NextResponse.json({ error: 'Parâmetros inválidos. É necessário informar action e lead.' }, { status: 400 });
+    if (!action) {
+      return NextResponse.json({ error: 'Parâmetros inválidos. É necessário informar a action.' }, { status: 400 });
     }
 
     if (!apiKey) {
@@ -43,6 +43,13 @@ export async function POST(req: NextRequest) {
           status: 'success',
           isMock: true,
           message
+        });
+      } else if (action === 'dashboard-summary') {
+        const summary = `*Análise Simulada:*\nNeste mês você gerou ótimos números! As conversões estão saudáveis, mas notei que a etapa "Contato Inicial" está acumulando alguns leads. Sugiro focar sua equipe nisso hoje.\n\n(Aviso: Adicione GEMINI_API_KEY no .env.local para gerar resumos reais por IA)`;
+        return NextResponse.json({
+          status: 'success',
+          isMock: true,
+          summary
         });
       }
 
@@ -103,9 +110,28 @@ A mensagem deve ser direta, amigável, incluir quebras de linha adequadas, e con
         contents: prompt,
       });
 
+      const textResult = response.text?.trim() || '';
       return NextResponse.json({
         status: 'success',
-        message: response.text?.trim() || ''
+        message: textResult
+      });
+
+    } else if (action === 'dashboard-summary') {
+      const prompt = `Você é um analista de vendas e diretor comercial de alto nível em uma empresa que utiliza o sistema Gente Digital. Analise as métricas do painel abaixo e escreva um resumo executivo direto e empolgante, focando no que está bom e no que precisa de atenção urgente.
+Métricas do Dashboard:
+${JSON.stringify(metrics || {}, null, 2)}
+
+Seja muito breve (apenas 1 parágrafo robusto), profissional, encorajador e forneça um insight prático baseado nestes dados. Utilize formatação amigável. Retorne apenas o texto final do resumo.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt
+      });
+
+      const summaryResult = response.text?.trim() || 'A análise não pôde ser gerada no momento.';
+      return NextResponse.json({
+        status: 'success',
+        summary: summaryResult
       });
     }
 
