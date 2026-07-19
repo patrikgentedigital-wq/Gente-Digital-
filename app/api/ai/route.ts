@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 
 export async function POST(req: NextRequest) {
   try {
     const { action, lead, metrics } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!action) {
       return NextResponse.json({ error: 'Parâmetros inválidos. É necessário informar a action.' }, { status: 400 });
     }
 
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY não encontrada nas variáveis de ambiente. Usando respostas simuladas (Mock).');
+      console.warn('OPENROUTER_API_KEY não encontrada nas variáveis de ambiente. Usando respostas simuladas (Mock).');
       
       // Fallback/Mock responses when GEMINI_API_KEY is not defined
       if (action === 'qualify') {
         const value = lead.value || 0;
         let qualification = 'Morno';
-        let reason = 'Histórico básico. Adicione GEMINI_API_KEY no seu .env.local para qualificação avançada por IA.';
+        let reason = 'Histórico básico. Adicione OPENROUTER_API_KEY no seu .env.local para qualificação avançada por IA.';
         let nextSteps = 'Entrar em contato por WhatsApp para entender o interesse do cliente.';
 
         if (value > 1000 || lead.status === 'Em contato') {
@@ -38,14 +37,14 @@ export async function POST(req: NextRequest) {
           nextSteps
         });
       } else if (action === 'generate-message') {
-        const message = `Olá, ${lead.name}! Tudo bem?\n\nVi que você se interessou pelos nossos serviços do Gente Digital. Gostaria de entender melhor como podemos te ajudar a escalar sua operação comercial.\n\nPodemos marcar uma rápida conversa de 5 minutos ainda hoje?\n\n(Aviso: Adicione GEMINI_API_KEY no .env.local para gerar mensagens altamente personalizadas por IA)`;
+        const message = `Olá, ${lead.name}! Tudo bem?\n\nVi que você se interessou pelos nossos serviços do Gente Digital. Gostaria de entender melhor como podemos te ajudar a escalar sua operação comercial.\n\nPodemos marcar uma rápida conversa de 5 minutos ainda hoje?\n\n(Aviso: Adicione OPENROUTER_API_KEY no .env.local para gerar mensagens altamente personalizadas por IA)`;
         return NextResponse.json({
           status: 'success',
           isMock: true,
           message
         });
       } else if (action === 'dashboard-summary') {
-        const summary = `*Análise Simulada:*\nNeste mês você gerou ótimos números! As conversões estão saudáveis, mas notei que a etapa "Contato Inicial" está acumulando alguns leads. Sugiro focar sua equipe nisso hoje.\n\n(Aviso: Adicione GEMINI_API_KEY no .env.local para gerar resumos reais por IA)`;
+        const summary = `*Análise Simulada:*\nNeste mês você gerou ótimos números! As conversões estão saudáveis, mas notei que a etapa "Contato Inicial" está acumulando alguns leads. Sugiro focar sua equipe nisso hoje.\n\n(Aviso: Adicione OPENROUTER_API_KEY no .env.local para gerar resumos reais por IA)`;
         return NextResponse.json({
           status: 'success',
           isMock: true,
@@ -56,8 +55,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
 
-    // Real API Call using Google Gen AI SDK
-    const ai = new GoogleGenAI({ apiKey });
+    // Real API Call using OpenRouter via fetch
+    const fetchOpenRouter = async (prompt: string, expectJson: boolean = false) => {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://gentedigital.com.br', // Optional, for OpenRouter rankings
+          'X-Title': 'Gente Digital CRM', // Optional, for OpenRouter rankings
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-3.1-8b-instruct:free',
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || '';
+    };
 
     if (action === 'qualify') {
       const prompt = `Você é um analista de vendas inteligente no sistema Gente Digital. Analise o lead de telecomunicações a seguir e qualifique a intenção de compra dele (Quente, Morno ou Frio).
@@ -67,19 +89,11 @@ Dados do Lead:
 - Valor do plano: R$ ${lead.value || 'Não especificado'}
 - Histórico de interações: ${JSON.stringify(lead.history || [])}
 
-Retorne exclusivamente um JSON válido com as chaves "qualification" (devendo ser apenas "Quente", "Morno" ou "Frio"), "reason" (explicação em português do porquê da classificação, em até 2 parágrafos) e "nextSteps" (próxima ação sugerida para o vendedor). Não utilize formatação markdown de bloco de código (\`\`\`json) na resposta.`;
+Retorne exclusivamente um JSON válido com as chaves "qualification" (devendo ser apenas "Quente", "Morno" ou "Frio"), "reason" (explicação em português do porquê da classificação, em até 2 parágrafos) e "nextSteps" (próxima ação sugerida para o vendedor). Não utilize formatação markdown de bloco de código na resposta, devolva apenas o JSON limpo.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        }
-      });
-
-      const textResult = response.text?.trim() || '{}';
+      const textResult = await fetchOpenRouter(prompt, true);
+      
       try {
-        // Strip any accidental markdown formatting if the model still generated it
         const cleanJson = textResult.replace(/^```json/, '').replace(/```$/, '').trim();
         const jsonResult = JSON.parse(cleanJson);
         return NextResponse.json({
@@ -87,11 +101,11 @@ Retorne exclusivamente um JSON válido com as chaves "qualification" (devendo se
           ...jsonResult
         });
       } catch (parseError) {
-        console.error('Failed to parse Gemini response as JSON:', textResult, parseError);
+        console.error('Failed to parse OpenRouter response as JSON:', textResult, parseError);
         return NextResponse.json({
           status: 'success',
           qualification: 'Morno',
-          reason: 'Lead analisado, mas a resposta de IA não pôde ser estruturada. Detalhes brutas: ' + textResult,
+          reason: 'Lead analisado, mas a resposta de IA não pôde ser estruturada perfeitamente. Detalhes brutas: ' + textResult,
           nextSteps: 'Verifique o histórico do lead e faça contato padrão.'
         });
       }
@@ -103,17 +117,12 @@ Retorne exclusivamente um JSON válido com as chaves "qualification" (devendo se
 - Valor contratado/negócio: R$ ${lead.value || 'Não informado'}
 - Histórico recente: ${JSON.stringify(lead.history || [])}
 
-A mensagem deve ser direta, amigável, incluir quebras de linha adequadas, e convidar para o próximo passo comercial natural (como agendamento, tirar dúvidas do plano, ou formalizar contrato). Use emojis de forma moderada e profissional. Não utilize placeholders como [Nome] ou [Telefone] na resposta final, preencha tudo. Retorne apenas o texto final da mensagem.`;
+A mensagem deve ser direta, amigável, incluir quebras de linha adequadas, e convidar para o próximo passo comercial natural (como agendamento, tirar dúvidas do plano, ou formalizar contrato). Use emojis de forma moderada e profissional. Não utilize placeholders como [Nome] ou [Telefone] na resposta final, preencha tudo. Retorne apenas o texto final da mensagem, sem aspas e sem introduções.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-      });
-
-      const textResult = response.text?.trim() || '';
+      const textResult = await fetchOpenRouter(prompt);
       return NextResponse.json({
         status: 'success',
-        message: textResult
+        message: textResult.trim()
       });
 
     } else if (action === 'dashboard-summary') {
@@ -121,17 +130,12 @@ A mensagem deve ser direta, amigável, incluir quebras de linha adequadas, e con
 Métricas do Dashboard:
 ${JSON.stringify(metrics || {}, null, 2)}
 
-Seja muito breve (apenas 1 parágrafo robusto), profissional, encorajador e forneça um insight prático baseado nestes dados. Utilize formatação amigável. Retorne apenas o texto final do resumo.`;
+Seja muito breve (apenas 1 parágrafo robusto), profissional, encorajador e forneça um insight prático baseado nestes dados. Utilize formatação amigável. Retorne apenas o texto final do resumo, sem introduções.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt
-      });
-
-      const summaryResult = response.text?.trim() || 'A análise não pôde ser gerada no momento.';
+      const summaryResult = await fetchOpenRouter(prompt);
       return NextResponse.json({
         status: 'success',
-        summary: summaryResult
+        summary: summaryResult.trim() || 'A análise não pôde ser gerada no momento.'
       });
     }
 
