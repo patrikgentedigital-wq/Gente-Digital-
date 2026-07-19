@@ -720,14 +720,14 @@ export function LeadsView() {
                           </span>
 
                           {/* Lead Name */}
-                          <h4 className="font-extrabold text-brand-charcoal text-[15px] -mt-1">{lead.name}</h4>
+                          <h4 className="font-extrabold text-brand-charcoal dark:text-gray-100 text-[15px] -mt-1">{lead.name}</h4>
 
                           {/* Details List */}
                           <div className="space-y-2">
                             {/* Phone */}
                             <div className="flex flex-col">
                               <span className="text-[9px] font-bold text-gray-400 tracking-wider">TELEFONE</span>
-                              <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                              <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
                                 <Phone className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
                                 {lead.phone}
                               </div>
@@ -736,7 +736,7 @@ export function LeadsView() {
                             {/* Responsável */}
                             <div className="flex flex-col">
                               <span className="text-[9px] font-bold text-gray-400 tracking-wider">RESPONSÁVEL</span>
-                              <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                              <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
                                 <Avatar size={16} name={lead.responsible || 'Admin'} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} className="mr-1.5" />
                                 {lead.responsible || 'Admin'}
                               </div>
@@ -746,7 +746,7 @@ export function LeadsView() {
                             {lead.waitingDays !== undefined && (
                               <div className="flex flex-col">
                                 <span className="text-[9px] font-bold text-gray-400 tracking-wider">ESPERA</span>
-                                <div className="flex items-center text-xs font-semibold text-brand-charcoal mt-0.5">
+                                <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
                                   <Clock className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
                                   {lead.waitingDays} dias
                                 </div>
@@ -757,7 +757,7 @@ export function LeadsView() {
                             {lead.value !== undefined && lead.value > 0 && (
                               <div className="flex flex-col">
                                 <span className="text-[9px] font-bold text-gray-400 tracking-wider">VALOR DA VENDA</span>
-                                <div className="flex items-center text-xs font-semibold text-green-700 mt-0.5">
+                                <div className="flex items-center text-xs font-semibold text-green-700 dark:text-green-500 mt-0.5">
                                   <span className="text-xs font-bold mr-1.5">$</span>
                                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
                                 </div>
@@ -766,8 +766,8 @@ export function LeadsView() {
                           </div>
 
                           {/* Footer Colaborador */}
-                          <div className="text-[11px] text-gray-500 border-t border-gray-100 pt-2.5 flex items-center justify-between">
-                            <span className="font-semibold text-gray-600">
+                          <div className="text-[11px] text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
+                            <span className="font-semibold text-gray-600 dark:text-gray-400">
                               Indicador {lead.ref.toUpperCase()}
                             </span>
                           </div>
