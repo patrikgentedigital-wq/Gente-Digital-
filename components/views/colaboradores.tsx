@@ -1,4 +1,4 @@
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode } from 'lucide-react';
+import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, Colaborador } from '@/lib/supabase';
@@ -10,7 +10,7 @@ import * as z from 'zod';
 const colaboradorSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('Insira um endereço de e-mail válido'),
-  photo_url: z.string().url('URL inválida').optional().or(z.literal('')),
+  photo_url: z.string().optional().or(z.literal('')),
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
@@ -37,9 +37,11 @@ export function ColaboradoresView() {
   const [selectedColabForQr, setSelectedColabForQr] = useState<Colaborador | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ColaboradorFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ColaboradorFormData>({
     resolver: zodResolver(colaboradorSchema)
   });
+  
+  const watchPhotoUrl = watch('photo_url');
 
   const [baseLink, setBaseLink] = useState('gentedigital.com.br/indicar');
   const [isEditingBase, setIsEditingBase] = useState(false);
@@ -134,6 +136,46 @@ export function ColaboradoresView() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 150;
+        const MAX_HEIGHT = 150;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7); // 70% quality JPEG
+          setValue('photo_url', compressedDataUrl, { shouldValidate: true });
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAdd = async (data: ColaboradorFormData) => {
     const initials = data.name.substring(0,2).toUpperCase();
@@ -400,17 +442,23 @@ export function ColaboradoresView() {
                 {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal mb-1">URL da Foto (opcional)</label>
-                <input 
-                  {...register('photo_url')} 
-                  type="url" 
-                  placeholder="https://exemplo.com/foto.jpg" 
-                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
-                    errors.photo_url 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-brand-border focus:border-brand-yellow focus:ring-brand-yellow'
-                  }`} 
-                />
+                <label className="block text-sm font-semibold text-brand-charcoal mb-1">Foto (Opcional)</label>
+                <div className="flex items-center gap-4">
+                  {watchPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={watchPhotoUrl} alt="Preview" className="w-12 h-12 rounded-full object-cover border border-brand-border shadow-sm" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center border border-dashed border-gray-300">
+                      <Upload className="w-5 h-5 text-gray-400" />
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="text-sm text-brand-muted file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-brand-yellow/20 file:text-brand-charcoal hover:file:bg-brand-yellow/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"
+                  />
+                </div>
                 {errors.photo_url && <p className="text-red-500 text-xs mt-1 font-medium">{errors.photo_url.message}</p>}
               </div>
               <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 transition-all">
