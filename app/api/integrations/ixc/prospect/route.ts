@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
+    // 0. Autenticação estrita da rota
+    await requireAuth();
+
     const { name, phone, ref } = await req.json();
 
     if (!name || !phone) {

@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { timingSafeEqual } from 'crypto';
+
+function isValidSecret(received: string, expected: string): boolean {
+  try {
+    const receivedBuf = Buffer.from(received || '');
+    const expectedBuf = Buffer.from(expected || '');
+    if (receivedBuf.length !== expectedBuf.length) return false;
+    return timingSafeEqual(receivedBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+}
 
 function normalizeString(str: string): string {
   return str
@@ -123,13 +135,13 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (Token Secreto)
-    const secret = req.nextUrl.searchParams.get('secret');
+    // Validação de Segurança Estrita (Webhook Secret via Header)
     const expectedSecret = process.env.WEBHOOK_SECRET;
+    const receivedSecret = req.headers.get('x-webhook-secret');
     
-    if (expectedSecret && secret !== expectedSecret) {
-      console.warn("Tentativa de acesso não autorizado ao webhook detectada.");
-      return NextResponse.json({ success: false, error: 'Não Autorizado: Token inválido' }, { status: 401 });
+    if (!expectedSecret || !isValidSecret(receivedSecret || '', expectedSecret)) {
+      console.error('Tentativa de acesso não autorizado ao webhook MS Forms (Secret inválido)');
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json();

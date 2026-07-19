@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { requireAuth } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
+    // 0. Autenticação estrita da rota
+    await requireAuth();
+
     // 1. Fetch credentials from settings
     const { data: settingsData, error: settingsError } = await supabase
       .from('settings')
