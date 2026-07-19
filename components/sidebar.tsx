@@ -1,6 +1,8 @@
 'use client';
 
 import { LayoutDashboard, Users, UsersRound, Network, Settings, Plus, LogOut, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 interface SidebarProps {
   activeTab: string;
@@ -10,6 +12,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
   return (
     <>
       {/* Overlay for mobile */}
@@ -44,6 +54,17 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
           <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
         </nav>
+
+        {/* User Actions */}
+        <div className="mt-auto px-3 pt-6 border-t border-white/10">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-red-400 hover:text-white hover:bg-red-500/20 font-medium"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm">Sair do Sistema</span>
+          </button>
+        </div>
 
       </aside>
     </>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 const DEFAULT_DOMAIN = 'ixc.gentedigital.com.br';
 const DEFAULT_TOKEN = '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb';

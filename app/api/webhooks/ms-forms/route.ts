@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 function normalizeString(str: string): string {
   return str
@@ -123,6 +123,15 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Validação de Segurança (Token Secreto)
+    const secret = req.nextUrl.searchParams.get('secret');
+    const expectedSecret = process.env.WEBHOOK_SECRET;
+    
+    if (expectedSecret && secret !== expectedSecret) {
+      console.warn("Tentativa de acesso não autorizado ao webhook detectada.");
+      return NextResponse.json({ success: false, error: 'Não Autorizado: Token inválido' }, { status: 401 });
+    }
+
     const body = await req.json();
     console.log('Received MS Forms webhook payload:', body);
 
