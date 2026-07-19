@@ -251,7 +251,7 @@ export function IntegracoesView() {
           <div className="flex-1">
             <h4 className="font-bold text-brand-charcoal dark:text-white text-base mb-1">Zerar Base de Leads (Modo Produção)</h4>
             <p className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed max-w-2xl">
-              Utilize esta opção para apagar permanentemente todos os leads cadastrados (dados de teste) e iniciar o sistema "valendo". 
+              Utilize esta opção para apagar permanentemente todos os leads cadastrados (dados de teste) e iniciar o sistema &quot;valendo&quot;. 
               <strong> Os colaboradores cadastrados NÃO serão afetados.</strong>
             </p>
           </div>

@@ -278,7 +278,10 @@ export function ColaboradoresView() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {colab.photo_url ? (
-                        <img src={colab.photo_url} alt={colab.name} className="w-9 h-9 rounded-full object-cover border border-brand-border" />
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={colab.photo_url} alt={colab.name} className="w-9 h-9 rounded-full object-cover border border-brand-border" />
+                        </>
                       ) : (
                         <Avatar size={36} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
                       )}
@@ -438,11 +441,14 @@ export function ColaboradoresView() {
             <div className="space-y-6 text-center">
               {/* QR Code Container */}
               <div className="bg-gray-50 border border-brand-border rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getFullReferralLink(baseLink, selectedColabForQr.id))}`} 
-                  alt="QR Code de Indicação" 
-                  className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" 
-                />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getFullReferralLink(baseLink, selectedColabForQr.id))}`} 
+                    alt="QR Code de Indicação" 
+                    className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" 
+                  />
+                </>
                 <p className="text-[11px] text-brand-muted font-bold mt-4 uppercase tracking-wider">
                   Escaneie para indicar
                 </p>
