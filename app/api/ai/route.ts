@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.1-8b-instruct:free',
+          model: 'tencent/hy3:free',
           messages: [
             { role: 'user', content: prompt }
           ]
