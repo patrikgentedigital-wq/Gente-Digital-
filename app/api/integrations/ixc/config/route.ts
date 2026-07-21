@@ -1,11 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { createServerClient } from '@supabase/ssr';
 
-const DEFAULT_DOMAIN = 'ixc.gentedigital.com.br';
-const DEFAULT_TOKEN = '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb';
+async function verifyAuth(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export async function GET() {
+  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+    // Modo offline/dev local sem Supabase configurado
+    return true;
+  }
+
+  const client = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll() {},
+      },
+    }
+  );
+
+  const { data: { user } } = await client.auth.getUser();
+  return !!user;
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    const envDomain = process.env.IXC_DOMAIN || '';
+    const envToken = process.env.IXC_TOKEN || '';
+
     // If the database configurations are loaded, fetch settings
     const { data, error } = await supabase
       .from('settings')
@@ -14,11 +46,10 @@ export async function GET() {
 
     if (error) {
       console.warn("Error reading settings table:", error.message);
-      // Suppress table missing error to allow the user time to run the SQL command
       return NextResponse.json({ 
         success: true, 
-        domain: DEFAULT_DOMAIN, 
-        token: DEFAULT_TOKEN, 
+        domain: envDomain, 
+        token: envToken, 
         tableMissing: true 
       });
     }
@@ -30,8 +61,8 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      domain: config['ixc_domain'] || DEFAULT_DOMAIN,
-      token: config['ixc_token'] || DEFAULT_TOKEN,
+      domain: config['ixc_domain'] || envDomain,
+      token: config['ixc_token'] || envToken,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -40,6 +71,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const { domain, token } = await req.json();
 
     if (domain === undefined || token === undefined) {

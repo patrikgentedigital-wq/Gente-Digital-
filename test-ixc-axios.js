@@ -1,6 +1,12 @@
 const axios = require('axios');
-const domain = 'ixc.gentedigital.com.br';
-const token = '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb';
+const domain = process.env.IXC_DOMAIN;
+const token = process.env.IXC_TOKEN;
+
+if (!domain || !token) {
+  console.error("IXC_DOMAIN e IXC_TOKEN devem estar configurados nas variáveis de ambiente.");
+  process.exit(1);
+}
+
 
 async function test() {
   try {

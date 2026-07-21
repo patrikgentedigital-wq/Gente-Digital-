@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
       .in('key', ['ixc_domain', 'ixc_token']);
 
     const config: Record<string, string> = {
-      ixc_domain: 'ixc.gentedigital.com.br',
-      ixc_token: '85:b8f803056841572d25dbc6bbd6a99bb8f544da3d26d5c33c76d8cf1ec6afdbfb'
+      ixc_domain: process.env.IXC_DOMAIN || '',
+      ixc_token: process.env.IXC_TOKEN || ''
     };
 
     if (settingsData && settingsData.length > 0) {

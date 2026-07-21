@@ -20,17 +20,20 @@ export function IntegracoesView() {
     setIsClearing(true);
     setClearSuccess(false);
     try {
-      // Deleta todos os leads onde id não seja 0 (basicamente todos)
-      const { error } = await supabase.from('leads').delete().neq('id', 0);
-      if (error) {
-        alert('Erro ao apagar os leads: ' + error.message);
+      const response = await fetch('/api/leads/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        alert('Erro ao apagar os leads: ' + (data.error || 'Falha na requisição'));
       } else {
         setClearSuccess(true);
         setTimeout(() => setClearSuccess(false), 4000);
         alert('✅ Sucesso! Todos os leads de teste foram apagados. O sistema está pronto para produção.');
       }
     } catch (err) {
-      alert('Erro inesperado de conexão com o banco de dados.');
+      alert('Erro inesperado de conexão com o servidor.');
     } finally {
       setIsClearing(false);
     }
