@@ -25,7 +25,18 @@ async function verifyAuth(req: NextRequest) {
   );
 
   const { data: { user } } = await client.auth.getUser();
-  return !!user;
+  
+  if (!user) return false;
+
+  const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+  if (adminEmails.length > 0 && user.email) {
+    if (!adminEmails.includes(user.email.toLowerCase())) {
+      console.warn(`Acesso bloqueado: ${user.email} tentou acessar rota protegida.`);
+      return false; // Usuário autenticado, mas não é admin
+    }
+  }
+
+  return true;
 }
 
 export async function GET(req: NextRequest) {

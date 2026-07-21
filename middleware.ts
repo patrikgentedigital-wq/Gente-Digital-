@@ -44,6 +44,9 @@ export async function middleware(request: NextRequest) {
   const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
   
   if (!user && !isAuthRoute && !isWebhookRoute) {
+    if (request.nextUrl.pathname.startsWith('/api')) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

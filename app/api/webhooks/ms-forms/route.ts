@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { timingSafeEqual } from 'crypto';
+import { z } from 'zod';
 
 function normalizeString(str: string): string {
   return str
@@ -127,13 +129,17 @@ export async function POST(req: NextRequest) {
     const secret = req.nextUrl.searchParams.get('secret');
     const expectedSecret = process.env.WEBHOOK_SECRET;
     
-    if (expectedSecret && secret !== expectedSecret) {
+    const isValidSecret = secret && expectedSecret &&
+                          secret.length === expectedSecret.length &&
+                          timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
+
+    if (expectedSecret && !isValidSecret) {
       console.warn("Tentativa de acesso não autorizado ao webhook detectada.");
       return NextResponse.json({ success: false, error: 'Não Autorizado: Token inválido' }, { status: 401 });
     }
 
     const body = await req.json();
-    console.log('Received MS Forms webhook payload:', body);
+    console.log('Received MS Forms webhook com chaves:', Object.keys(body || {}));
 
     // Captura parâmetros da query URL (?ref=... ou ?colaborador=...)
     const url = new URL(req.url);
@@ -158,6 +164,22 @@ export async function POST(req: NextRequest) {
     const rawValue = findField(body, ['valor', 'value', 'preco', 'preço', 'plano', 'mensalidade'], '0');
     const value = parseFloat(rawValue.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
 
+    // 2. Zod Validation das extrações
+    const ExtractedDataSchema = z.object({
+      name: z.string().max(100),
+      phone: z.string().max(30),
+      ref: z.string().max(50),
+      value: z.number().nonnegative()
+    });
+
+    const parsedData = ExtractedDataSchema.safeParse({ name, phone, ref, value });
+    if (!parsedData.success) {
+      console.warn("Validação falhou para o payload extraído:", parsedData.error.format());
+      return NextResponse.json({ success: false, error: 'Payload validation failed', details: parsedData.error.format() }, { status: 400 });
+    }
+
+    const validData = parsedData.data;
+
     // Check if Supabase is configured (avoid crashing on local mock state)
     const isSupabaseConfigured = 
       process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -169,7 +191,7 @@ export async function POST(req: NextRequest) {
       // 1. Insert Lead into Supabase
       const { data: leadData, error: leadError } = await supabase
         .from('leads')
-        .insert([{ name, phone, ref, status: 'Pendente', value }])
+        .insert([{ name: validData.name, phone: validData.phone, ref: validData.ref, status: 'Pendente', value: validData.value }])
         .select();
 
       if (leadError) {
@@ -196,7 +218,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Enviar para o IXC Soft como prospect
-        const ixcResult = await createIxcProspect(name, phone, ref);
+        const ixcResult = await createIxcProspect(validData.name, validData.phone, validData.ref);
         if (ixcResult.success) {
           await supabase
             .from('lead_history')
@@ -221,11 +243,11 @@ export async function POST(req: NextRequest) {
       // Mock insert response for development/mock mode
       insertedLead = {
         id: Math.floor(Math.random() * 1000) + 100,
-        name,
-        phone,
-        ref,
+        name: validData.name,
+        phone: validData.phone,
+        ref: validData.ref,
         status: 'Pendente',
-        value,
+        value: validData.value,
         created_at: new Date().toISOString()
       };
       console.log('Mocked MS Forms webhook registration (Supabase offline):', insertedLead);

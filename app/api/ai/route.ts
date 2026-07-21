@@ -1,4 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+// Inicializa Rate Limiter (10 requisições por janela de 1 minuto)
+// Evita crash se as variáveis não estiverem setadas ainda (modo fallback)
+const redis = (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) 
+  ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN }) 
+  : null;
+
+const ratelimit = redis 
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m') })
+  : null;
+
+// Schemas de Validação Zod
+const LeadHistorySchema = z.object({
+  date: z.string().max(50).optional(),
+  action: z.string().max(100).optional(),
+  note: z.string().max(250).optional()
+});
+
+const AiPayloadSchema = z.object({
+  action: z.string().min(1),
+  lead: z.object({
+    name: z.string().max(100).optional().default('Cliente'),
+    status: z.string().max(50).optional().default('Pendente'),
+    value: z.number().optional().default(0),
+    history: z.array(LeadHistorySchema).optional().default([])
+  }).optional().default({}),
+  metrics: z.record(z.any()).optional().default({})
+});
 
 function sanitizeString(str: any, maxLength = 250): string {
   if (typeof str !== 'string') return '';
@@ -20,7 +51,24 @@ function sanitizeHistory(history: any[]): any[] {
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, lead = {}, metrics = {} } = await req.json();
+    // 1. Rate Limiting (por IP ou Sessão anônima)
+    if (ratelimit) {
+      const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';
+      const { success } = await ratelimit.limit(`ai_endpoint_${ip}`);
+      if (!success) {
+        return NextResponse.json({ error: 'Muitas requisições. Tente novamente em um minuto.' }, { status: 429 });
+      }
+    }
+
+    // 2. Validação Zod
+    const rawBody = await req.json();
+    const parsed = AiPayloadSchema.safeParse(rawBody);
+    
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Payload inválido', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { action, lead, metrics } = parsed.data;
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!action) {
