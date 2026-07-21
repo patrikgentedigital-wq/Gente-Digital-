@@ -783,12 +783,12 @@ export function LeadsView() {
                               </div>
                             </div>
 
-                            {/* Responsável */}
+                            {/* Responsável / Indicador */}
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-bold text-gray-400 tracking-wider">RESPONSÁVEL</span>
-                              <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
-                                <Avatar size={16} name={lead.responsible || 'Admin'} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} className="mr-1.5" />
-                                {lead.responsible || 'Admin'}
+                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-400 tracking-wider">RESPONSÁVEL / INDICADOR</span>
+                              <div className="flex items-center text-xs font-bold text-brand-charcoal dark:text-white mt-0.5">
+                                <Avatar size={16} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} className="mr-1.5 shrink-0" />
+                                <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
                               </div>
                             </div>
 
@@ -946,7 +946,11 @@ export function LeadsView() {
                   <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{selectedLead.name}</h3>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(selectedLead.status)}`}>{selectedLead.status}</span>
-                    <span className="text-sm font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {selectedLead.phone}</span>
+                    <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {selectedLead.phone}</span>
+                    <span className="text-xs font-semibold text-brand-charcoal dark:text-white flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full">
+                      <Avatar size={14} name={selectedLead.responsible || selectedLead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} />
+                      {selectedLead.responsible || selectedLead.ref || 'Admin'}
+                    </span>
                   </div>
                 </div>
               </div>
