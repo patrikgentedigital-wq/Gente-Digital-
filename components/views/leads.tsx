@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
+import { logAuditEvent } from '@/lib/audit';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from 'boring-avatars';
 import { useForm } from 'react-hook-form';
@@ -126,6 +127,9 @@ export function LeadsView() {
   };
 
   const handleDeleteLead = async (id: number) => {
+    const targetLead = leads.find(l => l.id === id);
+    const leadName = targetLead?.name || `ID ${id}`;
+
     if (!window.confirm("Tem certeza que deseja excluir este lead? Essa ação não pode ser desfeita.")) {
       return;
     }
@@ -137,6 +141,7 @@ export function LeadsView() {
         if (error) throw error;
       }
       
+      await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
       setLeads(leads.filter(l => l.id !== id));
       setSelectedLead(null);
     } catch (err) {

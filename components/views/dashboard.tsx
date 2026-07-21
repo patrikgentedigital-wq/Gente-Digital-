@@ -1,11 +1,11 @@
 'use client';
 
-import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X } from 'lucide-react';
+import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
-
 import { useState, useEffect } from 'react';
+import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador } from '@/lib/supabase';
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -20,6 +20,7 @@ export function DashboardView() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
+  const [showExecutiveModal, setShowExecutiveModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -377,6 +378,14 @@ export function DashboardView() {
         
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowExecutiveModal(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">Relatório PDF</span>
+          </button>
+
+          <button
             onClick={handleGenerateAiSummary}
             className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm"
           >
@@ -544,6 +553,19 @@ export function DashboardView() {
             </div>
           </div>
         </div>
+      )}
+      {showExecutiveModal && (
+        <ExecutiveReportModal 
+          onClose={() => setShowExecutiveModal(false)}
+          metrics={{
+            totalLeads,
+            conversões,
+            conversionRate,
+            clicks,
+            topColaboradores,
+            topClientes: getTopClientes()
+          }}
+        />
       )}
     </div>
   );

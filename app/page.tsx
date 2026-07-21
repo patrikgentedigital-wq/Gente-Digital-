@@ -7,6 +7,8 @@ import { Header } from '@/components/header';
 import { DashboardView } from '@/components/views/dashboard';
 import { LeadsView } from '@/components/views/leads';
 import { ColaboradoresView } from '@/components/views/colaboradores';
+import { ComissoesView } from '@/components/views/comissoes';
+import { AuditoriaView } from '@/components/views/auditoria';
 import { IntegracoesView } from '@/components/views/integracoes';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -74,6 +76,8 @@ function PageContent() {
       case 'dashboard': return <DashboardView />;
       case 'leads': return <LeadsView />;
       case 'colaboradores': return <ColaboradoresView />;
+      case 'comissoes': return <ComissoesView />;
+      case 'auditoria': return <AuditoriaView />;
       case 'integracoes': return <IntegracoesView />;
       default: return <ColaboradoresView />;
     }
@@ -84,6 +88,8 @@ function PageContent() {
       dashboard: 'Dashboard',
       leads: 'Leads',
       colaboradores: 'Colaboradores',
+      comissoes: 'Gestão de Comissões & PIX',
+      auditoria: 'Audit Trail & Logs de Segurança',
       integracoes: 'Integrações (IXC & MS)'
     };
     return names[activeTab] || 'Painel';

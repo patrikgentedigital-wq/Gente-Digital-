@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, Users, UsersRound, Network, Settings, Plus, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Network, Settings, Plus, LogOut, X, Wallet, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -48,10 +48,12 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1 px-3">
+        <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavItem id="leads" icon={Users} label="Leads" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
+          <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
+          <NavItem id="auditoria" icon={ShieldCheck} label="Logs & Auditoria" active={activeTab === 'auditoria'} onClick={() => setActiveTab('auditoria')} />
           <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
         </nav>
 
