@@ -63,7 +63,7 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
     };
 
     if (settingsData && settingsData.length > 0) {
-      settingsData.forEach(row => {
+      settingsData.forEach((row: any) => {
         config[row.key] = row.value;
       });
     }

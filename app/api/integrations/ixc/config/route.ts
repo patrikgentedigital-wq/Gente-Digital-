@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     }
 
     const config: Record<string, string> = {};
-    data?.forEach(row => {
+    data?.forEach((row: any) => {
       config[row.key] = row.value;
     });
 
