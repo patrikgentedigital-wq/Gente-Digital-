@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
           const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
           leadDate.setDate(leadDate.getDate() - 30);
           
+          let activeContractValue = 0;
+          
           for (const client of ixcData.registros) {
             // Check contracts for this client
             const contractRes = await fetch(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
@@ -120,6 +122,10 @@ export async function POST(req: NextRequest) {
                     foundValidContract = true;
                     matchedClient = client;
                     activeContractId = contract.id;
+                    const val = parseFloat(contract.valor || contract.valor_total || contract.mensalidade || '0');
+                    if (val > 0) {
+                      activeContractValue = val;
+                    }
                     break;
                   }
                 }
@@ -133,10 +139,15 @@ export async function POST(req: NextRequest) {
             continue;
           }
           
-          // Update lead status in Supabase
+          // Update lead status and contract value in Supabase
+          const updateFields: Record<string, any> = { status: 'Ganho' };
+          if (activeContractValue > 0) {
+            updateFields.value = activeContractValue;
+          }
+
           const { error: updateError } = await supabase
             .from('leads')
-            .update({ status: 'Ganho' })
+            .update(updateFields)
             .eq('id', lead.id);
 
           if (updateError) {
@@ -145,11 +156,12 @@ export async function POST(req: NextRequest) {
           }
 
           // Insert into lead history
+          const valueText = activeContractValue > 0 ? ` | Valor: R$ ${activeContractValue.toFixed(2)}` : '';
           const historyData = {
             lead_id: lead.id,
             date: new Date().toLocaleString('pt-BR').substring(0, 16),
             action: 'Sincronizado com IXC Soft',
-            note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId})`
+            note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId}${valueText})`
           };
 
           await supabase.from('lead_history').insert([historyData]);
@@ -160,7 +172,8 @@ export async function POST(req: NextRequest) {
             name: lead.name,
             matchedAs: matchedClient.razao,
             code: matchedClient.id,
-            contract: activeContractId
+            contract: activeContractId,
+            value: activeContractValue
           });
         }
       } catch (err: any) {

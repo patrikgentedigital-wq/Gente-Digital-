@@ -170,6 +170,33 @@ export function IntegracoesView() {
               </>
             ) : 'Salvar e Testar Conexão'}
           </button>
+
+          <div className="pt-5 border-t border-brand-border dark:border-gray-700/80 space-y-2">
+            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white">
+              URL do Webhook em Tempo Real (Ativação de Contrato IXC)
+            </label>
+            <p className="text-xs text-brand-muted dark:text-gray-400 leading-relaxed">
+              Cole esta URL em <strong>Gatilhos / Webhooks</strong> do IXC Soft para atualizar o lead para "Ganho" e importar o valor do plano automaticamente no instante em que o contrato for ativado:
+            </p>
+            <div className="flex gap-2 pt-1">
+              <input 
+                type="text" 
+                readOnly 
+                value={origin ? `${origin}/api/integrations/ixc/webhook` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook'}
+                className="flex-1 px-4 py-2.5 bg-white dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-xl text-xs font-mono text-brand-charcoal dark:text-gray-300 outline-none select-all" 
+              />
+              <button
+                onClick={() => {
+                  const url = origin ? `${origin}/api/integrations/ixc/webhook` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook';
+                  navigator.clipboard.writeText(url);
+                  alert('URL do Webhook IXC copiada para a área de transferência!');
+                }}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors shrink-0 shadow-sm"
+              >
+                Copiar URL
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
