@@ -455,7 +455,7 @@ export function LeadsView() {
   });
 
   return (
-    <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 h-[calc(100vh-140px)] flex flex-col relative pb-8 overflow-hidden">
+    <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
       <div className="shrink-0">
         <div className="text-xs text-brand-muted dark:text-gray-400 font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
           <span>Marketing de indicações</span>
@@ -712,7 +712,7 @@ export function LeadsView() {
         <div 
           ref={scrollContainerRef} 
           onDragOver={handleDragOver}
-          className="flex-1 flex gap-6 overflow-x-auto pb-6 scrollbar-hide items-start"
+          className="flex-1 flex gap-6 overflow-x-auto pb-6 items-start min-h-[550px]"
         >
           {statuses.map(status => {
             const columnLeads = filteredLeads.filter(l => l.status === status);
@@ -722,7 +722,7 @@ export function LeadsView() {
                 key={status} 
                 onDrop={(e) => handleDrop(e, status)}
                 onDragOver={handleDragOver}
-                className="flex-shrink-0 w-[300px] flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-full overflow-hidden shadow-sm"
+                className="flex-shrink-0 w-[310px] flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-[calc(100vh-220px)] min-h-[480px] shadow-sm"
               >
                 <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                   <div className="flex items-center gap-2">
@@ -734,7 +734,7 @@ export function LeadsView() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide space-y-3 min-h-[300px]">
+                <div className="flex-1 overflow-y-auto pr-1.5 space-y-3 min-h-0">
                   <AnimatePresence>
                     {columnLeads.length > 0 ? (
                       columnLeads.map(lead => (
