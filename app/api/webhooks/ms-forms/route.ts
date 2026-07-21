@@ -129,9 +129,14 @@ export async function POST(req: NextRequest) {
     const secret = req.nextUrl.searchParams.get('secret');
     const expectedSecret = process.env.WEBHOOK_SECRET;
     
-    const isValidSecret = secret && expectedSecret &&
-                          secret.length === expectedSecret.length &&
-                          timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
+    let isValidSecret = false;
+    if (secret && expectedSecret && secret.length === expectedSecret.length) {
+      try {
+        isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
+      } catch (e) {
+        isValidSecret = false;
+      }
+    }
 
     if (expectedSecret && !isValidSecret) {
       console.warn("Tentativa de acesso não autorizado ao webhook detectada.");
