@@ -66,6 +66,17 @@ export function DashboardView() {
 
         if (typeof window !== 'undefined') {
           try {
+            const locRaw = localStorage.getItem('gente_digital_local_colaboradores');
+            if (locRaw) {
+              const localColabs: Colaborador[] = JSON.parse(locRaw);
+              const map = new Map<string, Colaborador>();
+              localColabs.forEach(c => map.set(c.id, c));
+              colabsData.forEach(c => {
+                if (!map.has(c.id)) map.set(c.id, c);
+              });
+              colabsData = Array.from(map.values());
+            }
+
             const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
             if (delRaw) {
               const delIds: string[] = JSON.parse(delRaw);
@@ -228,12 +239,14 @@ export function DashboardView() {
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
-        const points = referredLeads.length * 20 + colabConversions * 50;
+        const totalReferred = referredLeads.length;
+        const points = totalReferred * 20 + colabConversions * 50;
 
         return {
           ...colab,
           points: points,
-          conversions: colabConversions
+          conversions: colabConversions,
+          totalReferred: totalReferred
         };
       })
       .sort((a, b) => b.points - a.points)
@@ -270,13 +283,15 @@ export function DashboardView() {
       const originalName = clientRefs.find(r => normalizeStr(r) === uRef) || uRef;
       const referredLeads = filteredLeads.filter(l => normalizeStr(l.ref) === uRef);
       const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
-      const points = referredLeads.length * 20 + conversions * 50;
+      const totalReferred = referredLeads.length;
+      const points = totalReferred * 20 + conversions * 50;
       
       return {
         id: uRef,
         name: originalName,
         points: points,
-        conversions: conversions
+        conversions: conversions,
+        totalReferred: totalReferred
       };
     })
     .filter(client => client.points > 0)
@@ -491,7 +506,9 @@ export function DashboardView() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-brand-charcoal dark:text-white text-sm truncate">{colab.name}</p>
-                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">{colab.conversions} conversões</p>
+                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">
+                    {colab.conversions} {colab.conversions === 1 ? 'conversão' : 'conversões'} ({colab.totalReferred || colab.conversions} {colab.totalReferred === 1 ? 'indicação' : 'indicações'})
+                  </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-bold text-brand-charcoal dark:text-white text-sm">{colab.points}</p>
@@ -528,7 +545,9 @@ export function DashboardView() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-brand-charcoal dark:text-white text-sm truncate capitalize">{cliente.name}</p>
-                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">{cliente.conversions} conversões</p>
+                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">
+                    {cliente.conversions} {cliente.conversions === 1 ? 'conversão' : 'conversões'} ({cliente.totalReferred || cliente.conversions} {cliente.totalReferred === 1 ? 'indicação' : 'indicações'})
+                  </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-bold text-brand-charcoal dark:text-white text-sm">{cliente.points}</p>
