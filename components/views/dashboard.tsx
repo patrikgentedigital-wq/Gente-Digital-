@@ -43,7 +43,8 @@ export function DashboardView() {
               { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
               { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
               { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
-              { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 }
+              { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 },
+              { id: 'EMP-046', name: 'Alfredo Seixas', email: 'alfredo.seixas@gentedigital.com.br', initials: 'AS', count: 3 }
             ];
           }
         } else {
@@ -223,7 +224,7 @@ export function DashboardView() {
 
         const referredLeads = filteredLeads.filter(l => {
           const normRef = normalizeStr(l.ref);
-          return normRef === normColabId || normRef === normColabName;
+          return normRef === normColabId || normRef === normColabName || (!!normRef && !!normColabName && (normRef.includes(normColabName) || normColabName.includes(normRef)));
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
@@ -258,7 +259,7 @@ export function DashboardView() {
        const isColab = colaboradores.some(c => {
          const nName = normalizeStr(c.name);
          const nId = normalizeStr(c.id);
-         return normRef === nId || normRef === nName;
+         return normRef === nId || normRef === nName || (!!normRef && !!nName && (normRef.includes(nName) || nName.includes(normRef)));
        });
        return !isColab;
     });

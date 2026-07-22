@@ -20,7 +20,8 @@ const initialColaboradores: Colaborador[] = [
   { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
   { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
   { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
-  { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 }
+  { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 },
+  { id: 'EMP-046', name: 'Alfredo Seixas', email: 'alfredo.seixas@gentedigital.com.br', initials: 'AS', count: 3 }
 ];
 
 const getLocalColaboradores = (): Colaborador[] => {
@@ -199,7 +200,7 @@ export function ColaboradoresView() {
         
         const colabCount = leadsData.length > 0 ? leadsData.filter(lead => {
           const normRef = normalizeStr(lead.ref);
-          return normRef === normColabId || normRef === normColabName;
+          return normRef === normColabId || normRef === normColabName || (!!normRef && !!normColabName && (normRef.includes(normColabName) || normColabName.includes(normRef)));
         }).length : (colab.count || 0);
         
         return { ...colab, count: colabCount };
