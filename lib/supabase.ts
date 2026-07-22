@@ -31,5 +31,6 @@ export interface Colaborador {
   initials: string;
   count: number;
   photo_url?: string;
+  role?: 'admin' | 'colaborador';
   created_at?: string;
 }
