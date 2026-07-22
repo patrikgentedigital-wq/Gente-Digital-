@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UsersRound, Network, Settings, Plus, LogOut, X, Wallet, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Network, Settings, Plus, LogOut, X, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -14,70 +14,25 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
   const router = useRouter();
-  const [userRole, setUserRole] = useState<'admin' | 'colaborador' | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
-    async function checkUserRole() {
-      // Se não tem Supabase configurado, não trava o sistema, apenas assume colaborador (ou admin se for local dev, mas por segurança, colaborador)
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        setUserRole('colaborador');
-        return;
-      }
-
+    async function getEmail() {
       try {
-        // Atualiza a sessão para pegar metadados mais recentes do Supabase Auth
-        await supabase.auth.refreshSession();
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setUserEmail(user.email || '');
-          
-          // 1. Consulta tabela de colaboradores no Supabase em primeiro lugar
-          const { data: colab } = await supabase
-            .from('colaboradores')
-            .select('role')
-            .eq('email', user.email)
-            .maybeSingle();
-
-          if (colab?.role) {
-            setUserRole(colab.role as 'admin' | 'colaborador');
-            return;
-          }
-
-          // 2. Verifica se a role está no user_metadata
-          const metadataRole = user.user_metadata?.role;
-          if (metadataRole === 'admin' || metadataRole === 'colaborador') {
-            setUserRole(metadataRole);
-            return;
-          }
-
-          // Default role se não especificado
-          setUserRole('colaborador');
-        } else {
-          setUserRole('colaborador');
+        if (user?.email) {
+          setUserEmail(user.email);
         }
-      } catch (err) {
-        console.error("Auth check failed", err);
-        setUserRole('colaborador');
-      }
+      } catch (e) {}
     }
-    checkUserRole();
+    getEmail();
   }, []);
-
-  const isAdmin = userRole === 'admin';
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
   };
-
-  // Redireciona colaborador se estiver tentando acessar aba restrita
-  useEffect(() => {
-    if (userRole === 'colaborador' && (activeTab === 'auditoria' || activeTab === 'integracoes')) {
-      setActiveTab('dashboard');
-    }
-  }, [userRole, activeTab, setActiveTab]);
 
   return (
     <>
@@ -100,16 +55,10 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </button>
 
         {/* Logo */}
-        <div className="px-6 mb-6 mt-2 flex flex-col gap-2">
+        <div className="px-6 mb-8 mt-2">
           <h1 className="font-display text-[32px] font-bold text-brand-yellow leading-tight tracking-tight">
             Gente<br />Digital
           </h1>
-          {userRole && (
-            <div className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-gray-300 border border-white/10">
-              <span className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
-              <span className="capitalize">{isAdmin ? 'Administrador' : 'Colaborador'}</span>
-            </div>
-          )}
         </div>
 
         {/* Navigation */}
@@ -117,16 +66,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavItem id="leads" icon={Users} label="Leads" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
-          
-          {/* Funcionalidades protegidas/restritas para Admins se desejado */}
           <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
-          
-          {isAdmin && (
-            <>
-              <NavItem id="auditoria" icon={ShieldCheck} label="Logs & Auditoria" active={activeTab === 'auditoria'} onClick={() => setActiveTab('auditoria')} />
-              <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
-            </>
-          )}
+          <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
         </nav>
 
         {/* User Actions */}

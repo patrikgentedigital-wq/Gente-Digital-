@@ -290,12 +290,28 @@ export function LeadsView() {
 
   const fetchColaboradores = async () => {
     try {
+      let colabs: { id: string; name: string }[] = [];
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
         const { data, error } = await supabase.from('colaboradores').select('id, name');
-        if (!error && data) {
-          setColaboradores(data);
+        if (!error && data && data.length > 0) {
+          colabs = data;
         }
       }
+
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('gente_digital_local_colaboradores');
+          if (raw) {
+            const local: any[] = JSON.parse(raw);
+            const map = new Map<string, { id: string; name: string }>();
+            colabs.forEach(c => map.set(c.id, c));
+            local.forEach(c => map.set(c.id, { id: c.id, name: c.name }));
+            colabs = Array.from(map.values());
+          }
+        } catch (e) {}
+      }
+
+      setColaboradores(colabs);
     } catch (err) {
       console.error("Error fetching contributors in leads view:", err);
     }

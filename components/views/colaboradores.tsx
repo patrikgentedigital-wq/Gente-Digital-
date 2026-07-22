@@ -18,29 +18,64 @@ type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
 
 const initialColaboradores: Colaborador[] = [
   { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
-  { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 }
+  { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
+  { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
+  { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 }
 ];
 
-let mockColabCounter = Math.floor(Math.random() * 100) + 44;
-const getNextColabId = () => {
-  mockColabCounter += 1;
-  return `EMP-0${mockColabCounter}`;
+const getLocalColaboradores = (): Colaborador[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('gente_digital_local_colaboradores');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const saveLocalColaborador = (colab: Colaborador) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getLocalColaboradores();
+    const updated = [colab, ...existing.filter(c => c.id !== colab.id)];
+    localStorage.setItem('gente_digital_local_colaboradores', JSON.stringify(updated));
+  } catch (e) {}
+};
+
+const removeLocalColaborador = (id: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getLocalColaboradores();
+    const updated = existing.filter(c => c.id !== id);
+    localStorage.setItem('gente_digital_local_colaboradores', JSON.stringify(updated));
+  } catch (e) {}
 };
 
 export function ColaboradoresView() {
   const router = useRouter();
-  const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-  const [colaboradores, setColaboradores] = useState<Colaborador[]>(isSupabaseConfigured ? [] : initialColaboradores);
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedColabForQr, setSelectedColabForQr] = useState<Colaborador | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  
+
+  const getNextColabId = () => {
+    let maxNum = 45;
+    colaboradores.forEach(c => {
+      const match = c.id.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    return `EMP-0${maxNum + 1}`;
+  };
+
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ColaboradorFormData>({
     resolver: zodResolver(colaboradorSchema)
   });
-  
+
   const watchPhotoUrl = watch('photo_url');
 
   const [baseLink, setBaseLink] = useState('gentedigital.com.br/indicar');
@@ -59,7 +94,7 @@ export function ColaboradoresView() {
   const loadBaseLink = async () => {
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('settings')
           .select('value')
           .eq('key', 'base_link')
@@ -93,37 +128,59 @@ export function ColaboradoresView() {
   const fetchColaboradores = async () => {
     try {
       setIsLoading(true);
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        if (data) {
-           // Calcula dinamicamente a contagem de indicações baseada nos leads reais
-           const { data: leadsData } = await supabase.from('leads').select('ref');
-           
-           const normalizeStr = (str: string) => 
-             str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+      let baseColabs: Colaborador[] = [];
 
-           const colabsWithCount = data.map(colab => {
-             const normColabName = normalizeStr(colab.name);
-             const normColabId = normalizeStr(colab.id);
-             
-             const colabCount = leadsData ? leadsData.filter(lead => {
-               const normRef = normalizeStr(lead.ref);
-               return normRef === normColabId || normRef === normColabName;
-             }).length : (colab.count || 0);
-             
-             return { ...colab, count: colabCount };
-           });
-           
-           setColaboradores(colabsWithCount);
-        }
-      } else {
-        setColaboradores(initialColaboradores);
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        try {
+          const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
+          if (!error && data && data.length > 0) {
+            baseColabs = data;
+          }
+        } catch (e) {}
       }
+
+      if (baseColabs.length === 0) {
+        baseColabs = initialColaboradores;
+      }
+
+      const localColabs = getLocalColaboradores();
+      const colabsMap = new Map<string, Colaborador>();
+
+      localColabs.forEach(c => colabsMap.set(c.id, c));
+      baseColabs.forEach(c => {
+        if (!colabsMap.has(c.id)) {
+          colabsMap.set(c.id, c);
+        }
+      });
+
+      const combinedColabs = Array.from(colabsMap.values());
+
+      let leadsData: any[] = [];
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        try {
+          const { data: lData } = await supabase.from('leads').select('ref');
+          if (lData) leadsData = lData;
+        } catch (e) {}
+      }
+
+      const normalizeStr = (str: string) => 
+        str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+
+      const colabsWithCount = combinedColabs.map(colab => {
+        const normColabName = normalizeStr(colab.name);
+        const normColabId = normalizeStr(colab.id);
+        
+        const colabCount = leadsData.length > 0 ? leadsData.filter(lead => {
+          const normRef = normalizeStr(lead.ref);
+          return normRef === normColabId || normRef === normColabName;
+        }).length : (colab.count || 0);
+        
+        return { ...colab, count: colabCount };
+      });
+      
+      setColaboradores(colabsWithCount);
     } catch (error) {
       console.error("Error fetching colaboradores:", error);
-      const isConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-      setColaboradores(isConfigured ? [] : initialColaboradores);
     } finally {
       setIsLoading(false);
     }
@@ -178,34 +235,51 @@ export function ColaboradoresView() {
   };
 
   const handleAdd = async (data: ColaboradorFormData) => {
-    const initials = data.name.substring(0,2).toUpperCase();
+    const initials = data.name.substring(0, 2).toUpperCase();
     const id = getNextColabId();
     
-    const newColab = { id, name: data.name, email: data.email, initials, count: 0, photo_url: data.photo_url || undefined };
+    const newColab: Colaborador = { 
+      id, 
+      name: data.name, 
+      email: data.email, 
+      initials, 
+      count: 0, 
+      photo_url: data.photo_url || undefined,
+      created_at: new Date().toISOString()
+    };
 
-    try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const { error } = await supabase.from('colaboradores').insert([newColab]);
-        if (error) throw error;
+    saveLocalColaborador(newColab);
+    setColaboradores(prev => [newColab, ...prev]);
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      try {
+        await supabase.from('colaboradores').insert([{
+          id: newColab.id,
+          name: newColab.name,
+          email: newColab.email,
+          initials: newColab.initials,
+          count: 0,
+          photo_url: newColab.photo_url || null
+        }]);
+      } catch (err) {
+        console.warn("Supabase insert warning (saved locally):", err);
       }
-      setColaboradores([newColab, ...colaboradores]);
-    } catch (error) {
-      console.error("Error adding colaborador:", error);
     }
     
     setIsModalOpen(false);
     reset();
-  }
+  };
 
   const handleDelete = async (id: string) => {
-    try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const { error } = await supabase.from('colaboradores').delete().eq('id', id);
-        if (error) throw error;
+    removeLocalColaborador(id);
+    setColaboradores(prev => prev.filter(c => c.id !== id));
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      try {
+        await supabase.from('colaboradores').delete().eq('id', id);
+      } catch (err) {
+        console.warn("Supabase delete warning:", err);
       }
-      setColaboradores(colaboradores.filter(c => c.id !== id));
-    } catch (error) {
-      console.error("Error deleting colaborador:", error);
     }
   };
 

@@ -36,7 +36,16 @@ export function DashboardView() {
           if (lData) leadsData = lData;
 
           const { data: cData } = await supabase.from('colaboradores').select('*');
-          if (cData) colabsData = cData;
+          if (cData && cData.length > 0) {
+            colabsData = cData;
+          } else {
+            colabsData = [
+              { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
+              { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
+              { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
+              { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 }
+            ];
+          }
         } else {
           // Mocks for local display if DB is not configured
           leadsData = [
