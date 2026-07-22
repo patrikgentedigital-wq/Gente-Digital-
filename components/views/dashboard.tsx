@@ -63,6 +63,16 @@ export function DashboardView() {
           ];
         }
 
+        if (typeof window !== 'undefined') {
+          try {
+            const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
+            if (delRaw) {
+              const delIds: string[] = JSON.parse(delRaw);
+              colabsData = colabsData.filter(c => !delIds.includes(c.id));
+            }
+          } catch (e) {}
+        }
+
         setLeads(leadsData);
         setColaboradores(colabsData);
       } catch (err) {

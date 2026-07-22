@@ -51,6 +51,27 @@ const removeLocalColaborador = (id: string) => {
   } catch (e) {}
 };
 
+const getDeletedColaboradorIds = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('gente_digital_deleted_colaboradores');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const addDeletedColaboradorId = (id: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getDeletedColaboradorIds();
+    if (!existing.includes(id)) {
+      const updated = [...existing, id];
+      localStorage.setItem('gente_digital_deleted_colaboradores', JSON.stringify(updated));
+    }
+  } catch (e) {}
+};
+
 export function ColaboradoresView() {
   const router = useRouter();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
@@ -144,11 +165,17 @@ export function ColaboradoresView() {
       }
 
       const localColabs = getLocalColaboradores();
+      const deletedIds = getDeletedColaboradorIds();
       const colabsMap = new Map<string, Colaborador>();
 
-      localColabs.forEach(c => colabsMap.set(c.id, c));
+      localColabs.forEach(c => {
+        if (!deletedIds.includes(c.id)) {
+          colabsMap.set(c.id, c);
+        }
+      });
+      
       baseColabs.forEach(c => {
-        if (!colabsMap.has(c.id)) {
+        if (!deletedIds.includes(c.id) && !colabsMap.has(c.id)) {
           colabsMap.set(c.id, c);
         }
       });
@@ -271,6 +298,7 @@ export function ColaboradoresView() {
   };
 
   const handleDelete = async (id: string) => {
+    addDeletedColaboradorId(id);
     removeLocalColaborador(id);
     setColaboradores(prev => prev.filter(c => c.id !== id));
 
