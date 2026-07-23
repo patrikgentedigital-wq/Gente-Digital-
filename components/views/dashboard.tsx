@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
@@ -439,7 +440,7 @@ export function DashboardView() {
         <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
 
-      <div className="glass-panel rounded-3xl p-6 flex flex-col min-h-[420px] shadow-sm mb-6 transition-all">
+      <div className="saas-card p-6 flex flex-col min-h-[420px] mb-6">
         <div className="mb-6">
           <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
           <p className="text-sm text-brand-muted dark:text-gray-400">Comparativo de status de conversão ao longo do tempo.</p>
@@ -595,13 +596,18 @@ export function DashboardView() {
 
 function StatCard({ icon: Icon, title, value, trend, trendUp }: any) {
   return (
-    <div className="glass-panel p-6 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
-      <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-brand-yellow/10 dark:bg-brand-yellow/5 rounded-full blur-2xl group-hover:bg-brand-yellow/20 transition-all"></div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="p-3 bg-brand-yellow/20 dark:bg-brand-yellow/15 rounded-2xl text-brand-charcoal dark:text-brand-yellow group-hover:scale-110 transition-transform duration-300">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="saas-card p-6 flex flex-col justify-between group cursor-pointer transition-shadow hover:shadow-lg"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="p-2.5 bg-slate-100 dark:bg-zinc-800 rounded-xl text-slate-700 dark:text-slate-200 group-hover:bg-brand-yellow group-hover:text-slate-950 transition-colors">
           <Icon className="w-5 h-5" />
         </div>
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
           trendUp 
             ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
             : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
@@ -609,9 +615,11 @@ function StatCard({ icon: Icon, title, value, trend, trendUp }: any) {
           {trend}
         </span>
       </div>
-      <h3 className="font-semibold text-brand-muted dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{title}</h3>
-      <p className="font-display text-4xl font-extrabold text-brand-charcoal dark:text-white tracking-tight">{value}</p>
-    </div>
+      <div>
+        <h3 className="font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider mb-1">{title}</h3>
+        <p className="font-display text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{value}</p>
+      </div>
+    </motion.div>
   );
 }
 

@@ -93,11 +93,7 @@ function PageContent() {
   };
 
   return (
-    <div className="flex min-h-screen bg-brand-surface dark:bg-[#09090b] transition-colors relative overflow-hidden">
-      {/* Background Ambient Glows */}
-      <div className="glow-mesh w-96 h-96 bg-brand-yellow/20 top-0 right-1/4"></div>
-      <div className="glow-mesh w-96 h-96 bg-blue-600/10 bottom-10 left-1/3"></div>
-
+    <div className="flex min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-slate-900 dark:text-slate-100 transition-colors">
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={handleTabChange} 
@@ -105,17 +101,17 @@ function PageContent() {
         setIsOpen={setIsSidebarOpen} 
       />
       
-      <div className="flex-1 flex flex-col md:ml-64 min-w-0 transition-all duration-300 relative z-10">
+      <div className="flex-1 flex flex-col md:ml-64 min-w-0 transition-all duration-300">
         <Header activeTabName={getTabName()} onMenuClick={() => setIsSidebarOpen(true)} />
         
         <main className="flex-1 p-4 md:p-8 overflow-x-hidden relative">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -12, filter: 'blur(6px)' }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+              initial={{ opacity: 0, y: 8, scale: 0.995 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.995 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="h-full w-full"
             >
               {renderView()}
