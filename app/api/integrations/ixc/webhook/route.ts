@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { timingSafeEqual } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Validação de Segurança (Token Secreto se configurado)
+    const secret = req.nextUrl.searchParams.get('secret');
+    const expectedSecret = process.env.IXC_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+    
+    if (expectedSecret) {
+      let isValidSecret = false;
+      if (secret && secret.length === expectedSecret.length) {
+        try {
+          isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
+        } catch (e) {
+          isValidSecret = false;
+        }
+      }
+      if (!isValidSecret) {
+        console.warn("Tentativa de acesso não autorizado ao Webhook IXC.");
+        return NextResponse.json({ success: false, error: 'Não Autorizado: Token de webhook inválido' }, { status: 401 });
+      }
+    }
+
     const rawBody = await req.json().catch(() => ({}));
-    console.log('IXC Webhook Payload Received:', JSON.stringify(rawBody));
+    console.log('IXC Webhook recebido');
 
     // Support both direct IXC trigger payloads and standard webhook formats
     const payload = rawBody.data || rawBody.registro || rawBody;

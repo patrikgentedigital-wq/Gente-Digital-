@@ -6,7 +6,8 @@ import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
-import { supabase, Lead, Colaborador } from '@/lib/supabase';
+import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
+import { initialLeads, initialColaboradores } from '@/lib/mock-data';
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -29,9 +30,7 @@ export function DashboardView() {
         let leadsData: Lead[] = [];
         let colabsData: Colaborador[] = [];
 
-        const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-
-        if (isSupabaseConfigured) {
+        if (isSupabaseConfigured()) {
           const { data: lData } = await supabase.from('leads').select('*');
           if (lData) leadsData = lData;
 
@@ -39,29 +38,12 @@ export function DashboardView() {
           if (cData && cData.length > 0) {
             colabsData = cData;
           } else {
-            colabsData = [
-              { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
-              { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
-              { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
-              { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 },
-              { id: 'EMP-046', name: 'Alfredo Seixas', email: 'alfredo.seixas@gentedigital.com.br', initials: 'AS', count: 3 }
-            ];
+            colabsData = initialColaboradores;
           }
         } else {
           // Mocks for local display if DB is not configured
-          leadsData = [
-            { id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'Leandro Costa Silva', status: 'Em negociação', value: 0, created_at: '2026-07-10T12:00:00Z' },
-            { id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(55) 91991-7195', ref: 'Claudiane de Sousa Ribeiro Melo', status: 'Ganho', value: 99.90, created_at: '2026-07-12T12:00:00Z' },
-            { id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'Ana Costa Silva', status: 'Ganho', value: 1200, created_at: '2026-06-15T12:00:00Z' },
-            { id: 4, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'Carlos Oliveira', status: 'Contato inicial', value: 850, created_at: '2026-06-14T12:00:00Z' },
-            { id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500, created_at: '2026-05-17T12:00:00Z' }
-          ];
-
-          colabsData = [
-            { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
-            { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
-            { id: 'EMP-044', name: 'Beatriz Souza', email: 'beatriz.s@empresa.com', initials: 'BS', count: 5 }
-          ];
+          leadsData = initialLeads as Lead[];
+          colabsData = initialColaboradores;
         }
 
         if (typeof window !== 'undefined') {
@@ -119,7 +101,7 @@ export function DashboardView() {
   const totalLeads = filteredLeads.length;
   const conversões = filteredLeads.filter(l => l.status === 'Ganho').length;
   const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
-  const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + totalLeads * 4;
+  const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0);
 
   const handleExportReport = () => {
     const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
@@ -152,6 +134,7 @@ export function DashboardView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleGenerateAiSummary = async () => {
@@ -363,7 +346,7 @@ export function DashboardView() {
     let clicksTrend = '0% este mês';
     let clicksTrendUp = true;
     if (leads.length > 0) {
-      const totalClicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0) * 15 + leads.length * 4;
+      const totalClicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0);
       if (totalClicks > 0) {
         clicksTrend = leadsTrend;
         clicksTrendUp = leadsTrendUp;

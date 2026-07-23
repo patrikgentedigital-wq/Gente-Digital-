@@ -16,13 +16,18 @@ export async function logAuditEvent(action: string, details: string, user_email 
 
     if (isConfigured) {
       try {
-        await supabase.from('audit_logs').insert([{
+        const { error } = await supabase.from('audit_logs').insert([{
           action,
           details,
           user_email,
           created_at: new Date().toISOString()
         }]);
-      } catch (e) {}
+        if (error) {
+          console.warn('Supabase audit insert warning (usando fallback local):', error.message);
+        }
+      } catch (e: any) {
+        console.warn('Falha na requisição de auditoria para o Supabase (usando fallback local):', e?.message || e);
+      }
     }
 
     // Save to local storage as fallback for instant UI response

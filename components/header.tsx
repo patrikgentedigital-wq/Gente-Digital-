@@ -48,15 +48,6 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
             {theme === 'dark' ? <Sun className="w-5 h-5 text-brand-yellow" /> : <Moon className="w-5 h-5" />}
           </button>
         )}
-        
-        <div className="relative hidden lg:block text-brand-muted dark:text-gray-400 focus-within:text-brand-charcoal dark:focus-within:text-white transition-colors">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Busca rápida..."
-            className="pl-10 pr-4 py-2 bg-gray-50 dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-full text-sm focus:outline-none focus:border-brand-yellow dark:focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow dark:text-white transition-all w-64"
-          />
-        </div>
       </div>
     </header>
   );

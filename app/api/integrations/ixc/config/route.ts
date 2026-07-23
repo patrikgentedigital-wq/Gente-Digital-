@@ -1,42 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { createServerClient } from '@supabase/ssr';
+import { verifyAuth } from '@/lib/auth-server';
 
-async function verifyAuth(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-    // Modo offline/dev local sem Supabase configurado
-    return true;
-  }
-
-  const client = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {},
-      },
-    }
-  );
-
-  const { data: { user } } = await client.auth.getUser();
-  
-  if (!user) return false;
-
-  const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
-  if (adminEmails.length > 0 && user.email) {
-    if (!adminEmails.includes(user.email.toLowerCase())) {
-      console.warn(`Acesso bloqueado: ${user.email} tentou acessar rota protegida.`);
-      return false; // Usuário autenticado, mas não é admin
-    }
-  }
-
-  return true;
+function maskToken(token: string): string {
+  if (!token) return '';
+  if (token.length <= 6) return '****';
+  return '*'.repeat(token.length - 4) + token.slice(-4);
 }
 
 export async function GET(req: NextRequest) {
@@ -49,7 +18,6 @@ export async function GET(req: NextRequest) {
     const envDomain = process.env.IXC_DOMAIN || '';
     const envToken = process.env.IXC_TOKEN || '';
 
-    // If the database configurations are loaded, fetch settings
     const { data, error } = await supabase
       .from('settings')
       .select('*')
@@ -60,7 +28,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ 
         success: true, 
         domain: envDomain, 
-        token: envToken, 
+        token: maskToken(envToken),
+        hasToken: !!envToken,
         tableMissing: true 
       });
     }
@@ -70,10 +39,14 @@ export async function GET(req: NextRequest) {
       config[row.key] = row.value;
     });
 
+    const activeDomain = config['ixc_domain'] || envDomain;
+    const activeToken = config['ixc_token'] || envToken;
+
     return NextResponse.json({
       success: true,
-      domain: config['ixc_domain'] || envDomain,
-      token: config['ixc_token'] || envToken,
+      domain: activeDomain,
+      token: maskToken(activeToken),
+      hasToken: !!activeToken,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -89,8 +62,8 @@ export async function POST(req: NextRequest) {
 
     const { domain, token } = await req.json();
 
-    if (domain === undefined || token === undefined) {
-      return NextResponse.json({ error: 'Domínio e token são obrigatórios.' }, { status: 400 });
+    if (domain === undefined) {
+      return NextResponse.json({ error: 'Domínio é obrigatório.' }, { status: 400 });
     }
 
     const { error: err1 } = await supabase
@@ -104,11 +77,14 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const { error: err2 } = await supabase
-      .from('settings')
-      .upsert({ key: 'ixc_token', value: token });
+    // Se o token fornecido não for mascarado (não começa com '*'), atualiza no banco
+    if (token && !token.startsWith('*')) {
+      const { error: err2 } = await supabase
+        .from('settings')
+        .upsert({ key: 'ixc_token', value: token });
 
-    if (err2) throw err2;
+      if (err2) throw err2;
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

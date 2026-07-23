@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyAuth } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const { name, phone, ref } = await req.json();
 
     if (!name || !phone) {
@@ -38,13 +44,12 @@ export async function POST(req: NextRequest) {
     
     // Format current date for IXC (YYYY-MM-DD HH:MM:SS)
     const now = new Date();
-    // Use local timezone offset to get correct string
     const offset = now.getTimezoneOffset() * 60000;
     const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 19).replace('T', ' ');
 
     const payload = {
       nome: name,
-      razao: name, // Necessário para salvar como Lead
+      razao: name,
       fone_celular: phone,
       id_filial: '1',
       data_cadastro: localISOTime,

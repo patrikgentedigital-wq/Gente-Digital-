@@ -171,6 +171,7 @@ export function LeadsView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<LeadFormData>({

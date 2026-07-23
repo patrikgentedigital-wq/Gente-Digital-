@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyAuth } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     // 1. Fetch credentials from settings
     const { data: settingsData, error: settingsError } = await supabase
       .from('settings')

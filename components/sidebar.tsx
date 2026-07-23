@@ -91,7 +91,15 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
   );
 }
 
-function NavItem({ icon: Icon, label, active, onClick }: any) {
+interface NavItemProps {
+  id: string;
+  icon: any;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}

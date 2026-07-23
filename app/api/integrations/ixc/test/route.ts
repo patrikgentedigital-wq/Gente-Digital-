@@ -1,16 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyAuth } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { domain, token } = await req.json();
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
 
-    if (!domain || !token) {
-      return NextResponse.json({ error: 'Domínio e token são obrigatórios.' }, { status: 400 });
+    let { domain, token } = await req.json();
+
+    if (!domain) {
+      return NextResponse.json({ error: 'Domínio é obrigatório.' }, { status: 400 });
+    }
+
+    // Se o token fornecido for mascarado ou em branco, recupera o token salvo no banco/env
+    if (!token || token.startsWith('*')) {
+      const { data: settingsData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'ixc_token')
+        .maybeSingle();
+
+      token = settingsData?.value || process.env.IXC_TOKEN || '';
+    }
+
+    if (!token) {
+      return NextResponse.json({ error: 'Token do IXC não encontrado.' }, { status: 400 });
     }
 
     // Normalize domain
-    let cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
+    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
     
     // Test URL
     const url = `https://${cleanDomain}/webservice/v1/cliente`;

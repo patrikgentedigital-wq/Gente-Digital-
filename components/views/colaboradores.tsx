@@ -1,7 +1,8 @@
 import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase, Colaborador } from '@/lib/supabase';
+import { supabase, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
+import { initialColaboradores } from '@/lib/mock-data';
 import Avatar from 'boring-avatars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,14 +16,6 @@ const colaboradorSchema = z.object({
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
 
-
-const initialColaboradores: Colaborador[] = [
-  { id: 'EMP-042', name: 'Ana Costa Silva', email: 'ana.costa@empresa.com', initials: 'AC', count: 12 },
-  { id: 'EMP-043', name: 'Carlos Oliveira', email: 'carlos.o@empresa.com', initials: 'CO', count: 8 },
-  { id: 'EMP-044', name: 'Claudiane de Sousa Ribeiro Melo', email: 'claudiane@gentedigital.com.br', initials: 'CM', count: 7 },
-  { id: 'EMP-045', name: 'Leandro Costa Silva', email: 'leandro@gentedigital.com.br', initials: 'LS', count: 5 },
-  { id: 'EMP-046', name: 'Alfredo Seixas', email: 'alfredo.seixas@gentedigital.com.br', initials: 'AS', count: 3 }
-];
 
 const getLocalColaboradores = (): Colaborador[] => {
   if (typeof window === 'undefined') return [];
@@ -91,7 +84,7 @@ export function ColaboradoresView() {
         if (num > maxNum) maxNum = num;
       }
     });
-    return `EMP-0${maxNum + 1}`;
+    return `EMP-${String(maxNum + 1).padStart(3, '0')}`;
   };
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ColaboradorFormData>({
@@ -152,7 +145,7 @@ export function ColaboradoresView() {
       setIsLoading(true);
       let baseColabs: Colaborador[] = [];
 
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         try {
           const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
           if (!error && data && data.length > 0) {
@@ -184,7 +177,7 @@ export function ColaboradoresView() {
       const combinedColabs = Array.from(colabsMap.values());
 
       let leadsData: any[] = [];
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         try {
           const { data: lData } = await supabase.from('leads').select('ref');
           if (lData) leadsData = lData;
@@ -279,7 +272,7 @@ export function ColaboradoresView() {
     saveLocalColaborador(newColab);
     setColaboradores(prev => [newColab, ...prev]);
 
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    if (isSupabaseConfigured()) {
       try {
         await supabase.from('colaboradores').insert([{
           id: newColab.id,
@@ -303,7 +296,7 @@ export function ColaboradoresView() {
     removeLocalColaborador(id);
     setColaboradores(prev => prev.filter(c => c.id !== id));
 
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    if (isSupabaseConfigured()) {
       try {
         await supabase.from('colaboradores').delete().eq('id', id);
       } catch (err) {
@@ -509,10 +502,10 @@ export function ColaboradoresView() {
       {/* Modal Novo Colaborador */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-2xl text-brand-charcoal">Novo Colaborador</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted" /></button>
+              <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Colaborador</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
             </div>
             <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
@@ -575,17 +568,17 @@ export function ColaboradoresView() {
       {/* Modal QR Code e Link de Indicação */}
       {selectedColabForQr && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="font-display font-bold text-2xl text-brand-charcoal">Link de Indicação</h3>
+                <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Link de Indicação</h3>
                 <p className="text-xs text-brand-muted mt-1">{selectedColabForQr.name}</p>
               </div>
               <button 
                 onClick={() => setSelectedColabForQr(null)} 
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
               >
-                <X className="w-5 h-5 text-brand-muted" />
+                <X className="w-5 h-5 text-brand-muted dark:text-gray-400" />
               </button>
             </div>
             

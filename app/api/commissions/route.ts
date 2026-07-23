@@ -9,19 +9,21 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      return NextResponse.json({ success: true, commissions: [] });
+      console.error('Erro ao buscar comissões:', error.message);
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, commissions });
   } catch (err: any) {
-    return NextResponse.json({ success: true, commissions: [] });
+    console.error('Exceção ao buscar comissões:', err.message);
+    return NextResponse.json({ success: false, error: err.message || 'Erro interno do servidor' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, commissionId, status, amount } = body;
+    const { action, commissionId } = body;
 
     if (action === 'pay') {
       const { data, error } = await supabase

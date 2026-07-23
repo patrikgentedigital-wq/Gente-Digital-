@@ -22,7 +22,8 @@ export function IntegracoesView() {
     try {
       const response = await fetch('/api/leads/clear', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -182,12 +183,12 @@ export function IntegracoesView() {
               <input 
                 type="text" 
                 readOnly 
-                value={origin ? `${origin}/api/integrations/ixc/webhook` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook'}
+                value={origin ? `${origin}/api/integrations/ixc/webhook?secret=CONFIGURE_SEU_TOKEN_AQUI` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook?secret=CONFIGURE_SEU_TOKEN_AQUI'}
                 className="flex-1 px-4 py-2.5 bg-white dark:bg-[#27272a] border border-brand-border dark:border-gray-700 rounded-xl text-xs font-mono text-brand-charcoal dark:text-gray-300 outline-none select-all" 
               />
               <button
                 onClick={() => {
-                  const url = origin ? `${origin}/api/integrations/ixc/webhook` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook';
+                  const url = origin ? `${origin}/api/integrations/ixc/webhook?secret=CONFIGURE_SEU_TOKEN_AQUI` : 'https://seu-dominio.vercel.app/api/integrations/ixc/webhook?secret=CONFIGURE_SEU_TOKEN_AQUI';
                   navigator.clipboard.writeText(url);
                   alert('URL do Webhook IXC copiada para a área de transferência!');
                 }}
