@@ -64,16 +64,35 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </button>
 
         {/* Logo Header */}
-        <div className="px-6 mb-7 mt-1">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-brand-yellow flex items-center justify-center text-slate-950 font-black text-lg shadow-sm shrink-0">
-              G
+        <div className="px-5 mb-7 mt-1">
+          <div className="relative group flex items-center gap-3">
+            {/* Custom Geometric Logo Icon */}
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 p-[1px] shadow-lg shadow-amber-500/10 group-hover:shadow-amber-500/25 transition-all duration-300 shrink-0">
+              <div className="w-full h-full bg-zinc-950/90 rounded-[11px] flex items-center justify-center backdrop-blur-sm relative overflow-hidden">
+                {/* Subtle ambient light inside logo mark */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/20 via-transparent to-yellow-400/10 opacity-70 group-hover:opacity-100 transition-opacity" />
+                {/* Geometric Abstract 'G' & Network Node SVG */}
+                <svg className="w-5 h-5 relative z-10 text-amber-400 group-hover:scale-105 transition-transform duration-300" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 3.5C7.30558 3.5 3.5 7.30558 3.5 12C3.5 16.6944 7.30558 20.5 12 20.5C15.2582 20.5 18.084 18.6657 19.4975 16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <path d="M12 12H19.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                  <circle cx="19.5" cy="12" r="1.8" fill="currentColor" />
+                  <circle cx="19.5" cy="16" r="1.4" fill="currentColor" />
+                </svg>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-lg font-bold text-white leading-none tracking-tight">
-                Gente<span className="text-brand-yellow">Digital</span>
-              </h1>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase mt-1">Gestão de Vendas</p>
+
+            {/* Brand Typography */}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <h1 className="font-display text-[17px] font-bold text-white tracking-tight leading-none">
+                  Gente<span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 font-extrabold">Digital</span>
+                </h1>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-[9.5px] font-semibold text-zinc-400 tracking-wider uppercase truncate">Gestão de Vendas</span>
+              </div>
             </div>
           </div>
         </div>
@@ -136,14 +155,20 @@ function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 py-2.5 px-3 rounded-xl transition-all duration-150 group relative text-xs font-semibold ${
+      className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl transition-all duration-200 group relative text-xs ${
         active
-          ? 'text-slate-950 font-bold bg-brand-yellow shadow-sm'
-          : 'text-slate-400 hover:text-slate-100 hover:bg-zinc-800/60 font-medium'
+          ? 'text-white font-bold bg-zinc-800/90 border border-zinc-700/60 shadow-sm'
+          : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 font-medium border border-transparent'
       }`}
     >
-      <motion.div whileHover={{ scale: 1.15 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
-        <Icon className={`w-4 h-4 ${active ? 'text-slate-950' : 'text-slate-400 group-hover:text-slate-200'}`} />
+      {active && (
+        <motion.div
+          layoutId="activeNavIndicator"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-to-b from-amber-400 via-yellow-400 to-amber-500 rounded-r-full shadow-md shadow-amber-400/40"
+        />
+      )}
+      <motion.div whileHover={{ scale: 1.1 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
+        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-amber-400' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
       </motion.div>
       <span className="truncate">{label}</span>
     </button>

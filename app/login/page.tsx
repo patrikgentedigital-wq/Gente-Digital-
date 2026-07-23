@@ -71,15 +71,24 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="text-center mb-8">
           <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.3, type: 'spring', stiffness: 300 }}
-            className="w-12 h-12 bg-brand-yellow rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-950 font-black text-2xl shadow-sm"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.35, type: 'spring', stiffness: 300 }}
+            className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 p-[1px] shadow-xl shadow-amber-500/20 mx-auto mb-4"
           >
-            G
+            <div className="w-full h-full bg-zinc-950/90 rounded-[15px] flex items-center justify-center backdrop-blur-sm relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/20 via-transparent to-yellow-400/10" />
+              <svg className="w-7 h-7 relative z-10 text-amber-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3.5C7.30558 3.5 3.5 7.30558 3.5 12C3.5 16.6944 7.30558 20.5 12 20.5C15.2582 20.5 18.084 18.6657 19.4975 16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                <path d="M12 12H19.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                <circle cx="19.5" cy="12" r="1.8" fill="currentColor" />
+                <circle cx="19.5" cy="16" r="1.4" fill="currentColor" />
+              </svg>
+            </div>
           </motion.div>
-          <h1 className="text-2xl font-display font-black tracking-tight text-slate-900 dark:text-white">
-            Gente<span className="text-brand-yellow dark:text-amber-400">Digital</span>
+          <h1 className="text-2xl font-display font-bold tracking-tight text-slate-900 dark:text-white">
+            Gente<span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-500 font-extrabold">Digital</span>
           </h1>
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1.5 uppercase tracking-wider">
             Painel de Gestão & Indicações
