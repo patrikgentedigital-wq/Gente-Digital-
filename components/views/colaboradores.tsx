@@ -7,6 +7,7 @@ import Avatar from 'boring-avatars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useToast } from '@/components/providers/toast-context';
 
 const colaboradorSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
@@ -17,57 +18,9 @@ const colaboradorSchema = z.object({
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
 
 
-const getLocalColaboradores = (): Colaborador[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem('gente_digital_local_colaboradores');
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
-const saveLocalColaborador = (colab: Colaborador) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = getLocalColaboradores();
-    const updated = [colab, ...existing.filter(c => c.id !== colab.id)];
-    localStorage.setItem('gente_digital_local_colaboradores', JSON.stringify(updated));
-  } catch (e) {}
-};
-
-const removeLocalColaborador = (id: string) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = getLocalColaboradores();
-    const updated = existing.filter(c => c.id !== id);
-    localStorage.setItem('gente_digital_local_colaboradores', JSON.stringify(updated));
-  } catch (e) {}
-};
-
-const getDeletedColaboradorIds = (): string[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem('gente_digital_deleted_colaboradores');
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
-const addDeletedColaboradorId = (id: string) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = getDeletedColaboradorIds();
-    if (!existing.includes(id)) {
-      const updated = [...existing, id];
-      localStorage.setItem('gente_digital_deleted_colaboradores', JSON.stringify(updated));
-    }
-  } catch (e) {}
-};
-
 export function ColaboradoresView() {
   const router = useRouter();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,12 +61,12 @@ export function ColaboradoresView() {
 
   const loadBaseLink = async () => {
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         const { data } = await supabase
           .from('settings')
           .select('value')
           .eq('key', 'base_link')
-          .single();
+          .maybeSingle();
         if (data && data.value) {
           setBaseLink(data.value);
         }
@@ -130,13 +83,19 @@ export function ColaboradoresView() {
     setIsEditingBase(false);
 
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        await supabase
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase
           .from('settings')
           .upsert({ key: 'base_link', value: trimmed });
+        if (error) {
+          toastError("Erro ao salvar link base", error.message);
+        } else {
+          toastSuccess("Link base atualizado!", "Sincronizado em todos os dispositivos.");
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving base link:", err);
+      toastError("Erro ao salvar link base", err?.message);
     }
   };
 
@@ -144,37 +103,25 @@ export function ColaboradoresView() {
     try {
       setIsLoading(true);
       let baseColabs: Colaborador[] = [];
+      let loadedFromSupabase = false;
 
       if (isSupabaseConfigured()) {
         try {
           const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
-          if (!error && data && data.length > 0) {
+          if (!error && data) {
             baseColabs = data;
+            loadedFromSupabase = true;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error("Supabase fetch error:", e);
+        }
       }
 
-      if (baseColabs.length === 0) {
-        baseColabs = initialColaboradores;
+      if (!loadedFromSupabase || baseColabs.length === 0) {
+        if (!loadedFromSupabase) {
+          baseColabs = initialColaboradores;
+        }
       }
-
-      const localColabs = getLocalColaboradores();
-      const deletedIds = getDeletedColaboradorIds();
-      const colabsMap = new Map<string, Colaborador>();
-
-      localColabs.forEach(c => {
-        if (!deletedIds.includes(c.id)) {
-          colabsMap.set(c.id, c);
-        }
-      });
-      
-      baseColabs.forEach(c => {
-        if (!deletedIds.includes(c.id) && !colabsMap.has(c.id)) {
-          colabsMap.set(c.id, c);
-        }
-      });
-
-      const combinedColabs = Array.from(colabsMap.values());
 
       let leadsData: any[] = [];
       if (isSupabaseConfigured()) {
@@ -187,7 +134,7 @@ export function ColaboradoresView() {
       const normalizeStr = (str: string) => 
         str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-      const colabsWithCount = combinedColabs.map(colab => {
+      const colabsWithCount = baseColabs.map(colab => {
         const normColabName = normalizeStr(colab.name);
         const normColabId = normalizeStr(colab.id);
         
@@ -208,11 +155,29 @@ export function ColaboradoresView() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchColaboradores();
-      loadBaseLink();
-    }, 0);
-    return () => clearTimeout(timer);
+    fetchColaboradores();
+    loadBaseLink();
+
+    if (isSupabaseConfigured()) {
+      const colabChannel = supabase
+        .channel('colaboradores_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
+          fetchColaboradores();
+        })
+        .subscribe();
+
+      const settingsChannel = supabase
+        .channel('settings_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+          loadBaseLink();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(colabChannel);
+        supabase.removeChannel(settingsChannel);
+      };
+    }
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,12 +234,11 @@ export function ColaboradoresView() {
       created_at: new Date().toISOString()
     };
 
-    saveLocalColaborador(newColab);
     setColaboradores(prev => [newColab, ...prev]);
 
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('colaboradores').insert([{
+        const { error } = await supabase.from('colaboradores').insert([{
           id: newColab.id,
           name: newColab.name,
           email: newColab.email,
@@ -282,9 +246,20 @@ export function ColaboradoresView() {
           count: 0,
           photo_url: newColab.photo_url || null
         }]);
-      } catch (err) {
-        console.warn("Supabase insert warning (saved locally):", err);
+
+        if (error) {
+          console.error("Supabase insert error:", error);
+          toastError("Erro ao salvar no banco", error.message || "As alterações não puderam ser sincronizadas.");
+          fetchColaboradores();
+        } else {
+          toastSuccess("Colaborador cadastrado!", "Disponível instantaneamente em todos os dispositivos.");
+        }
+      } catch (err: any) {
+        console.error("Supabase insert exception:", err);
+        toastError("Erro de conexão", "Não foi possível conectar ao servidor para salvar o colaborador.");
       }
+    } else {
+      toastInfo("Modo Demonstração", "O Supabase não está configurado. As alterações são locais.");
     }
     
     setIsModalOpen(false);
@@ -292,15 +267,23 @@ export function ColaboradoresView() {
   };
 
   const handleDelete = async (id: string) => {
-    addDeletedColaboradorId(id);
-    removeLocalColaborador(id);
+    const previousColabs = [...colaboradores];
     setColaboradores(prev => prev.filter(c => c.id !== id));
 
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('colaboradores').delete().eq('id', id);
-      } catch (err) {
-        console.warn("Supabase delete warning:", err);
+        const { error } = await supabase.from('colaboradores').delete().eq('id', id);
+        if (error) {
+          console.error("Supabase delete error:", error);
+          toastError("Erro ao excluir", error.message || "Não foi possível excluir no servidor.");
+          setColaboradores(previousColabs);
+        } else {
+          toastSuccess("Colaborador removido", "Exclusão refletida em todos os dispositivos.");
+        }
+      } catch (err: any) {
+        console.error("Supabase delete exception:", err);
+        toastError("Erro de conexão", "Não foi possível remover no servidor.");
+        setColaboradores(previousColabs);
       }
     }
   };
