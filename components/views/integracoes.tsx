@@ -177,7 +177,7 @@ export function IntegracoesView() {
               URL do Webhook em Tempo Real (Ativação de Contrato IXC)
             </label>
             <p className="text-xs text-brand-muted dark:text-gray-400 leading-relaxed">
-              Cole esta URL em <strong>Gatilhos / Webhooks</strong> do IXC Soft para atualizar o lead para "Ganho" e importar o valor do plano automaticamente no instante em que o contrato for ativado:
+              Cole esta URL em <strong>Gatilhos / Webhooks</strong> do IXC Soft para atualizar o lead para &quot;Ganho&quot; e importar o valor do plano automaticamente no instante em que o contrato for ativado:
             </p>
             <div className="flex gap-2 pt-1">
               <input 

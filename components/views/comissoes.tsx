@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, CheckCircle2, Clock, Search, Download, Filter, Wallet, ArrowUpRight, Check, Sparkles } from 'lucide-react';
 import { supabase, Lead } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
@@ -25,8 +25,8 @@ export function ComissoesView() {
   const [editingCommissionRate, setEditingCommissionRate] = useState(false);
 
   // Fetch leads and calculate commissions
-  const fetchCommissions = async () => {
-    setIsLoading(true);
+  const fetchCommissions = useCallback(async () => {
+    await Promise.resolve();
     try {
       // Read saved local paid states if any
       const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
@@ -82,11 +82,12 @@ export function ComissoesView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCommissions();
-  }, []);
+  }, [fetchCommissions]);
 
   const handlePayCommission = async (id: string | number, leadName: string, colabName: string, amount: number) => {
     if (!window.confirm(`Confirmar BAIXA FINANCEIRA do pagamento de R$ ${amount.toFixed(2)} PIX para ${colabName}?`)) {
@@ -213,7 +214,7 @@ export function ComissoesView() {
           <p className="font-display text-3xl font-extrabold text-brand-charcoal dark:text-white">
             {totalConversoes}
           </p>
-          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Leads no status "Ganho"</p>
+          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Leads no status &quot;Ganho&quot;</p>
         </div>
 
         <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm flex flex-col justify-between">

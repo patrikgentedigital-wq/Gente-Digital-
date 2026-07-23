@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
 import { motion, AnimatePresence } from 'motion/react';
@@ -7,6 +7,8 @@ import Avatar from 'boring-avatars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useToast } from '@/components/providers/toast-context';
+import { LeadsSkeleton } from '@/components/views/leads-skeleton';
 
 const leadSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
@@ -92,6 +94,7 @@ export function LeadsView() {
     return null;
   };
 
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
   const [leads, setLeads] = useState<UILead[]>(isSupabaseConfigured ? [] : initialLeads);
@@ -103,6 +106,11 @@ export function LeadsView() {
   const [minValueFilter, setMinValueFilter] = useState<number | ''>('');
   const [maxValueFilter, setMaxValueFilter] = useState<number | ''>('');
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+  const [totalLeadsCount, setTotalLeadsCount] = useState(isSupabaseConfigured ? 0 : initialLeads.length);
+
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSyncIxc = async () => {
@@ -113,14 +121,14 @@ export function LeadsView() {
       });
       const data = await response.json();
       if (data.success) {
-        alert(data.message);
-        await fetchLeads();
+        toastSuccess('Sincronização IXC', data.message || 'Sincronização realizada com sucesso.');
+        await fetchLeads(currentPage);
       } else {
-        alert(`Erro na sincronização: ${data.error}`);
+        toastError('Erro na Sincronização', data.error || 'Não foi possível sincronizar com o IXC.');
       }
     } catch (error) {
       console.error('Error syncing with IXC:', error);
-      alert('Erro de rede ao tentar sincronizar com o IXC.');
+      toastError('Erro de Conexão', 'Não foi possível conectar à API de sincronização do IXC.');
     } finally {
       setIsSyncing(false);
     }
@@ -130,7 +138,7 @@ export function LeadsView() {
     const targetLead = leads.find(l => l.id === id);
     const leadName = targetLead?.name || `ID ${id}`;
 
-    if (!window.confirm("Tem certeza que deseja excluir este lead? Essa ação não pode ser desfeita.")) {
+    if (!window.confirm(`Tem certeza que deseja excluir o lead "${leadName}"? Essa ação não pode ser desfeita.`)) {
       return;
     }
     
@@ -143,10 +151,12 @@ export function LeadsView() {
       
       await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
       setLeads(leads.filter(l => l.id !== id));
+      setTotalLeadsCount(prev => Math.max(0, prev - 1));
       setSelectedLead(null);
+      toastSuccess('Lead Excluído', `O lead "${leadName}" foi removido com sucesso.`);
     } catch (err) {
       console.error("Erro ao excluir lead:", err);
-      alert("Falha ao excluir o lead. Verifique sua conexão ou permissões.");
+      toastError('Erro ao Excluir', 'Falha ao excluir o lead. Verifique suas permissões.');
     }
   };
 
@@ -256,38 +266,54 @@ export function LeadsView() {
     }
   };
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async (page = 1) => {
     try {
       setIsLoading(true);
-      // Ensure we don't crash if supabase url is placeholder
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const { data: leadsData, error: leadsError } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data: leadsData, count, error: leadsError } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
         if (leadsError) throw leadsError;
 
         if (leadsData && leadsData.length > 0) {
-          const { data: historyData, error: historyError } = await supabase.from('lead_history').select('*').order('created_at', { ascending: false });
-          if (historyError) throw historyError;
-          
+          const leadIds = leadsData.map(l => l.id);
+          const { data: historyData, error: historyError } = await supabase
+            .from('lead_history')
+            .select('*')
+            .in('lead_id', leadIds)
+            .order('created_at', { ascending: false });
+
+          if (historyError) console.error("Error fetching lead history:", historyError);
+
           const uiLeads: UILead[] = leadsData.map(lead => ({
             ...lead,
             history: historyData ? historyData.filter(h => h.lead_id === lead.id) : []
           }));
           setLeads(uiLeads);
+          setTotalLeadsCount(count || uiLeads.length);
         } else {
           setLeads([]);
+          setTotalLeadsCount(count || 0);
         }
       } else {
-         setLeads(initialLeads);
+        setLeads(initialLeads);
+        setTotalLeadsCount(initialLeads.length);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
-      // Fallback to initial local state only if not configured
+      toastError('Erro no Carregamento', 'Falha ao buscar a lista de leads do banco.');
       const isConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
       setLeads(isConfigured ? [] : initialLeads);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [pageSize, toastError]);
 
   const fetchColaboradores = async () => {
     try {
@@ -319,16 +345,11 @@ export function LeadsView() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchLeads();
-      fetchColaboradores();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+    fetchLeads(currentPage);
+    fetchColaboradores();
+  }, [currentPage, fetchLeads]);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
-
-  // getReferralCookie was moved to the top of the component to prevent being called before declaration.
 
   const handleAdd = async (data: LeadFormData) => {
     const referral = data.ref || getReferralCookie() || 'Manual';
@@ -348,6 +369,7 @@ export function LeadsView() {
            const historyData = { lead_id: inserted[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
            await supabase.from('lead_history').insert([historyData]);
            setLeads([{ ...inserted[0], history: [{...historyData, id: inserted[0].id + 9999}] }, ...leads]);
+           setTotalLeadsCount(prev => prev + 1);
          }
        } else {
          const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
@@ -356,7 +378,10 @@ export function LeadsView() {
             id: newId,
             history: [{ id: newId + 5000, lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
          }, ...leads]);
+         setTotalLeadsCount(prev => prev + 1);
        }
+
+       toastSuccess('Lead Cadastrado!', `O lead "${newLeadData.name}" foi adicionado com sucesso.`);
 
        fetch('/api/integrations/ixc/prospect', {
          method: 'POST',
@@ -365,6 +390,7 @@ export function LeadsView() {
        }).catch(err => console.error('Failed to send prospect to IXC:', err));
     } catch (error) {
       console.error("Error creating lead", error);
+      toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
     }
 
     setIsModalOpen(false);
@@ -392,8 +418,11 @@ export function LeadsView() {
         status, 
         history: [{ id: id + 9000, lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
       } : l));
+
+      toastInfo('Status Atualizado', `Lead "${currentLead.name}" movido para "${status}".`);
     } catch(err) {
       console.error("Error updating lead status", err);
+      toastError('Erro na Atualização', 'Não foi possível alterar o status do lead.');
     }
   };
 
@@ -632,7 +661,9 @@ export function LeadsView() {
         </div>
       </div>
 
-      {viewMode === 'list' ? (
+      {isLoading ? (
+        <LeadsSkeleton viewMode={viewMode} />
+      ) : viewMode === 'list' ? (
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 overflow-hidden shrink-0 flex-1 flex flex-col">
           <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
             <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Todos os Leads</h3>
@@ -659,22 +690,7 @@ export function LeadsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border dark:divide-gray-800 text-sm">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28"></div></td>
-                      <td className="px-6 py-4"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-20"></div></td>
-                      <td className="px-6 py-4"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-24"></div></td>
-                      <td className="px-6 py-4 text-right"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4 ml-auto"></div></td>
-                    </tr>
-                  ))
-                ) : leads.length === 0 ? (
+                {leads.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-16">
                       <div className="flex flex-col items-center justify-center text-center">
@@ -738,7 +754,6 @@ export function LeadsView() {
         >
           {statuses.map(status => {
             const columnLeads = filteredLeads.filter(l => l.status === status);
-            const totalValue = columnLeads.reduce((acc, lead) => acc + (lead.value || 0), 0);
             return (
               <div 
                 key={status} 
@@ -858,6 +873,35 @@ export function LeadsView() {
           })}
         </div>
       )}
+
+      {/* Pagination Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-brand-border dark:border-gray-800 text-sm mt-2">
+        <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+          Mostrando <span className="font-bold text-brand-charcoal dark:text-white">{leads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a <span className="font-bold text-brand-charcoal dark:text-white">{Math.min(currentPage * pageSize, totalLeadsCount)}</span> de <span className="font-bold text-brand-charcoal dark:text-white">{totalLeadsCount}</span> leads
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1 || isLoading}
+            className="flex items-center gap-1 px-3.5 py-1.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 rounded-xl font-medium text-xs hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Anterior
+          </button>
+          <span className="px-3.5 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-brand-charcoal dark:text-gray-200 border border-brand-border dark:border-gray-700">
+            Página {currentPage} de {Math.max(1, Math.ceil(totalLeadsCount / pageSize))}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            disabled={currentPage >= Math.ceil(totalLeadsCount / pageSize) || isLoading}
+            className="flex items-center gap-1 px-3.5 py-1.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 rounded-xl font-medium text-xs hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+          >
+            Próximo
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Floating Action Button for New Lead (bottom right) */}
       <button 
