@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, CheckCircle2, Clock, Search, Download, Filter, Wallet, ArrowUpRight, Check, Sparkles } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, Info } from 'lucide-react';
 import { supabase, Lead } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
 import Avatar from 'boring-avatars';
@@ -14,28 +16,24 @@ export interface CommissionItem {
   status: 'Pendente' | 'Paga';
   date: string;
   paid_at?: string;
+  isBonus?: boolean;
 }
 
 export function ComissoesView() {
-  const [commissionPerLead, setCommissionPerLead] = useState<number>(50);
   const [commissions, setCommissions] = useState<CommissionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'Pendente' | 'Paga'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingCommissionRate, setEditingCommissionRate] = useState(false);
+  const [topColaborador, setTopColaborador] = useState<{ name: string; count: number } | null>(null);
 
-  // Fetch leads and calculate commissions
+  // Fetch leads and calculate commissions using official company rules
   const fetchCommissions = useCallback(async () => {
-    await Promise.resolve();
     try {
+      setIsLoading(true);
+
       // Read saved local paid states if any
       const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
       const paidMap: Record<string, string> = paidStateRaw ? JSON.parse(paidStateRaw) : {};
-
-      const rateSaved = localStorage.getItem('gente_digital_commission_rate');
-      if (rateSaved) {
-        setCommissionPerLead(parseFloat(rateSaved) || 50);
-      }
 
       const isConfigured = typeof window !== 'undefined' && 
         !!process.env.NEXT_PUBLIC_SUPABASE_URL && 
@@ -50,31 +48,79 @@ export function ComissoesView() {
         }
       }
 
-      // If no supabase data or empty, use fallback mock leads with Ganho status for preview
+      // Fallback preview data if database is empty
       if (leadsData.length === 0) {
         leadsData = [
-          { id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(91) 99171-9195', ref: 'CLAUDIANE DE SOUSA RIBEIRO MELO', status: 'Ganho', value: 99.90, created_at: '2026-07-15' },
-          { id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Ganho', value: 1200, created_at: '2026-07-18' },
-          { id: 9, name: 'Benedito Silveira', phone: '(91) 98765-4321', ref: 'LEANDRO COSTA SILVA', status: 'Ganho', value: 149.90, created_at: '2026-07-20' }
+          { id: 1, name: 'Maria Silva', phone: '(91) 99171-9195', ref: 'CLAUDIANE MELO', status: 'Ganho', value: 99.90, created_at: '2026-07-15' },
+          { id: 2, name: 'João Souza', phone: '(11) 98888-7777', ref: 'CLAUDIANE MELO', status: 'Ganho', value: 120.00, created_at: '2026-07-16' },
+          { id: 3, name: 'Ana Costa', phone: '(91) 98765-4321', ref: 'LEANDRO SILVA', status: 'Ganho', value: 149.90, created_at: '2026-07-18' }
         ];
       }
 
-      const currentRate = parseFloat(rateSaved || '50');
+      // 1. Contagem de indicações instaladas ("Ganho") por colaborador
+      const colabCounts: Record<string, number> = {};
+      leadsData.forEach(lead => {
+        const colab = (lead.ref || 'Não especificado').trim();
+        colabCounts[colab] = (colabCounts[colab] || 0) + 1;
+      });
 
+      // 2. Identifica o Top Indicador (quem mais fez indicações)
+      let maxCount = 0;
+      let topColabName = '';
+      Object.entries(colabCounts).forEach(([colab, count]) => {
+        if (count > maxCount && colab !== 'Não especificado') {
+          maxCount = count;
+          topColabName = colab;
+        }
+      });
+
+      if (topColabName && maxCount > 0) {
+        setTopColaborador({ name: topColabName, count: maxCount });
+      } else {
+        setTopColaborador(null);
+      }
+
+      // 3. Calcula o valor de comissão por lead conforme regra:
+      // - 1 a 9 indicações instaladas: R$ 20,00 por indicação
+      // - 10 ou mais indicações instaladas: R$ 30,00 por indicação
       const items: CommissionItem[] = leadsData.map(lead => {
+        const colab = (lead.ref || 'Não especificado').trim();
+        const totalColabLeads = colabCounts[colab] || 1;
+        
+        // Regra de escalonamento: 1 a 9 = R$ 20 | 10+ = R$ 30
+        const ratePerLead = totalColabLeads >= 10 ? 30 : 20;
         const isPaid = paidMap[lead.id.toString()];
+
         return {
           id: `comm_${lead.id}`,
           lead_id: lead.id,
           lead_name: lead.name,
-          colaborador_name: lead.ref || 'Não especificado',
+          colaborador_name: colab,
           sale_value: lead.value || 0,
-          commission_amount: currentRate,
+          commission_amount: ratePerLead,
           status: isPaid ? 'Paga' : 'Pendente',
           date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
           paid_at: isPaid || undefined
         };
       });
+
+      // 4. Adiciona item de Prêmio Bônus Adicional de R$ 100 para o Top Indicador se houver
+      if (topColabName && maxCount > 0) {
+        const bonusId = `bonus_top_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
+        const isBonusPaid = paidMap[bonusId];
+        items.unshift({
+          id: bonusId,
+          lead_id: 999999,
+          lead_name: '🏆 Prêmio Bônus Top Indicador do Mês',
+          colaborador_name: topColabName,
+          sale_value: 0,
+          commission_amount: 100, // Prêmio adicional de R$ 100
+          status: isBonusPaid ? 'Paga' : 'Pendente',
+          date: new Date().toLocaleDateString('pt-BR'),
+          paid_at: isBonusPaid || undefined,
+          isBonus: true
+        });
+      }
 
       setCommissions(items);
     } catch (err) {
@@ -85,7 +131,6 @@ export function ComissoesView() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCommissions();
   }, [fetchCommissions]);
 
@@ -100,28 +145,22 @@ export function ComissoesView() {
     const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
     const paidMap: Record<string, string> = paidStateRaw ? JSON.parse(paidStateRaw) : {};
     
-    const numericId = id.toString().replace('comm_', '');
-    paidMap[numericId] = nowStr;
+    const cleanId = id.toString().replace('comm_', '');
+    paidMap[cleanId] = nowStr;
     localStorage.setItem('gente_digital_paid_commissions', JSON.stringify(paidMap));
 
     // Log Audit event
     await logAuditEvent(
       'Baixa Financeira (PIX)',
-      `Comissão de R$ ${amount.toFixed(2)} marcada como PAGA para o colaborador ${colabName} (Lead: ${leadName})`
+      `Comissão de R$ ${amount.toFixed(2)} marcada como PAGA para o colaborador ${colabName} (${leadName})`
     );
 
     // Update state in UI
     setCommissions(commissions.map(c => c.id === id ? { ...c, status: 'Paga', paid_at: nowStr } : c));
   };
 
-  const handleSaveRate = () => {
-    localStorage.setItem('gente_digital_commission_rate', commissionPerLead.toString());
-    setEditingCommissionRate(false);
-    fetchCommissions();
-  };
-
   const handleExportCSV = () => {
-    const headers = ['ID Lead', 'Nome do Lead', 'Colaborador (Indicador)', 'Valor da Venda (R$)', 'Comissao (R$)', 'Status', 'Data Conversao', 'Data Pagamento'];
+    const headers = ['ID Lead', 'Nome do Lead / Prêmio', 'Colaborador (Indicador)', 'Valor da Venda (R$)', 'Comissao (R$)', 'Status', 'Data Conversao', 'Data Pagamento'];
     const rows = commissions.map(c => [
       c.lead_id,
       `"${c.lead_name.replace(/"/g, '""')}"`,
@@ -154,15 +193,16 @@ export function ComissoesView() {
 
   const totalPendente = commissions.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + c.commission_amount, 0);
   const totalPago = commissions.filter(c => c.status === 'Paga').reduce((acc, c) => acc + c.commission_amount, 0);
-  const totalConversoes = commissions.length;
+  const totalConversoes = commissions.filter(c => !c.isBonus).length;
 
   return (
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border dark:border-gray-800 pb-5">
         <div>
           <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Comissões & Baixa PIX</h2>
-          <p className="text-brand-muted dark:text-gray-400 mt-1">Acompanhe e confirme o pagamento de recompensas aos colaboradores por indicações convertidas.</p>
+          <p className="text-brand-muted dark:text-gray-400 mt-1">Regras comerciais oficiais de comissionamento por indicações instaladas.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -173,6 +213,49 @@ export function ComissoesView() {
             <Download className="w-4 h-4" />
             Exportar Extrato (CSV)
           </button>
+        </div>
+      </div>
+
+      {/* Regras Comerciais Banner */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-500/30">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">1 a 9 Indicações</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 20,00 <span className="text-xs font-normal text-slate-500">/ indicação</span></p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-emerald-500 text-white font-bold shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">10+ Indicações</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 30,00 <span className="text-xs font-normal text-slate-500">/ indicação</span></p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-purple-600 text-white font-bold shrink-0">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Indicador do Mês</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ 100,00 <span className="text-xs font-normal text-slate-500">bônus PIX</span></p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-blue-500 text-white font-bold shrink-0">
+            <Tag className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Cliente Indicado</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 50,00 <span className="text-xs font-normal text-slate-500">desconto na 1ª mensalidade</span></p>
+          </div>
         </div>
       </div>
 
@@ -209,7 +292,7 @@ export function ComissoesView() {
             <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
               <Wallet className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Contratos Convertidos</span>
+            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Contratos Instalados</span>
           </div>
           <p className="font-display text-3xl font-extrabold text-brand-charcoal dark:text-white">
             {totalConversoes}
@@ -217,37 +300,19 @@ export function ComissoesView() {
           <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Leads no status &quot;Ganho&quot;</p>
         </div>
 
-        <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/20 p-6 rounded-2xl border border-amber-400/30 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Comissão por Venda</span>
-            <button 
-              onClick={() => setEditingCommissionRate(!editingCommissionRate)}
-              className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
-            >
-              {editingCommissionRate ? 'Cancelar' : 'Alterar'}
-            </button>
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">🏆 Top Indicador Atual</span>
+            <Award className="w-5 h-5 text-amber-500" />
           </div>
-          {editingCommissionRate ? (
-            <div className="flex items-center gap-2 mt-2">
-              <input 
-                type="number" 
-                value={commissionPerLead} 
-                onChange={e => setCommissionPerLead(parseFloat(e.target.value) || 0)}
-                className="w-24 px-2 py-1 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded text-sm text-brand-charcoal dark:text-white font-bold"
-              />
-              <button 
-                onClick={handleSaveRate}
-                className="px-3 py-1 bg-brand-yellow text-brand-charcoal font-bold text-xs rounded shadow-sm"
-              >
-                Salvar
-              </button>
-            </div>
-          ) : (
-            <p className="font-display text-3xl font-extrabold text-brand-yellow mt-2">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(commissionPerLead)}
+          <div className="mt-2">
+            <p className="font-display text-lg font-bold text-slate-900 dark:text-white truncate">
+              {topColaborador ? topColaborador.name : 'Nenhum líder'}
             </p>
-          )}
-          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Valor atribuído por contrato ativo</p>
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+              {topColaborador ? `${topColaborador.count} instalações (+ R$ 100 bônus)` : 'Aguardando conversões'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -307,7 +372,7 @@ export function ComissoesView() {
                 <th className="px-6 py-4 font-bold tracking-wider">Cliente (Lead)</th>
                 <th className="px-6 py-4 font-bold tracking-wider">Colaborador / Indicador</th>
                 <th className="px-6 py-4 font-bold tracking-wider">Valor do Contrato</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Comissão</th>
+                <th className="px-6 py-4 font-bold tracking-wider">Comissão Calculada</th>
                 <th className="px-6 py-4 font-bold tracking-wider">Status</th>
                 <th className="px-6 py-4 font-bold tracking-wider text-right">Ação / Baixa</th>
               </tr>
@@ -331,13 +396,23 @@ export function ComissoesView() {
                   </td>
                 </tr>
               ) : filteredCommissions.map(comm => (
-                <tr key={comm.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
+                <tr key={comm.id} className={`hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${comm.isBonus ? 'bg-amber-500/10 dark:bg-amber-500/10' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar size={30} name={comm.lead_name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} />
+                      {comm.isBonus ? (
+                        <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+                          🏆
+                        </div>
+                      ) : (
+                        <Avatar size={30} name={comm.lead_name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} />
+                      )}
                       <div>
-                        <p className="font-semibold text-brand-charcoal dark:text-white">{comm.lead_name}</p>
-                        <p className="text-[11px] text-brand-muted dark:text-gray-400">Conversão em: {comm.date}</p>
+                        <p className={`font-semibold ${comm.isBonus ? 'text-amber-600 dark:text-amber-400 font-extrabold' : 'text-brand-charcoal dark:text-white'}`}>
+                          {comm.lead_name}
+                        </p>
+                        <p className="text-[11px] text-brand-muted dark:text-gray-400">
+                          {comm.isBonus ? 'Prêmio adicional por liderança mensal' : `Conversão em: ${comm.date}`}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -345,7 +420,7 @@ export function ComissoesView() {
                     {comm.colaborador_name}
                   </td>
                   <td className="px-6 py-4 text-brand-muted dark:text-gray-300 font-semibold">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.sale_value)}
+                    {comm.isBonus ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.sale_value)}
                   </td>
                   <td className="px-6 py-4 font-extrabold text-green-600 dark:text-green-400">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.commission_amount)}
