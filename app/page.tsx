@@ -10,6 +10,7 @@ import { ColaboradoresView } from '@/components/views/colaboradores';
 import { ComissoesView } from '@/components/views/comissoes';
 import { IntegracoesView } from '@/components/views/integracoes';
 import { AnimatePresence, motion } from 'motion/react';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 
 export default function Page() {
@@ -37,6 +38,25 @@ function PageContent() {
   
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Check and monitor auth state
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) {
+          router.push('/login');
+        }
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          router.push('/login');
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    }
+  }, [router]);
 
   // Sync state when URL changes
   useEffect(() => {

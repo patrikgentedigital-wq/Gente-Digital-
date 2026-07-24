@@ -3,6 +3,23 @@ import { createBrowserClient } from '@supabase/ssr';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
 
+// Se o cookie do Supabase for removido pelo usuário, limpa o localStorage correspondente
+// para evitar que o cliente reidrate a sessão deletada.
+if (typeof window !== 'undefined') {
+  const hasAuthCookie = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
+  if (!hasAuthCookie) {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      console.error('Erro ao limpar localStorage:', e);
+    }
+  }
+}
+
 export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
 export const isSupabaseConfigured = () => {
