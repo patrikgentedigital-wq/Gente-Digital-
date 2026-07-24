@@ -9,9 +9,9 @@ import { LeadsView } from '@/components/views/leads';
 import { ColaboradoresView } from '@/components/views/colaboradores';
 import { ComissoesView } from '@/components/views/comissoes';
 import { IntegracoesView } from '@/components/views/integracoes';
+import { GamificacaoView } from '@/components/views/gamificacao';
 import { AnimatePresence, motion } from 'motion/react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-
 
 export default function Page() {
   return (
@@ -95,6 +95,7 @@ function PageContent() {
       case 'dashboard': return <DashboardView />;
       case 'leads': return <LeadsView />;
       case 'colaboradores': return <ColaboradoresView />;
+      case 'gamificacao': return <GamificacaoView />;
       case 'comissoes': return <ComissoesView />;
       case 'integracoes': return <IntegracoesView />;
       default: return <ColaboradoresView />;
@@ -106,6 +107,7 @@ function PageContent() {
       dashboard: 'Dashboard',
       leads: 'Leads',
       colaboradores: 'Colaboradores',
+      gamificacao: 'Loja de Prêmios & Gamificação',
       comissoes: 'Gestão de Comissões & PIX',
       integracoes: 'Integrações (IXC & MS)'
     };
