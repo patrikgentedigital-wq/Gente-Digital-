@@ -117,14 +117,11 @@ export function ColaboradoresView() {
         }
       }
 
-      const colabsMap = new Map<string, Colaborador>();
-      // First add initial colaboradores as baseline
-      initialColaboradores.forEach(c => colabsMap.set(c.id, c));
-      // Overwrite/add with real Supabase database records
-      if (loadedFromSupabase && baseColabs.length > 0) {
-        baseColabs.forEach(c => colabsMap.set(c.id, c));
+      // Se carregou do Supabase com sucesso, usa APENAS os dados do banco.
+      // Os dados mockados só são usados como fallback quando Supabase não está disponível.
+      if (!loadedFromSupabase) {
+        baseColabs = [...initialColaboradores];
       }
-      baseColabs = Array.from(colabsMap.values());
 
       let leadsData: any[] = [];
       if (isSupabaseConfigured()) {
