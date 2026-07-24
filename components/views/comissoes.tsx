@@ -253,8 +253,8 @@ export function ComissoesView() {
             <Tag className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Cliente Indicado</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 50,00 <span className="text-xs font-normal text-slate-500">desconto na 1ª mensalidade</span></p>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Cliente Indicador</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 50,00 <span className="text-xs font-normal text-slate-500">desconto na mensalidade para quem indica</span></p>
           </div>
         </div>
       </div>
