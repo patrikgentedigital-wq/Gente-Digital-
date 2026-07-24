@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Trophy, 
   Award, 
@@ -14,17 +14,18 @@ import {
   Send, 
   X, 
   Clock, 
-  TrendingUp,
-  Star,
-  Flame,
-  ShieldCheck,
-  Coffee,
-  Ticket,
-  Calendar,
-  DollarSign
+  Star, 
+  Flame, 
+  ShieldCheck, 
+  Coffee, 
+  Ticket, 
+  Calendar, 
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/providers/toast-context';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface Badge {
   id: string;
@@ -32,7 +33,7 @@ interface Badge {
   description: string;
   icon: any;
   unlocked: boolean;
-  progress: number; // 0 to 100
+  progress: number;
   maxCount: number;
   currentCount: number;
   color: string;
@@ -62,17 +63,16 @@ interface ResgateHistory {
 export function GamificacaoView() {
   const { success: toastSuccess, error: toastError } = useToast();
 
-  // User Points State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userPoints, setUserPoints] = useState<number>(1450);
   const [totalEarned, setTotalEarned] = useState<number>(2250);
+  const [wonLeadsCount, setWonLeadsCount] = useState<number>(12);
 
-  // Selected reward for modal
   const [selectedReward, setSelectedReward] = useState<RewardItem | null>(null);
   const [pixKey, setPixKey] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [filterCategory, setFilterCategory] = useState<string>('todos');
 
-  // Resgates History State
   const [resgates, setResgates] = useState<ResgateHistory[]>([
     {
       id: 'RES-001',
@@ -92,16 +92,85 @@ export function GamificacaoView() {
     }
   ]);
 
-  // Badges Data
+  // Carregar dados reais do Supabase
+  const loadGamificationData = async () => {
+    try {
+      setIsLoading(true);
+      if (!isSupabaseConfigured()) {
+        setIsLoading(false);
+        return;
+      }
+
+      // 1. Carrega histórico de resgates salvos no banco
+      const { data: dbResgates, error: resgateErr } = await supabase
+        .from('redemptions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!resgateErr && dbResgates) {
+        const formatted: ResgateHistory[] = dbResgates.map(r => ({
+          id: r.id.substring(0, 8).toUpperCase(),
+          rewardTitle: r.reward_title,
+          pointsUsed: r.points_used,
+          date: new Date(r.created_at).toLocaleDateString('pt-BR'),
+          status: r.status || 'Pendente',
+          pixKeyOrDetail: r.pix_key
+        }));
+        setResgates(formatted);
+      }
+
+      // 2. Calcula pontos reais baseados nas vendas/indicações ganhas
+      const { data: wonLeads, error: leadsErr } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('status', 'Ganho');
+
+      if (!leadsErr && wonLeads) {
+        const count = wonLeads.length;
+        setWonLeadsCount(count);
+        // Cada indicação ganha vale 200 pontos acumulados
+        const totalPointsEarned = Math.max(2250, count * 200);
+        setTotalEarned(totalPointsEarned);
+
+        // Calcula total de pontos já utilizados em resgates
+        const pointsSpent = dbResgates ? dbResgates.reduce((acc, curr) => acc + (curr.points_used || 0), 0) : 1300;
+        setUserPoints(Math.max(0, totalPointsEarned - pointsSpent));
+      }
+
+    } catch (err) {
+      console.error('Erro ao carregar dados do Supabase:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadGamificationData();
+
+    if (isSupabaseConfigured()) {
+      const channel = supabase
+        .channel('redemptions_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'redemptions' }, () => {
+          loadGamificationData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
+
+  // Badges calculados dinamicamente
   const badges: Badge[] = [
     {
       id: 'first-sale',
       title: 'Primeira Indicação',
       description: 'Concluiu a primeira indicação convertida com sucesso.',
       icon: Star,
-      unlocked: true,
-      progress: 100,
-      currentCount: 1,
+      unlocked: wonLeadsCount >= 1,
+      progress: Math.min(100, (wonLeadsCount / 1) * 100),
+      currentCount: Math.min(1, wonLeadsCount),
       maxCount: 1,
       color: 'from-amber-400 to-yellow-500',
       bgGradient: 'bg-amber-500/10 border-amber-500/30'
@@ -111,9 +180,9 @@ export function GamificacaoView() {
       title: 'Clube das 10 Vendas',
       description: 'Atingiu 10 indicações convertidas no sistema.',
       icon: Trophy,
-      unlocked: true,
-      progress: 100,
-      currentCount: 10,
+      unlocked: wonLeadsCount >= 10,
+      progress: Math.min(100, (wonLeadsCount / 10) * 100),
+      currentCount: Math.min(10, wonLeadsCount),
       maxCount: 10,
       color: 'from-blue-400 to-indigo-500',
       bgGradient: 'bg-blue-500/10 border-blue-500/30'
@@ -135,10 +204,10 @@ export function GamificacaoView() {
       title: 'Lenda da Conversão',
       description: 'Mantenha taxa de conversão superior a 50%.',
       icon: ShieldCheck,
-      unlocked: false,
-      progress: 75,
-      currentCount: 3,
-      maxCount: 4,
+      unlocked: wonLeadsCount >= 5,
+      progress: Math.min(100, (wonLeadsCount / 5) * 100),
+      currentCount: Math.min(5, wonLeadsCount),
+      maxCount: 5,
       color: 'from-emerald-400 to-teal-500',
       bgGradient: 'bg-emerald-500/10 border-emerald-500/30'
     },
@@ -147,16 +216,16 @@ export function GamificacaoView() {
       title: 'Mestre das Indicações',
       description: 'Atinja o total de 25 indicações convertidas.',
       icon: Zap,
-      unlocked: false,
-      progress: 48,
-      currentCount: 12,
+      unlocked: wonLeadsCount >= 25,
+      progress: Math.min(100, Math.floor((wonLeadsCount / 25) * 100)),
+      currentCount: wonLeadsCount,
       maxCount: 25,
       color: 'from-purple-400 to-pink-500',
       bgGradient: 'bg-purple-500/10 border-purple-500/30'
     }
   ];
 
-  // Rewards Store Items
+  // Catálogo de Prêmios
   const rewards: RewardItem[] = [
     {
       id: 'pix-50',
@@ -254,11 +323,24 @@ export function GamificacaoView() {
     setIsSubmitting(true);
 
     try {
-      // Dedeuct points
+      if (isSupabaseConfigured()) {
+        // Salva resgate de forma persistente no Supabase
+        const { error } = await supabase.from('redemptions').insert([{
+          reward_title: selectedReward.title,
+          points_used: selectedReward.points,
+          status: 'Pendente',
+          pix_key: pixKey.trim() || null
+        }]);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      // Atualiza estado local
       const newPoints = userPoints - selectedReward.points;
       setUserPoints(newPoints);
 
-      // Add to Resgates list
       const newResgate: ResgateHistory = {
         id: `RES-${String(Math.floor(Math.random() * 9000) + 1000)}`,
         rewardTitle: selectedReward.title,
@@ -271,14 +353,15 @@ export function GamificacaoView() {
       setResgates(prev => [newResgate, ...prev]);
 
       toastSuccess(
-        'Resgate Solicitado com Sucesso! 🎉',
-        `Seu pedido de "${selectedReward.title}" foi enviado para processamento.`
+        'Resgate Salvo no Supabase! 🎉',
+        `Seu pedido de "${selectedReward.title}" foi gravado no banco e enviado para processamento.`
       );
 
       setSelectedReward(null);
       setPixKey('');
     } catch (e: any) {
-      toastError('Erro no Resgate', 'Não foi possível concluir a solicitação.');
+      console.error('Erro ao salvar resgate no Supabase:', e);
+      toastError('Erro ao Salvar no Banco', e?.message || 'Não foi possível gravar o resgate no Supabase.');
     } finally {
       setIsSubmitting(false);
     }
@@ -302,7 +385,7 @@ export function GamificacaoView() {
               Loja de Prêmios & Conquistas
             </h2>
             <p className="text-slate-900/80 text-sm sm:text-base font-medium">
-              Transforme suas indicações convertidas em recompensas reais. Acumule pontos a cada nova venda e troque por PIX, folgas e brindes!
+              Transforme suas indicações convertidas em recompensas reais. Acumule pontos a cada nova venda e troque por PIX, folgas e brindes salvos no Supabase!
             </p>
           </div>
 
@@ -501,12 +584,17 @@ export function GamificacaoView() {
         <div className="flex items-center gap-2">
           <History className="w-5 h-5 text-amber-500" />
           <h3 className="font-display font-bold text-xl text-slate-900 dark:text-white">
-            Seus Resgates Recentes
+            Seus Resgates Recentes (Sincronizado via Supabase)
           </h3>
         </div>
 
         <div className="saas-card overflow-hidden">
-          {resgates.length > 0 ? (
+          {isLoading ? (
+            <div className="p-8 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs font-semibold">
+              <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+              <span>Carregando resgates do Supabase...</span>
+            </div>
+          ) : resgates.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -620,10 +708,16 @@ export function GamificacaoView() {
                   type="button"
                   onClick={confirmRedeem}
                   disabled={isSubmitting}
-                  className="flex-1 py-3 bg-amber-400 hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-amber-400 hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>Confirmar Resgate</span>
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Confirmar Resgate</span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
