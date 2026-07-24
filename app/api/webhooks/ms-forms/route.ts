@@ -125,12 +125,19 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (Token Secreto)
-    const secret = req.nextUrl.searchParams.get('secret');
+    // 1. Validação de Segurança (Token Secreto via Header ou Query)
+    const secretFromQuery = req.nextUrl.searchParams.get('secret');
+    const secretFromHeader = req.headers.get('x-webhook-secret');
+    const secret = secretFromHeader || secretFromQuery;
     const expectedSecret = process.env.WEBHOOK_SECRET;
+
+    if (!expectedSecret) {
+      console.error("SEGURANÇA: WEBHOOK_SECRET não configurado no servidor.");
+      return NextResponse.json({ success: false, error: 'Endpoint não configurado' }, { status: 503 });
+    }
     
     let isValidSecret = false;
-    if (secret && expectedSecret && secret.length === expectedSecret.length) {
+    if (secret && secret.length === expectedSecret.length) {
       try {
         isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
       } catch (e) {
@@ -138,8 +145,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (expectedSecret && !isValidSecret) {
-      console.warn("Tentativa de acesso não autorizado ao webhook detectada.");
+    if (!isValidSecret) {
+      console.warn("Tentativa de acesso não autorizado ao webhook MS Forms.");
       return NextResponse.json({ success: false, error: 'Não Autorizado: Token inválido' }, { status: 401 });
     }
 
@@ -270,7 +277,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('MS Forms Webhook Error:', error);
     return NextResponse.json(
-      { error: 'Falha ao processar o webhook', details: error.message || error },
+      { error: 'Falha ao processar o webhook.' },
       { status: 500 }
     );
   }

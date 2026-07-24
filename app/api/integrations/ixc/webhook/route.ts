@@ -4,23 +4,27 @@ import { timingSafeEqual } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (Token Secreto se configurado)
+    // 1. Validação de Segurança (Token Secreto Obrigatório)
     const secret = req.nextUrl.searchParams.get('secret');
     const expectedSecret = process.env.IXC_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
     
-    if (expectedSecret) {
-      let isValidSecret = false;
-      if (secret && secret.length === expectedSecret.length) {
-        try {
-          isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
-        } catch (e) {
-          isValidSecret = false;
-        }
+    if (!expectedSecret) {
+      console.error("SEGURANÇA: IXC_WEBHOOK_SECRET / WEBHOOK_SECRET não configurado no servidor.");
+      return NextResponse.json({ success: false, error: 'Endpoint não configurado' }, { status: 503 });
+    }
+
+    let isValidSecret = false;
+    if (secret && secret.length === expectedSecret.length) {
+      try {
+        isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
+      } catch (e) {
+        isValidSecret = false;
       }
-      if (!isValidSecret) {
-        console.warn("Tentativa de acesso não autorizado ao Webhook IXC.");
-        return NextResponse.json({ success: false, error: 'Não Autorizado: Token de webhook inválido' }, { status: 401 });
-      }
+    }
+
+    if (!isValidSecret) {
+      console.warn("Tentativa de acesso não autorizado ao Webhook IXC.");
+      return NextResponse.json({ success: false, error: 'Não Autorizado: Token de webhook inválido' }, { status: 401 });
     }
 
     const rawBody = await req.json().catch(() => ({}));

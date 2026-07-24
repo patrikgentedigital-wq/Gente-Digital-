@@ -64,8 +64,15 @@ function generateDynamicSummary(metrics: any): string {
     `• Foque no acompanhamento dos leads nas etapas "Contato Inicial" e "Em Negociação" no funil Kanban para maximizar a conversão nesta semana.`;
 }
 
+import { verifyAuth } from '@/lib/auth-server';
+
 export async function POST(req: NextRequest) {
   try {
+    const isAuthenticated = await verifyAuth(req);
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Não autorizado. Faça login para continuar.' }, { status: 401 });
+    }
+
     // 1. Rate Limiting
     if (ratelimit) {
       const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';

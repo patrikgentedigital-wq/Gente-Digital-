@@ -9,8 +9,13 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
 
-  // Se não estiver configurado corretamente, não travar o build, mas redirecionar
+  // Se não estiver configurado corretamente, não travar o build, mas bloquear em produção
   if (supabaseUrl.includes('placeholder')) {
+    if (process.env.NODE_ENV === 'production') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
     return supabaseResponse;
   }
 
