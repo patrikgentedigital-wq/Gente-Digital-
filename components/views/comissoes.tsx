@@ -84,7 +84,7 @@ export function ComissoesView() {
         }
       });
 
-      // 2. Identifica o TOP Colaborador do Mês (EXCLUSIVO para colaboradores da empresa)
+      // 2. Identifica o TOP Colaborador do Mês (mínimo de 15 indicações instaladas para ganhar o bônus de R$ 100)
       let maxCount = 0;
       let topColabName = '';
       Object.entries(colabCounts).forEach(([name, count]) => {
@@ -93,6 +93,8 @@ export function ComissoesView() {
           topColabName = name;
         }
       });
+
+      const meetsMinThreshold = maxCount >= 15;
 
       if (topColabName && maxCount > 0) {
         setTopColaborador({ name: topColabName, count: maxCount });
@@ -140,17 +142,17 @@ export function ComissoesView() {
         }
       });
 
-      // 4. Adiciona bônus de R$ 100 EXCLUSIVAMENTE se houver um Colaborador TOP no mês
-      if (topColabName && maxCount > 0) {
+      // 4. Adiciona bônus de R$ 100 EXCLUSIVAMENTE se o Colaborador TOP tiver atingido NO MÍNIMO 15 INDICAÇÕES
+      if (topColabName && meetsMinThreshold) {
         const bonusId = `bonus_top_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
         const isBonusPaid = paidMap[bonusId];
         items.unshift({
           id: bonusId,
           lead_id: 999999,
-          lead_name: '🏆 Prêmio Bônus Top Indicador do Mês',
+          lead_name: '🏆 Prêmio Bônus Top Indicador do Mês (15+ indicações)',
           colaborador_name: topColabName,
           sale_value: 0,
-          commission_amount: 100, // R$ 100 de bônus PIX exclusivo para o colaborador TOP
+          commission_amount: 100, // R$ 100 de bônus PIX exclusivo para o colaborador TOP com 15+ indicações
           status: isBonusPaid ? 'Paga' : 'Pendente',
           date: new Date().toLocaleDateString('pt-BR'),
           paid_at: isBonusPaid || undefined,
@@ -281,8 +283,8 @@ export function ComissoesView() {
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Colaborador do Mês</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ 100,00 <span className="text-xs font-normal text-slate-500">bônus PIX exclusivo</span></p>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Colaborador (15+ vendas)</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ 100,00 <span className="text-xs font-normal text-slate-500">bônus PIX (mín. 15 vendas)</span></p>
           </div>
         </div>
 
@@ -348,7 +350,11 @@ export function ComissoesView() {
               {topColaborador ? topColaborador.name : 'Nenhum líder'}
             </p>
             <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-              {topColaborador ? `${topColaborador.count} instalações (+ R$ 100 bônus)` : 'Somente Colaboradores'}
+              {topColaborador ? (
+                topColaborador.count >= 15 
+                  ? `${topColaborador.count} instalações (Bônus R$ 100 Liberado! 🎉)`
+                  : `${topColaborador.count}/15 instalações (Faltam ${15 - topColaborador.count} p/ bônus R$ 100)`
+              ) : 'Mínimo de 15 indicações p/ bônus'}
             </p>
           </div>
         </div>
