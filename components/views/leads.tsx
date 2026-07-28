@@ -924,71 +924,102 @@ export function LeadsView() {
 
       {/* New Lead Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-brand-charcoal/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Lead</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
-            </div>
-            <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
+        <div className="fixed inset-0 bg-brand-charcoal/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-5 shrink-0">
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1.5">Nome do Lead</label>
+                <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Lead</h3>
+                <p className="text-xs text-brand-muted dark:text-gray-400 mt-0.5">Cadastre um novo cliente no sistema</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <X className="w-5 h-5 text-brand-muted dark:text-gray-400" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit(handleAdd)} className="space-y-4 overflow-y-auto pr-1 pb-2">
+              {/* Campo 1: Nome do Cliente */}
+              <div>
+                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
+                  Nome do Cliente <span className="text-red-500">*</span>
+                </label>
                 <input 
                   autoFocus 
                   {...register('name')} 
                   type="text" 
-                  placeholder="Ex: Cliente Silva" 
-                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-1 transition-all ${
+                  placeholder="Digite o nome completo do cliente (Ex: João da Silva)" 
+                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
                     errors.name 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow'
+                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow/30'
                   }`} 
                 />
-                {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>}
+                {errors.name ? (
+                  <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>
+                ) : (
+                  <p className="text-gray-400 text-xs mt-1">Este é o nome do cliente que aparecerá no sistema.</p>
+                )}
               </div>
+
+              {/* Campo 2: Telefone */}
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1.5">Telefone / WhatsApp</label>
+                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
+                  Telefone / WhatsApp <span className="text-red-500">*</span>
+                </label>
                 <input 
                   {...register('phone')} 
                   type="tel" 
-                  placeholder="(00) 00000-0000" 
-                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-1 transition-all ${
+                  placeholder="(91) 98000-0000" 
+                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
                     errors.phone 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow'
+                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow/30'
                   }`} 
                 />
                 {errors.phone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.phone.message}</p>}
               </div>
+
+              {/* Campo 3: Valor */}
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1.5">Valor (R$)</label>
+                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
+                  Valor da Venda (R$)
+                </label>
                 <input 
                   {...register('value')} 
                   type="number"
                   step="0.01" 
-                  placeholder="Ex: 1500.00" 
-                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-1 transition-all ${
+                  placeholder="Ex: 99.90" 
+                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
                     errors.value 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow'
+                      : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow/30'
                   }`} 
                 />
                 {errors.value && <p className="text-red-500 text-xs mt-1 font-medium">{errors.value.message}</p>}
               </div>
+
+              {/* Campo 4: Técnico / Indicador (Origem) */}
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1.5">Técnico / Indicador</label>
+                <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
+                  Técnico / Indicador (Origem da Venda)
+                </label>
                 <select
                   {...register('ref')}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:border-brand-yellow focus:ring-brand-yellow transition-all text-brand-charcoal dark:text-white"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-brand-yellow focus:ring-brand-yellow/30 transition-all text-brand-charcoal dark:text-white cursor-pointer"
                 >
                   <option value="Manual">Nenhum (Venda Manual)</option>
                   <option value="Orgânico">Orgânico (Pesquisa do Cliente)</option>
-                  {colaboradores.map(c => (
-                    <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
-                  ))}
+                  {colaboradores.length > 0 && (
+                    <optgroup label="--- Técnicos e Colaboradores ---">
+                      {colaboradores.map(c => (
+                        <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                <p className="text-gray-400 text-xs mt-1">Selecione o técnico ou colaborador que indicou este cliente.</p>
               </div>
-              <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 hover:scale-[1.02] active:scale-95 transition-all">
+
+              <button type="submit" className="w-full py-3.5 bg-brand-yellow hover:bg-brand-yellow/90 text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer">
                 Adicionar Lead
               </button>
             </form>

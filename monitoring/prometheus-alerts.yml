@@ -1,0 +1,72 @@
+# Regras de Alerta para Prometheus Alertmanager (DevOps Regra 9)
+# Regra 9: Todo sistema deve ter alertas configuráveis para anomalias em produção.
+
+groups:
+  - name: gente_digital_observability_alerts
+    rules:
+
+      # 1. Alerta de Taxa de Erro HTTP Alta (5xx)
+      - alert: HighHttp5xxErrorRate
+        expr: (sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m]))) * 100 > 1
+        for: 2m
+        labels:
+          severity: critical
+          service: gente-digital-api
+        annotations:
+          summary: "Taxa de erro HTTP 5xx acima de 1%"
+          description: "A taxa de erros de servidor está em {{ $value | printf \"%.2f\" }}% nos últimos 5 minutos."
+
+      # 2. Alerta de Latência P95 Alta
+      - alert: HighHttpLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: gente-digital-api
+        annotations:
+          summary: "Latência P95 do serviço acima de 500ms"
+          description: "O tempo de resposta do 95º percentil atingiu {{ $value | printf \"%.2f\" }}s."
+
+      # 3. Alerta de Falha no Health Check
+      - alert: ServiceHealthCheckFailed
+        expr: probe_success{job="gente_digital_health"} == 0
+        for: 1m
+        labels:
+          severity: page
+          service: gente-digital-api
+        annotations:
+          summary: "Health Check do serviço FALHOU!"
+          description: "O endpoint /api/health retornou status 503 ou não respondeu por mais de 1 minuto."
+
+      # 4. Alerta de Degradação do Cache (Baixa Taxa de Hit)
+      - alert: LowCacheHitRatio
+        expr: cache_hit_ratio_percent < 70
+        for: 10m
+        labels:
+          severity: warning
+          service: gente-digital-api
+        annotations:
+          summary: "Taxa de acerto (Hit Ratio) do Cache caiu abaixo de 70%"
+          description: "O cache está ineficiente. Hit ratio atual: {{ $value | printf \"%.2f\" }}%."
+
+      # 5. Alerta de Alto Uso de Memória Heap
+      - alert: HighMemoryHeapUsage
+        expr: process_heap_used_percent > 85
+        for: 5m
+        labels:
+          severity: critical
+          service: gente-digital-api
+        annotations:
+          summary: "Uso de memória Heap crítico (>85%)"
+          description: "O processo da aplicação está usando {{ $value | printf \"%.2f\" }}% do Heap disponível, risco de Out-Of-Memory (OOM)."
+
+      # 6. Alerta de Consultas Lentas de Banco de Dados
+      - alert: SlowDatabaseQueriesDetected
+        expr: rate(db_slow_queries_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: gente-digital-api
+        annotations:
+          summary: "Pico de consultas lentas de banco de dados (>200ms)"
+          description: "Detecção de múltiplas queries lentas executando no banco de dados."
