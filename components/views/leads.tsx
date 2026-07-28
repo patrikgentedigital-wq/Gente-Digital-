@@ -332,32 +332,17 @@ export function LeadsView() {
     try {
       const map = new Map<string, { id: string; name: string }>();
 
-      // 1. Inclui colaboradores padrão/iniciais (como Alfredo Seixas, Leandro, etc.)
-      initialColaboradores.forEach(c => {
-        map.set(c.id, { id: c.id, name: c.name });
-      });
-
-      // 2. Busca do Supabase se configurado
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
         const { data, error } = await supabase.from('colaboradores').select('id, name');
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           data.forEach(c => {
             map.set(c.id, { id: c.id, name: c.name });
           });
         }
-      }
-
-      // 3. Mescla com colaboradores salvos localmente
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem('gente_digital_local_colaboradores');
-          if (raw) {
-            const local: any[] = JSON.parse(raw);
-            local.forEach(c => {
-              map.set(c.id, { id: c.id, name: c.name });
-            });
-          }
-        } catch (e) {}
+      } else {
+        initialColaboradores.forEach(c => {
+          map.set(c.id, { id: c.id, name: c.name });
+        });
       }
 
       setColaboradores(Array.from(map.values()));
@@ -369,6 +354,19 @@ export function LeadsView() {
   useEffect(() => {
     fetchLeads(currentPage);
     fetchColaboradores();
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      const colabChannel = supabase
+        .channel('leads_colaboradores_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
+          fetchColaboradores();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(colabChannel);
+      };
+    }
   }, [currentPage, fetchLeads]);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];

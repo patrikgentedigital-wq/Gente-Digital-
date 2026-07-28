@@ -44,7 +44,7 @@ export function ComissoesView() {
         !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
 
       let leadsData: Lead[] = [];
-      let colabsData: Colaborador[] = initialColaboradores;
+      let colabsData: Colaborador[] = [];
 
       if (isConfigured) {
         // Fetch leads
@@ -53,7 +53,9 @@ export function ComissoesView() {
 
         // Fetch colaboradores cadastrados
         const { data: cData } = await supabase.from('colaboradores').select('*');
-        if (cData && cData.length > 0) colabsData = cData;
+        if (cData) colabsData = cData;
+      } else {
+        colabsData = initialColaboradores;
       }
 
       // Helper para verificar se um ref é um Colaborador oficial da empresa

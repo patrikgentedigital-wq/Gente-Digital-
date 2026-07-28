@@ -36,36 +36,34 @@ export function DashboardView() {
           if (lData) leadsData = lData;
 
           const { data: cData } = await supabase.from('colaboradores').select('*');
-          if (cData && cData.length > 0) {
+          if (cData) {
             colabsData = cData;
-          } else {
-            colabsData = initialColaboradores;
           }
         } else {
           // Mocks for local display if DB is not configured
           leadsData = initialLeads as Lead[];
           colabsData = initialColaboradores;
-        }
 
-        if (typeof window !== 'undefined') {
-          try {
-            const locRaw = localStorage.getItem('gente_digital_local_colaboradores');
-            if (locRaw) {
-              const localColabs: Colaborador[] = JSON.parse(locRaw);
-              const map = new Map<string, Colaborador>();
-              localColabs.forEach(c => map.set(c.id, c));
-              colabsData.forEach(c => {
-                if (!map.has(c.id)) map.set(c.id, c);
-              });
-              colabsData = Array.from(map.values());
-            }
+          if (typeof window !== 'undefined') {
+            try {
+              const locRaw = localStorage.getItem('gente_digital_local_colaboradores');
+              if (locRaw) {
+                const localColabs: Colaborador[] = JSON.parse(locRaw);
+                const map = new Map<string, Colaborador>();
+                localColabs.forEach(c => map.set(c.id, c));
+                colabsData.forEach(c => {
+                  if (!map.has(c.id)) map.set(c.id, c);
+                });
+                colabsData = Array.from(map.values());
+              }
 
-            const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
-            if (delRaw) {
-              const delIds: string[] = JSON.parse(delRaw);
-              colabsData = colabsData.filter(c => !delIds.includes(c.id));
-            }
-          } catch (e) {}
+              const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
+              if (delRaw) {
+                const delIds: string[] = JSON.parse(delRaw);
+                colabsData = colabsData.filter(c => !delIds.includes(c.id));
+              }
+            } catch (e) {}
+          }
         }
 
         setLeads(leadsData);
@@ -77,6 +75,22 @@ export function DashboardView() {
       }
     };
     fetchData();
+
+    if (isSupabaseConfigured()) {
+      const dashboardChannel = supabase
+        .channel('dashboard_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
+          fetchData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+          fetchData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(dashboardChannel);
+      };
+    }
   }, []);
 
   const now = new Date();

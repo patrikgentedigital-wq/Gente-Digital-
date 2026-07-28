@@ -21,7 +21,7 @@ type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
 export function ColaboradoresView() {
   const router = useRouter();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
-  const [colaboradores, setColaboradores] = useState<Colaborador[]>(initialColaboradores);
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>(isSupabaseConfigured() ? [] : initialColaboradores);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,7 +29,7 @@ export function ColaboradoresView() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   const getNextColabId = () => {
-    let maxNum = 45;
+    let maxNum = 0;
     colaboradores.forEach(c => {
       const match = c.id.match(/\d+/);
       if (match) {
