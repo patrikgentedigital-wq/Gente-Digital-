@@ -19,6 +19,15 @@ const leadSchema = z.object({
     return !isNaN(num) && num >= 0;
   }, 'O valor deve ser um número positivo'),
   ref: z.string().optional(),
+  customRef: z.string().optional(),
+}).refine(data => {
+  if (data.ref === 'Outro') {
+    return !!data.customRef && data.customRef.trim().length > 0;
+  }
+  return true;
+}, {
+  message: 'Digite o nome da pessoa que indicou',
+  path: ['customRef'],
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -184,9 +193,11 @@ export function LeadsView() {
     URL.revokeObjectURL(url);
   };
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<LeadFormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema)
   });
+
+  const selectedRef = watch('ref');
 
   useEffect(() => {
     if (isModalOpen) {
@@ -195,7 +206,8 @@ export function LeadsView() {
         name: '',
         phone: '',
         value: '',
-        ref: cookieRef || ''
+        ref: cookieRef || 'Manual',
+        customRef: ''
       });
     }
   }, [isModalOpen, reset]);
@@ -352,7 +364,10 @@ export function LeadsView() {
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
 
   const handleAdd = async (data: LeadFormData) => {
-    const referral = data.ref || getReferralCookie() || 'Manual';
+    let referral = data.ref || getReferralCookie() || 'Manual';
+    if (referral === 'Outro' && data.customRef && data.customRef.trim() !== '') {
+      referral = data.customRef.trim();
+    }
     const newLeadData = {
       name: data.name,
       phone: data.phone,
@@ -1008,15 +1023,41 @@ export function LeadsView() {
                 >
                   <option value="Manual">Nenhum (Venda Manual)</option>
                   <option value="Orgânico">Orgânico (Pesquisa do Cliente)</option>
+                  <option value="Outro">✏️ Outro (Digitar Nome da Indicação Manualmente)</option>
                   {colaboradores.length > 0 && (
-                    <optgroup label="--- Técnicos e Colaboradores ---">
+                    <optgroup label="--- Técnicos e Colaboradores Cadastrados ---">
                       {colaboradores.map(c => (
                         <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
                       ))}
                     </optgroup>
                   )}
                 </select>
-                <p className="text-gray-400 text-xs mt-1">Selecione o técnico ou colaborador que indicou este cliente.</p>
+
+                {/* Campo condicional para digitação manual de quem indicou */}
+                {selectedRef === 'Outro' && (
+                  <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <label className="block text-xs font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
+                      Nome de Quem Indicou <span className="text-red-500">*</span>
+                    </label>
+                    <input 
+                      {...register('customRef')} 
+                      type="text" 
+                      placeholder="Digite o nome da pessoa ou cliente que indicou..." 
+                      className={`w-full px-3.5 py-2.5 bg-white dark:bg-zinc-800 border rounded-lg text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                        errors.customRef 
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                          : 'border-brand-border dark:border-gray-700 focus:border-brand-yellow focus:ring-brand-yellow/30'
+                      }`} 
+                    />
+                    {errors.customRef ? (
+                      <p className="text-red-500 text-xs mt-1 font-medium">{errors.customRef.message}</p>
+                    ) : (
+                      <p className="text-gray-400 text-xs mt-1">Este nome ficará registrado como o indicador do lead.</p>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-gray-400 text-xs mt-1">Selecione o técnico, indicação manual ou origem da venda.</p>
               </div>
 
               <button type="submit" className="w-full py-3.5 bg-brand-yellow hover:bg-brand-yellow/90 text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer">
