@@ -63,10 +63,10 @@ export function DashboardView() {
         let colabsData: Colaborador[] = [];
 
         if (isSupabaseConfigured()) {
-          const { data: lData } = await supabase.from('leads').select('id, ref, status, created_at');
+          const { data: lData } = await supabase.from('leads').select('*');
           if (lData) leadsData = lData;
 
-          const { data: cData } = await supabase.from('colaboradores').select('id, name');
+          const { data: cData } = await supabase.from('colaboradores').select('*');
           if (cData) {
             colabsData = cData;
           }

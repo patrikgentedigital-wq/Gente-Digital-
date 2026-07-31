@@ -75,10 +75,10 @@ export function ComissoesView() {
       let colabsData: Colaborador[] = [];
 
       if (isConfigured) {
-        const { data: lData } = await supabase.from('leads').select('id, name, ref, status, value, created_at').eq('status', 'Ganho');
+        const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
         if (lData) leadsData = lData;
 
-        const { data: cData } = await supabase.from('colaboradores').select('id, name');
+        const { data: cData } = await supabase.from('colaboradores').select('*');
         if (cData) colabsData = cData;
       } else {
         colabsData = initialColaboradores;
