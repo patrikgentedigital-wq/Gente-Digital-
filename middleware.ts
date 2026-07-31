@@ -54,13 +54,15 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect all routes except /login, /api/webhooks, /api/health e /api/metrics
+  // Protect all routes except /login, /indicar, /api/webhooks, /api/health, /api/metrics e /api/track-click
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
   const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
   const isHealthRoute = request.nextUrl.pathname.startsWith('/api/health')
   const isMetricsRoute = request.nextUrl.pathname.startsWith('/api/metrics')
-  
-  if (!user && !isAuthRoute && !isWebhookRoute && !isHealthRoute && !isMetricsRoute) {
+  const isTrackClickRoute = request.nextUrl.pathname.startsWith('/api/track-click')
+
+  if (!user && !isAuthRoute && !isPublicLanding && !isWebhookRoute && !isHealthRoute && !isMetricsRoute && !isTrackClickRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
       unauthRes.headers.set('x-request-id', requestId);

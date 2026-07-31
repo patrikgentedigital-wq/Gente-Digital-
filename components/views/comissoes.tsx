@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2 } from 'lucide-react';
 import { supabase, Lead, Colaborador } from '@/lib/supabase';
 import { initialColaboradores } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useToast } from '@/components/providers/toast-context';
 import Avatar from 'boring-avatars';
+import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
 
 export interface CommissionItem {
   id: string | number;
@@ -21,44 +24,69 @@ export interface CommissionItem {
   type: 'pix_colaborador' | 'desconto_cliente' | 'bonus_top';
 }
 
+type PaidMap = Record<string, string>;
+
+const itemKey = (id: string | number) => id.toString().replace(/^comm_/, '');
+
 export function ComissoesView() {
+  const { success: toastSuccess, error: toastError } = useToast();
   const [commissions, setCommissions] = useState<CommissionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'Pendente' | 'Paga'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [topColaborador, setTopColaborador] = useState<{ name: string; count: number } | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<CommissionItem | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
 
-  const normalizeStr = (str: string) => 
+  const normalizeStr = (str: string) =>
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+
+  // Busca o estado de pagamentos no servidor (fonte da verdade)
+  const fetchPaidMap = useCallback(async (): Promise<{ map: PaidMap; fromLocalFallback: boolean }> => {
+    try {
+      const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.payments)) {
+        const map: PaidMap = {};
+        data.payments.forEach((p: any) => {
+          if (p.commission_key && p.paid_at) map[p.commission_key] = p.paid_at;
+        });
+        return { map, fromLocalFallback: false };
+      }
+      throw new Error(data.error || 'Falha ao carregar pagamentos');
+    } catch (err) {
+      console.error('Erro ao carregar pagamentos do servidor, usando fallback local:', err);
+      const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
+      const map: PaidMap = paidStateRaw ? JSON.parse(paidStateRaw) : {};
+      return { map, fromLocalFallback: true };
+    }
+  }, []);
 
   // Fetch leads and calculate commissions using official rules
   const fetchCommissions = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
-      const paidMap: Record<string, string> = paidStateRaw ? JSON.parse(paidStateRaw) : {};
-
-      const isConfigured = typeof window !== 'undefined' && 
-        !!process.env.NEXT_PUBLIC_SUPABASE_URL && 
+      const isConfigured = typeof window !== 'undefined' &&
+        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
         !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
 
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
 
       if (isConfigured) {
-        // Fetch leads
-        const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
+        const { data: lData } = await supabase.from('leads').select('id, name, ref, status, value, created_at').eq('status', 'Ganho');
         if (lData) leadsData = lData;
 
-        // Fetch colaboradores cadastrados
-        const { data: cData } = await supabase.from('colaboradores').select('*');
+        const { data: cData } = await supabase.from('colaboradores').select('id, name');
         if (cData) colabsData = cData;
       } else {
         colabsData = initialColaboradores;
       }
 
-      // Helper para verificar se um ref é um Colaborador oficial da empresa
+      const { map: paidMap } = await fetchPaidMap();
+
+      // Helper para verificar se um ref é um Colaborador oficial da empresa (match EXATO)
       const isColaborador = (refStr: string): { isColab: boolean; officialName: string } => {
         const norm = normalizeStr(refStr);
         if (!norm || norm === 'organico' || norm === 'nao especificado') {
@@ -68,7 +96,7 @@ export function ComissoesView() {
         const found = colabsData.find(c => {
           const normId = normalizeStr(c.id);
           const normName = normalizeStr(c.name);
-          return norm === normId || norm === normName || (norm.length >= 4 && (normName.includes(norm) || norm.includes(normName)));
+          return norm === normId || norm === normName;
         });
 
         if (found) {
@@ -77,26 +105,32 @@ export function ComissoesView() {
         return { isColab: false, officialName: refStr };
       };
 
-      // 1. Contagem de indicações instaladas por Colaboradores da Empresa
-      const colabCounts: Record<string, number> = {};
+      // Contagem de indicações instaladas por Colaborador, separada por mês
+      const monthlyCounts: Record<string, Record<string, number>> = {};
       leadsData.forEach(lead => {
         const { isColab, officialName } = isColaborador(lead.ref);
-        if (isColab) {
-          colabCounts[officialName] = (colabCounts[officialName] || 0) + 1;
-        }
+        if (!isColab) return;
+        const d = lead.created_at ? new Date(lead.created_at) : new Date();
+        const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+        if (!monthlyCounts[monthKey]) monthlyCounts[monthKey] = {};
+        monthlyCounts[monthKey][officialName] = (monthlyCounts[monthKey][officialName] || 0) + 1;
       });
 
-      // 2. Identifica o TOP Colaborador do Mês (mínimo de 15 indicações instaladas para ganhar o bônus de R$ 100)
+      // Identifica o TOP Colaborador do MÊS ATUAL (mínimo de 15 indicações instaladas para o bônus de R$ 100)
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+      const currentCounts = monthlyCounts[currentMonthKey] || {};
+
       let maxCount = 0;
       let topColabName = '';
-      Object.entries(colabCounts).forEach(([name, count]) => {
+      Object.entries(currentCounts).forEach(([name, count]) => {
         if (count > maxCount) {
           maxCount = count;
           topColabName = name;
         }
       });
 
-      const meetsMinThreshold = maxCount >= 15;
+      const meetsMinThreshold = maxCount >= PROGRAM_RULES.bonusTop.minimoIndicacoes;
 
       if (topColabName && maxCount > 0) {
         setTopColaborador({ name: topColabName, count: maxCount });
@@ -104,16 +138,19 @@ export function ComissoesView() {
         setTopColaborador(null);
       }
 
-      // 3. Monta a lista de comissões aplicando as regras exatas:
-      // - COLABORADOR: R$ 20 (1-9 indicações) ou R$ 30 (10+ indicações) no PIX
-      // - CLIENTE INDICADOR: R$ 50,00 de desconto na mensalidade (NÃO PIX / NÃO R$ 100)
+      // Monta a lista de comissões aplicando as regras exatas
       const items: CommissionItem[] = leadsData.map(lead => {
         const { isColab, officialName } = isColaborador(lead.ref);
-        const isPaid = paidMap[lead.id.toString()];
+        const leadKey = itemKey(lead.id);
+        const isPaid = paidMap[leadKey];
 
         if (isColab) {
-          const totalColabLeads = colabCounts[officialName] || 1;
-          const ratePerLead = totalColabLeads >= 10 ? 30 : 20;
+          const d = lead.created_at ? new Date(lead.created_at) : new Date();
+          const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+          const totalColabLeads = (monthlyCounts[monthKey] && monthlyCounts[monthKey][officialName]) || 1;
+          const ratePerLead = totalColabLeads >= PROGRAM_RULES.colaborador.volumeThreshold
+            ? PROGRAM_RULES.colaborador.taxaVolume
+            : PROGRAM_RULES.colaborador.taxaPorVenda;
 
           return {
             id: `comm_${lead.id}`,
@@ -122,39 +159,38 @@ export function ComissoesView() {
             colaborador_name: officialName,
             sale_value: lead.value || 0,
             commission_amount: ratePerLead,
-            status: isPaid ? 'Paga' : 'Pendente',
+            status: isPaid ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
             paid_at: isPaid || undefined,
-            type: 'pix_colaborador'
+            type: 'pix_colaborador' as const
           };
         } else {
-          // Cliente em Geral indicando outro cliente
           return {
             id: `comm_${lead.id}`,
             lead_id: lead.id,
             lead_name: lead.name,
             colaborador_name: officialName || 'Cliente Indicador',
             sale_value: lead.value || 0,
-            commission_amount: 50, // R$ 50 de desconto na mensalidade para o cliente indicador
-            status: isPaid ? 'Paga' : 'Pendente',
+            commission_amount: PROGRAM_RULES.clienteIndicador.descontoMensalidade,
+            status: isPaid ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
             paid_at: isPaid || undefined,
-            type: 'desconto_cliente'
+            type: 'desconto_cliente' as const
           };
         }
       });
 
-      // 4. Adiciona bônus de R$ 100 EXCLUSIVAMENTE se o Colaborador TOP tiver atingido NO MÍNIMO 15 INDICAÇÕES
+      // Adiciona bônus de R$ 100 EXCLUSIVAMENTE se o Colaborador TOP do mês atual atingiu o mínimo de indicações
       if (topColabName && meetsMinThreshold) {
         const bonusId = `bonus_top_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
         const isBonusPaid = paidMap[bonusId];
         items.unshift({
           id: bonusId,
           lead_id: 999999,
-          lead_name: '🏆 Prêmio Bônus Top Indicador do Mês (15+ indicações)',
+          lead_name: `🏆 Prêmio Bônus Top Indicador do Mês (${PROGRAM_RULES.bonusTop.minimoIndicacoes}+ indicações)`,
           colaborador_name: topColabName,
           sale_value: 0,
-          commission_amount: 100, // R$ 100 de bônus PIX exclusivo para o colaborador TOP com 15+ indicações
+          commission_amount: PROGRAM_RULES.bonusTop.valor,
           status: isBonusPaid ? 'Paga' : 'Pendente',
           date: new Date().toLocaleDateString('pt-BR'),
           paid_at: isBonusPaid || undefined,
@@ -169,35 +205,58 @@ export function ComissoesView() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchPaidMap]);
 
   useEffect(() => {
     fetchCommissions();
   }, [fetchCommissions]);
 
-  const handlePayCommission = async (id: string | number, leadName: string, colabName: string, amount: number, type: string) => {
-    const isDesconto = type === 'desconto_cliente';
-    const actionName = isDesconto ? 'Baixa de Desconto na Mensalidade' : 'Baixa Financeira (PIX)';
-    const confirmMsg = isDesconto
-      ? `Confirmar desconto de R$ ${amount.toFixed(2)} na MENSALIDADE de ${colabName}?`
-      : `Confirmar pagamento via PIX no valor de R$ ${amount.toFixed(2)} para o colaborador ${colabName}?`;
+  const handlePayCommission = (comm: CommissionItem) => {
+    setPendingPayment(comm);
+  };
 
-    if (!window.confirm(confirmMsg)) return;
+  const confirmPayment = async () => {
+    const comm = pendingPayment;
+    if (!comm) return;
 
-    const nowStr = new Date().toLocaleString('pt-BR');
-    const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
-    const paidMap: Record<string, string> = paidStateRaw ? JSON.parse(paidStateRaw) : {};
-    
-    const cleanId = id.toString().replace('comm_', '');
-    paidMap[cleanId] = nowStr;
-    localStorage.setItem('gente_digital_paid_commissions', JSON.stringify(paidMap));
+    setIsPaying(true);
+    try {
+      const key = itemKey(comm.id);
+      const res = await fetch('/api/commissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pay',
+          key,
+          colaboradorName: comm.colaborador_name,
+          leadName: comm.lead_name,
+          amount: comm.commission_amount,
+          type: comm.type
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Falha ao registrar pagamento');
 
-    await logAuditEvent(
-      actionName,
-      `${actionName}: R$ ${amount.toFixed(2)} registrado para ${colabName} (Ref: ${leadName})`
-    );
+      const nowStr = new Date().toLocaleString('pt-BR');
 
-    setCommissions(commissions.map(c => c.id === id ? { ...c, status: 'Paga', paid_at: nowStr } : c));
+      await logAuditEvent(
+        comm.type === 'desconto_cliente' ? 'Baixa de Desconto na Mensalidade' : 'Baixa Financeira (PIX)',
+        `${comm.type === 'desconto_cliente' ? 'Desconto' : 'Pagamento'} de R$ ${comm.commission_amount.toFixed(2)} registrado para ${comm.colaborador_name} (Ref: ${comm.lead_name})`
+      );
+
+      setCommissions(prev => prev.map(c => c.id === comm.id ? { ...c, status: 'Paga', paid_at: nowStr } : c));
+      setPendingPayment(null);
+      toastSuccess(
+        'Pagamento registrado!',
+        `R$ ${comm.commission_amount.toFixed(2)} salvo no banco para ${comm.colaborador_name} (${comm.type === 'desconto_cliente' ? 'desconto na mensalidade' : 'PIX'}).`
+      );
+    } catch (err: any) {
+      console.error('Erro ao registrar pagamento:', err);
+      setPendingPayment(null);
+      toastError('Erro ao Registrar', 'Não foi possível salvar o pagamento no banco. Tente novamente.');
+    } finally {
+      setIsPaying(false);
+    }
   };
 
   const handleExportCSV = () => {
@@ -227,7 +286,7 @@ export function ComissoesView() {
   };
 
   const filteredCommissions = commissions.filter(c => {
-    const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.colaborador_name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -239,7 +298,7 @@ export function ComissoesView() {
 
   return (
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border dark:border-gray-800 pb-5">
         <div>
@@ -248,7 +307,7 @@ export function ComissoesView() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
           >
@@ -266,7 +325,7 @@ export function ComissoesView() {
           </div>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Colaborador (1 a 9 vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 20,00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.colaborador.taxaPorVenda},00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
           </div>
         </div>
 
@@ -276,7 +335,7 @@ export function ComissoesView() {
           </div>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Colaborador (10+ vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 30,00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.colaborador.taxaVolume},00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
           </div>
         </div>
 
@@ -285,8 +344,8 @@ export function ComissoesView() {
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Colaborador (15+ vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ 100,00 <span className="text-xs font-normal text-slate-500">bônus PIX (mín. 15 vendas)</span></p>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Colaborador ({PROGRAM_RULES.bonusTop.minimoIndicacoes}+ vendas)</h4>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ {PROGRAM_RULES.bonusTop.valor},00 <span className="text-xs font-normal text-slate-500">bônus PIX (mín. {PROGRAM_RULES.bonusTop.minimoIndicacoes} vendas no mês)</span></p>
           </div>
         </div>
 
@@ -296,9 +355,18 @@ export function ComissoesView() {
           </div>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Cliente Indicador</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ 50,00 <span className="text-xs font-normal text-slate-500">desconto na mensalidade</span></p>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.clienteIndicador.descontoMensalidade},00 <span className="text-xs font-normal text-slate-500">desconto na mensalidade</span></p>
           </div>
         </div>
+      </div>
+
+      {/* Prazo de pagamento */}
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60">
+        <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium leading-relaxed">
+          {RULES_COPY.prazoPagamento} O desconto do cliente indicador é aplicado na primeira fatura após a instalação.
+          O bônus de top indicador é calculado sobre as vendas do mês atual.
+        </p>
       </div>
 
       {/* Metric Cards */}
@@ -344,7 +412,7 @@ export function ComissoesView() {
 
         <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/20 p-6 rounded-2xl border border-amber-400/30 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">🏆 Top Colaborador</span>
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">🏆 Top Colaborador do Mês</span>
             <Award className="w-5 h-5 text-amber-500" />
           </div>
           <div className="mt-2">
@@ -353,10 +421,10 @@ export function ComissoesView() {
             </p>
             <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
               {topColaborador ? (
-                topColaborador.count >= 15 
-                  ? `${topColaborador.count} instalações (Bônus R$ 100 Liberado! 🎉)`
-                  : `${topColaborador.count}/15 instalações (Faltam ${15 - topColaborador.count} p/ bônus R$ 100)`
-              ) : 'Mínimo de 15 indicações p/ bônus'}
+                topColaborador.count >= PROGRAM_RULES.bonusTop.minimoIndicacoes
+                  ? `${topColaborador.count} instalações (Bônus R$ ${PROGRAM_RULES.bonusTop.valor} Liberado! 🎉)`
+                  : `${topColaborador.count}/${PROGRAM_RULES.bonusTop.minimoIndicacoes} instalações (Faltam ${PROGRAM_RULES.bonusTop.minimoIndicacoes - topColaborador.count} p/ bônus R$ ${PROGRAM_RULES.bonusTop.valor})`
+              ) : `Mínimo de ${PROGRAM_RULES.bonusTop.minimoIndicacoes} indicações p/ bônus`}
             </p>
           </div>
         </div>
@@ -400,12 +468,12 @@ export function ComissoesView() {
 
           <div className="relative text-brand-muted focus-within:text-brand-charcoal transition-colors w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar por lead ou indicador..." 
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white dark:placeholder-gray-400 focus:outline-none focus:border-brand-yellow transition-all" 
+              placeholder="Buscar por lead ou indicador..."
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white dark:placeholder-gray-400 focus:outline-none focus:border-brand-yellow transition-all"
             />
           </div>
         </div>
@@ -456,7 +524,7 @@ export function ComissoesView() {
                         <p className={`font-semibold ${comm.isBonus ? 'text-amber-600 dark:text-amber-400 font-extrabold' : 'text-brand-charcoal dark:text-white'}`}>
                           {comm.lead_name}
                         </p>
-                        <p className="text-[11px] text-brand-muted dark:text-gray-400">
+                        <p className="text-xs text-brand-muted dark:text-gray-400">
                           {comm.isBonus ? 'Prêmio de liderança mensal para colaborador' : `Conversão em: ${comm.date}`}
                         </p>
                       </div>
@@ -482,8 +550,8 @@ export function ComissoesView() {
                   </td>
                   <td className="px-6 py-4 font-extrabold text-green-600 dark:text-green-400">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.commission_amount)}
-                    {comm.type === 'desconto_cliente' && <span className="text-[10px] block font-normal text-slate-500 dark:text-slate-400">Desconto na Mensalidade</span>}
-                    {comm.type !== 'desconto_cliente' && <span className="text-[10px] block font-normal text-emerald-600 dark:text-emerald-400">Pagamento PIX</span>}
+                    {comm.type === 'desconto_cliente' && <span className="text-xs block font-normal text-slate-500 dark:text-slate-400">Desconto na Mensalidade</span>}
+                    {comm.type !== 'desconto_cliente' && <span className="text-xs block font-normal text-emerald-600 dark:text-emerald-400">Pagamento PIX</span>}
                   </td>
                   <td className="px-6 py-4">
                     {comm.status === 'Paga' ? (
@@ -499,7 +567,7 @@ export function ComissoesView() {
                   <td className="px-6 py-4 text-right">
                     {comm.status === 'Pendente' ? (
                       <button
-                        onClick={() => handlePayCommission(comm.id, comm.lead_name, comm.colaborador_name, comm.commission_amount, comm.type)}
+                        onClick={() => handlePayCommission(comm)}
                         className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto ${
                           comm.type === 'desconto_cliente'
                             ? 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -521,6 +589,28 @@ export function ComissoesView() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingPayment}
+        title={pendingPayment?.type === 'desconto_cliente' ? 'Aplicar desconto na mensalidade' : 'Confirmar pagamento via PIX'}
+        message={
+          pendingPayment
+            ? `Confirma ${pendingPayment.type === 'desconto_cliente' ? 'o desconto de' : 'o pagamento de'} R$ ${pendingPayment.commission_amount.toFixed(2)} para ${pendingPayment.colaborador_name}${pendingPayment.type === 'desconto_cliente' ? ' (cliente indicador)' : ''}? O registro fica salvo no banco e poderá ser conferido em qualquer dispositivo.`
+            : ''
+        }
+        confirmLabel={pendingPayment?.type === 'desconto_cliente' ? 'Aplicar desconto' : 'Confirmar pagamento'}
+        tone={pendingPayment?.type === 'desconto_cliente' ? 'primary' : 'success'}
+        onConfirm={confirmPayment}
+        onCancel={() => setPendingPayment(null)}
+      />
+      {isPaying && (
+        <div className="fixed inset-0 bg-black/40 z-[75] flex items-center justify-center">
+          <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 rounded-2xl px-6 py-4 shadow-2xl">
+            <Loader2 className="w-5 h-5 animate-spin text-brand-yellow" />
+            <p className="text-sm font-semibold text-brand-charcoal dark:text-white">Registrando pagamento...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X, FileText } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import dynamic from 'next/dynamic';
 import Avatar from 'boring-avatars';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -9,6 +9,17 @@ import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
+import { PROGRAM_RULES } from '@/lib/rules';
+
+// Lazy load recharts para reduzir bundle inicial
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
+const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false });
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -23,6 +34,26 @@ export function DashboardView() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
   const [showExecutiveModal, setShowExecutiveModal] = useState(false);
+  const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const fetchClickCounts = async () => {
+      try {
+        const res = await fetch('/api/track-click');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.clicks)) {
+          const map: Record<string, number> = {};
+          data.clicks.forEach((c: { ref: string; count: number }) => {
+            map[normalizeStr(c.ref)] = (map[normalizeStr(c.ref)] || 0) + c.count;
+          });
+          setClickCounts(map);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar cliques:', err);
+      }
+    };
+    fetchClickCounts();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,10 +63,10 @@ export function DashboardView() {
         let colabsData: Colaborador[] = [];
 
         if (isSupabaseConfigured()) {
-          const { data: lData } = await supabase.from('leads').select('*');
+          const { data: lData } = await supabase.from('leads').select('id, ref, status, created_at');
           if (lData) leadsData = lData;
 
-          const { data: cData } = await supabase.from('colaboradores').select('*');
+          const { data: cData } = await supabase.from('colaboradores').select('id, name');
           if (cData) {
             colabsData = cData;
           }
@@ -116,7 +147,6 @@ export function DashboardView() {
   const totalLeads = filteredLeads.length;
   const conversões = filteredLeads.filter(l => l.status === 'Ganho').length;
   const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
-  const clicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0);
 
   const handleExportReport = () => {
     const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
@@ -129,7 +159,7 @@ export function DashboardView() {
         return normRef === normColabId || normRef === normColabName;
       });
       const convs = referredLeads.filter(l => l.status === 'Ganho').length;
-      const points = referredLeads.length * 20 + convs * 50;
+      const points = referredLeads.length * PROGRAM_RULES.pontos.porIndicacao + convs * PROGRAM_RULES.pontos.porConversao;
       
       return [
         `"${colab.name}"`,
@@ -225,6 +255,14 @@ export function DashboardView() {
   const normalizeStr = (str: string) => 
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
+  // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
+  const clicks = colaboradores.reduce((acc, c) => {
+    const normId = normalizeStr(c.id);
+    const normName = normalizeStr(c.name);
+    const refClicks = clickCounts[normId] || clickCounts[normName] || 0;
+    return acc + refClicks;
+  }, 0);
+
   const getTopColaboradores = () => {
     return colaboradores
       .map(colab => {
@@ -233,12 +271,12 @@ export function DashboardView() {
 
         const referredLeads = filteredLeads.filter(l => {
           const normRef = normalizeStr(l.ref);
-          return normRef === normColabId || normRef === normColabName || (!!normRef && !!normColabName && (normRef.includes(normColabName) || normColabName.includes(normRef)));
+          return normRef === normColabId || normRef === normColabName;
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
         const totalReferred = referredLeads.length;
-        const points = totalReferred * 20 + colabConversions * 50;
+        const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + colabConversions * PROGRAM_RULES.pontos.porConversao;
 
         return {
           ...colab,
@@ -270,7 +308,7 @@ export function DashboardView() {
        const isColab = colaboradores.some(c => {
          const nName = normalizeStr(c.name);
          const nId = normalizeStr(c.id);
-         return normRef === nId || normRef === nName || (!!normRef && !!nName && (normRef.includes(nName) || nName.includes(normRef)));
+         return normRef === nId || normRef === nName;
        });
        return !isColab;
     });
@@ -282,7 +320,7 @@ export function DashboardView() {
       const referredLeads = filteredLeads.filter(l => normalizeStr(l.ref) === uRef);
       const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
       const totalReferred = referredLeads.length;
-      const points = totalReferred * 20 + conversions * 50;
+      const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + conversions * PROGRAM_RULES.pontos.porConversao;
       
       return {
         id: uRef,
@@ -360,12 +398,9 @@ export function DashboardView() {
 
     let clicksTrend = '0% este mês';
     let clicksTrendUp = true;
-    if (leads.length > 0) {
-      const totalClicks = colaboradores.reduce((acc, c) => acc + (c.count || 0), 0);
-      if (totalClicks > 0) {
-        clicksTrend = leadsTrend;
-        clicksTrendUp = leadsTrendUp;
-      }
+    if (clicks > 0) {
+      clicksTrend = leadsTrend;
+      clicksTrendUp = leadsTrendUp;
     }
 
     const curRate = curLeadsCount > 0 ? (curConvs / curLeadsCount) * 100 : 0;
@@ -412,6 +447,7 @@ export function DashboardView() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowExecutiveModal(true)}
+            aria-label="Gerar Relatório PDF"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm"
           >
             <FileText className="w-4 h-4" />
@@ -420,6 +456,7 @@ export function DashboardView() {
 
           <button
             onClick={handleGenerateAiSummary}
+            aria-label="Gerar Resumo com IA"
             className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm"
           >
             <Sparkles className="w-4 h-4" />
@@ -428,6 +465,7 @@ export function DashboardView() {
 
           <button
             onClick={handleExportReport}
+            aria-label="Exportar relatório CSV"
             className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
           >
             <Download className="w-4 h-4" />

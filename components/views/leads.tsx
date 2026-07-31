@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { supabase, Lead, LeadHistory } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
@@ -10,6 +10,7 @@ import * as z from 'zod';
 import { useToast } from '@/components/providers/toast-context';
 import { LeadsSkeleton } from '@/components/views/leads-skeleton';
 import { initialColaboradores } from '@/lib/mock-data';
+import { ConfirmModal } from '@/components/providers/confirm-modal';
 
 const leadSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
@@ -85,6 +86,21 @@ export function LeadsView() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
 
+  // Auto-switch para lista em telas pequenas (mobile)
+  useEffect(() => {
+    const checkMobile = () => {
+      if (window.innerWidth < 768) {
+        setViewMode('list');
+      }
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Estado do modal de confirmação de exclusão
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: number; name: string } | null>(null);
+
   const selectLead = (lead: UILead | null) => {
     setSelectedLead(lead);
     setAiResult(null);
@@ -144,21 +160,22 @@ export function LeadsView() {
     }
   };
 
-  const handleDeleteLead = async (id: number) => {
+  const handleDeleteLead = (id: number) => {
     const targetLead = leads.find(l => l.id === id);
     const leadName = targetLead?.name || `ID ${id}`;
+    setConfirmDelete({ isOpen: true, id, name: leadName });
+  };
 
-    if (!window.confirm(`Tem certeza que deseja excluir o lead "${leadName}"? Essa ação não pode ser desfeita.`)) {
-      return;
-    }
-    
+  const executeDeleteLead = async () => {
+    if (!confirmDelete) return;
+    const { id, name: leadName } = confirmDelete;
+    setConfirmDelete(null);
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
         await supabase.from('lead_history').delete().eq('lead_id', id);
         const { error } = await supabase.from('leads').delete().eq('id', id);
         if (error) throw error;
       }
-      
       await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
       setLeads(leads.filter(l => l.id !== id));
       setTotalLeadsCount(prev => Math.max(0, prev - 1));
@@ -245,9 +262,11 @@ export function LeadsView() {
         });
       } else {
         console.error('AI Error:', data.error);
+        toastError('Erro na análise IA', data.error || 'Não foi possível qualificar o lead. Tente novamente.');
       }
     } catch (err) {
       console.error('AI Request failed:', err);
+      toastError('Erro de conexão', 'Não foi possível conectar à IA. Verifique sua conexão.');
     } finally {
       setIsAiLoading(false);
     }
@@ -271,9 +290,11 @@ export function LeadsView() {
         });
       } else {
         console.error('AI Error:', data.error);
+        toastError('Erro na IA', data.error || 'Não foi possível gerar a mensagem. Tente novamente.');
       }
     } catch (err) {
       console.error('AI Request failed:', err);
+      toastError('Erro de conexão', 'Não foi possível conectar à IA. Verifique sua conexão.');
     } finally {
       setIsAiLoading(false);
     }
@@ -487,17 +508,23 @@ export function LeadsView() {
 
   const [dateFilter, setDateFilter] = useState('all');
 
-  const uniqueRefs = Array.from(new Set(leads.map(l => l.ref).filter(Boolean)));
+  const uniqueRefs = useMemo(
+    () => Array.from(new Set(leads.map(l => l.ref).filter(Boolean))),
+    [leads]
+  );
   
-  let activeFiltersCount = 0;
-  if (selectedColabFilter) activeFiltersCount++;
-  if (minValueFilter !== '') activeFiltersCount++;
-  if (maxValueFilter !== '') activeFiltersCount++;
-  if (dateFilter !== 'all') activeFiltersCount++;
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedColabFilter) count++;
+    if (minValueFilter !== '') count++;
+    if (maxValueFilter !== '') count++;
+    if (dateFilter !== 'all') count++;
+    return count;
+  }, [selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
 
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
 
-  const filteredLeads = leads.filter(l => {
+  const filteredLeads = useMemo(() => leads.filter(l => {
     const matchesSearch = 
       l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       (l.phone && l.phone.includes(searchQuery)) ||
@@ -513,20 +540,21 @@ export function LeadsView() {
         matchesDate = false;
       } else {
         const d = new Date(l.created_at);
+        const currentDate = new Date();
         if (dateFilter === 'this_month') {
-          matchesDate = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          matchesDate = d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
         } else if (dateFilter === 'last_month') {
-          const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-          const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+          const lastMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
+          const lastYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
           matchesDate = d.getMonth() === lastMonth && d.getFullYear() === lastYear;
         } else if (dateFilter === 'this_year') {
-          matchesDate = d.getFullYear() === now.getFullYear();
+          matchesDate = d.getFullYear() === currentDate.getFullYear();
         }
       }
     }
 
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
-  });
+  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
 
   return (
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
@@ -755,6 +783,7 @@ export function LeadsView() {
                             e.stopPropagation();
                             handleDeleteLead(lead.id);
                           }}
+                          aria-label={`Excluir lead ${lead.name}`}
                           className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/50 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
                           title="Excluir Lead"
                         >
@@ -817,6 +846,7 @@ export function LeadsView() {
                                 e.stopPropagation();
                                 handleDeleteLead(lead.id);
                               }}
+                              aria-label={`Excluir lead ${lead.name}`}
                               className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors"
                               title="Excluir Lead"
                             >
@@ -1103,6 +1133,7 @@ export function LeadsView() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => handleDeleteLead(selectedLead.id)} 
+                  aria-label={`Excluir lead ${selectedLead.name}`}
                   className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full transition-colors shrink-0 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 shadow-sm"
                   title="Excluir Lead"
                 >
@@ -1238,6 +1269,21 @@ export function LeadsView() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Modal de confirmação de exclusão de lead */}
+      {confirmDelete && (
+        <ConfirmModal
+          isOpen={confirmDelete.isOpen}
+          title="Excluir Lead"
+          message={`Tem certeza que deseja excluir o lead "${confirmDelete.name}"? Essa ação não pode ser desfeita.`}
+          confirmLabel="Excluir"
+          cancelLabel="Cancelar"
+          variant="danger"
+          icon="trash"
+          onConfirm={executeDeleteLead}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   )

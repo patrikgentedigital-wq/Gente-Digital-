@@ -1,4 +1,4 @@
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload } from 'lucide-react';
+import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
@@ -438,7 +438,8 @@ export function ColaboradoresView() {
                     <div className="flex justify-end gap-1">
                       <button 
                         onClick={() => router.push('/?tab=dashboard')}
-                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 transition-colors" 
+                        aria-label={`Ver analytics de ${colab.name}`}
+                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors" 
                         title="Ver Analytics"
                       >
                         <BarChart2 className="w-4 h-4" />
@@ -448,12 +449,18 @@ export function ColaboradoresView() {
                           setSelectedColabForQr(colab);
                           setCopiedLink(false);
                         }}
-                        className="p-2 text-brand-muted hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" 
+                        aria-label={`Gerar QR Code para ${colab.name}`}
+                        className="p-2 text-brand-muted hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors" 
                         title="Gerar QR Code / Link"
                       >
                         <QrCode className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(colab.id)} className="p-2 text-brand-muted hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Excluir">
+                      <button
+                        onClick={() => handleDelete(colab.id)}
+                        aria-label={`Excluir colaborador ${colab.name}`}
+                        className="p-2 text-brand-muted hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        title="Excluir"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -608,12 +615,27 @@ export function ColaboradoresView() {
                 💡 <strong>Dica do Sucesso:</strong> Compartilhe este link ou QR Code com seus colaboradores. Quando os novos clientes acessarem, o Gente Digital rastreará a indicação automaticamente!
               </div>
 
-              <button 
-                onClick={() => setSelectedColabForQr(null)}
-                className="w-full py-3.5 border-2 border-brand-charcoal text-brand-charcoal font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
-              >
-                Concluído
-              </button>
+              {/* Botões de ação */}
+              <div className="flex flex-col gap-3">
+                {/* WhatsApp Share */}
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`🌐 Assine a internet da Gente Digital usando meu link exclusivo e aproveite as melhores ofertas! 🚀\n\n${getFullReferralLink(baseLink, selectedColabForQr.id)}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Compartilhar link de ${selectedColabForQr.name} no WhatsApp`}
+                  className="w-full py-3.5 bg-green-500 hover:bg-green-600 text-white font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Compartilhar no WhatsApp
+                </a>
+
+                <button 
+                  onClick={() => setSelectedColabForQr(null)}
+                  className="w-full py-3.5 border-2 border-brand-charcoal dark:border-gray-700 text-brand-charcoal dark:text-white font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all text-sm"
+                >
+                  Concluído
+                </button>
+              </div>
             </div>
           </div>
         </div>
