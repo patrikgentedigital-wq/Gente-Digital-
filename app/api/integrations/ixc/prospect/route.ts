@@ -1,53 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth } from '@/lib/auth-server';
+import { z } from 'zod';
+import { getAdminUser } from '@/lib/auth-server';
+import { isSameOriginRequest } from '@/lib/request-security';
+import { fetchIxc, getIxcConfig } from '@/lib/ixc';
+import { checkPublicRateLimit } from '@/lib/rate-limit';
 
-export async function POST(req: NextRequest) {
+const ProspectSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  phone: z.string().trim().min(10).max(30),
+  ref: z.string().trim().max(50).optional().default(''),
+});
+
+const NAME_PATTERN = /^[\p{L}\p{M} .'-]+$/u;
+
+export async function POST(request: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const admin = await getAdminUser(request);
+    if (!admin) return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
+    if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem nao permitida.' }, { status: 403 });
+
+    const rateLimit = await checkPublicRateLimit('ixc-prospect', request, `user:${admin.id}`);
+    if (rateLimit.unavailable) return NextResponse.json({ error: 'Rate limit indisponivel.' }, { status: 503 });
+    if (!rateLimit.success) return NextResponse.json({ error: 'Muitos prospects em pouco tempo.' }, { status: 429 });
+
+    const parsed = ProspectSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ success: false, error: 'Nome e telefone invalidos.' }, { status: 400 });
+
+    const name = parsed.data.name.normalize('NFC').replace(/\s+/g, ' ');
+    const phone = parsed.data.phone.replace(/\D/g, '').slice(0, 13);
+    if (!NAME_PATTERN.test(name) || phone.length < 10) {
+      return NextResponse.json({ success: false, error: 'Nome e telefone invalidos.' }, { status: 400 });
     }
 
-    const { name, phone, ref } = await req.json();
+    const config = await getIxcConfig();
+    if (!config) return NextResponse.json({ success: false, error: 'IXC nao configurado.' }, { status: 503 });
 
-    if (!name || !phone) {
-      return NextResponse.json({ success: false, error: 'Nome e telefone são obrigatórios' }, { status: 400 });
-    }
-
-    // Fetch credentials from settings
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
-
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
-
-    if (!domain || !token) {
-      return NextResponse.json({ success: false, error: 'IXC não configurado' }, { status: 400 });
-    }
-
-    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-    const base64Token = Buffer.from(token).toString('base64');
-    
-    // Format current date for IXC (YYYY-MM-DD HH:MM:SS)
     const now = new Date();
-    const offset = now.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 19).replace('T', ' ');
+    const localISOTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 19).replace('T', ' ');
 
-    const payload = {
+    const response = await fetchIxc(`${config.host}/webservice/v1/contato`, config.token, {
       nome: name,
       razao: name,
       fone_celular: phone,
@@ -56,29 +48,17 @@ export async function POST(req: NextRequest) {
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
-      obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
-    };
-
-    const ixcResponse = await fetch(`https://${cleanDomain}/webservice/v1/contato`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${base64Token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
+      obs: `Indicado via Gente Digital por: ${parsed.data.ref || 'Desconhecido'}`,
     });
 
-    const ixcData = await ixcResponse.json();
-
-    if (ixcData.type === 'error') {
-      console.error('IXC Prospect Creation Error:', ixcData.message);
-      return NextResponse.json({ success: false, error: ixcData.message }, { status: 400 });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.type === 'error') {
+      return NextResponse.json({ success: false, error: 'O IXC recusou a criacao do prospect.' }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true, message: 'Prospect criado no IXC', id: ixcData.id });
-
-  } catch (error: any) {
-    console.error('Create Prospect Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, message: 'Prospect criado no IXC.', id: String(data.id || '') });
+  } catch (error) {
+    console.error('IXC prospect error:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ success: false, error: 'Nao foi possivel criar o prospect.' }, { status: 500 });
   }
 }

@@ -1,5 +1,3 @@
-import { supabase } from './supabase';
-
 export interface AuditLog {
   id?: number | string;
   action: string;
@@ -8,45 +6,16 @@ export interface AuditLog {
   created_at?: string;
 }
 
-export async function logAuditEvent(action: string, details: string, user_email = 'Admin') {
+export async function logAuditEvent(action: string, details: string) {
   try {
-    const isConfigured = typeof window !== 'undefined' && 
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-
-    if (isConfigured) {
-      try {
-        const { error } = await supabase.from('audit_logs').insert([{
-          action,
-          details,
-          user_email,
-          created_at: new Date().toISOString()
-        }]);
-        if (error) {
-          console.warn('Supabase audit insert warning (usando fallback local):', error.message);
-        }
-      } catch (e: any) {
-        console.warn('Falha na requisição de auditoria para o Supabase (usando fallback local):', e?.message || e);
-      }
-    }
-
-    // Save to local storage as fallback for instant UI response
-    if (typeof window !== 'undefined') {
-      const existingLogsRaw = localStorage.getItem('gente_digital_audit_logs');
-      const existingLogs: AuditLog[] = existingLogsRaw ? JSON.parse(existingLogsRaw) : [];
-      
-      const newLog: AuditLog = {
-        id: Date.now(),
-        action,
-        details,
-        user_email,
-        created_at: new Date().toLocaleString('pt-BR')
-      };
-
-      const updatedLogs = [newLog, ...existingLogs].slice(0, 100); // Keep last 100 logs
-      localStorage.setItem('gente_digital_audit_logs', JSON.stringify(updatedLogs));
-    }
-  } catch (err) {
-    console.error('Failed to log audit event:', err);
+    const response = await fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, details }),
+      credentials: 'same-origin',
+    });
+    if (!response.ok) console.warn('Audit event was not persisted.');
+  } catch {
+    console.warn('Audit event request failed.');
   }
 }

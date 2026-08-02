@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/providers/toast-context';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 
 interface Badge {
   id: string;
@@ -60,6 +60,25 @@ interface ResgateHistory {
   pixKeyOrDetail?: string;
 }
 
+const INITIAL_RESGATES: ResgateHistory[] = [
+  {
+    id: 'RES-001',
+    rewardTitle: 'R$ 50,00 PIX na Conta',
+    pointsUsed: 500,
+    date: '29/07/2026',
+    status: 'Concluído',
+    pixKeyOrDetail: 'chavetestepix@email.com',
+  },
+  {
+    id: 'RES-002',
+    rewardTitle: 'Par de Ingressos de Cinema',
+    pointsUsed: 800,
+    date: '22/07/2026',
+    status: 'Concluído',
+    pixKeyOrDetail: 'Código: CINEMA-9821',
+  },
+];
+
 export function GamificacaoView() {
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -73,24 +92,7 @@ export function GamificacaoView() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [filterCategory, setFilterCategory] = useState<string>('todos');
 
-  const [resgates, setResgates] = useState<ResgateHistory[]>([
-    {
-      id: 'RES-001',
-      rewardTitle: 'R$ 50,00 PIX na Conta',
-      pointsUsed: 500,
-      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-      status: 'Concluído',
-      pixKeyOrDetail: 'chavetestepix@email.com'
-    },
-    {
-      id: 'RES-002',
-      rewardTitle: 'Par de Ingressos de Cinema',
-      pointsUsed: 800,
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-      status: 'Concluído',
-      pixKeyOrDetail: 'Código: CINEMA-9821'
-    }
-  ]);
+  const [resgates, setResgates] = useState<ResgateHistory[]>(INITIAL_RESGATES);
 
   // Carregar dados reais do Supabase
   const loadGamificationData = async () => {
@@ -145,9 +147,11 @@ export function GamificacaoView() {
   };
 
   useEffect(() => {
+    // Sincronização inicial com o banco externo; a atualização ocorre após a consulta.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadGamificationData();
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseRealtimeEnabled()) {
       const channel = supabase
         .channel('redemptions_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'redemptions' }, () => {

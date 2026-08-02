@@ -1,93 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth } from '@/lib/auth-server';
+import { z } from 'zod';
+import { getAdminUser } from '@/lib/auth-server';
+import { isSameOriginRequest } from '@/lib/request-security';
+import { normalizeIxcHost } from '@/lib/ixc';
+import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
 
-function maskToken(token: string): string {
+const IxcConfigSchema = z.object({
+  domain: z.string().trim().min(1).max(253),
+  token: z.string().trim().max(300).optional().default(''),
+});
+
+function maskToken(token: string) {
   if (!token) return '';
   if (token.length <= 6) return '****';
   return '*'.repeat(token.length - 4) + token.slice(-4);
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    if (!await getAdminUser(request)) return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ success: false, error: 'Integracao indisponivel.' }, { status: 503 });
 
-    const envDomain = process.env.IXC_DOMAIN || '';
-    const envToken = process.env.IXC_TOKEN || '';
-
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('settings')
-      .select('*')
+      .select('key, value')
       .in('key', ['ixc_domain', 'ixc_token']);
+    if (error) throw error;
 
-    if (error) {
-      console.warn("Error reading settings table:", error.message);
-      return NextResponse.json({ 
-        success: true, 
-        domain: envDomain, 
-        token: maskToken(envToken),
-        hasToken: !!envToken,
-        tableMissing: true 
-      });
-    }
+    const config = Object.fromEntries((data || []).map((row) => [row.key, row.value]));
+    const domain = normalizeIxcHost(config.ixc_domain || process.env.IXC_DOMAIN || '') || '';
+    const token = config.ixc_token || process.env.IXC_TOKEN || '';
 
-    const config: Record<string, string> = {};
-    data?.forEach((row: any) => {
-      config[row.key] = row.value;
+    return NextResponse.json({ success: true, domain, token: maskToken(token), hasToken: Boolean(token) }, {
+      headers: { 'Cache-Control': 'private, no-store' },
     });
-
-    const activeDomain = config['ixc_domain'] || envDomain;
-    const activeToken = config['ixc_token'] || envToken;
-
-    return NextResponse.json({
-      success: true,
-      domain: activeDomain,
-      token: maskToken(activeToken),
-      hasToken: !!activeToken,
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (error) {
+    console.error('IXC config read error:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ success: false, error: 'Nao foi possivel carregar a configuracao.' }, { status: 500 });
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    if (!await getAdminUser(request)) return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
+    if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem nao permitida.' }, { status: 403 });
+    if (!isSupabaseAdminConfigured()) return NextResponse.json({ success: false, error: 'Integracao indisponivel.' }, { status: 503 });
 
-    const { domain, token } = await req.json();
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > 8 * 1024) return NextResponse.json({ error: 'Payload excede o limite permitido.' }, { status: 413 });
+    const body = await request.json().catch(() => null);
+    const parsed = IxcConfigSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: 'Dominio ou token invalidos.' }, { status: 400 });
 
-    if (domain === undefined) {
-      return NextResponse.json({ error: 'Domínio é obrigatório.' }, { status: 400 });
-    }
+    const domain = normalizeIxcHost(parsed.data.domain);
+    if (!domain) return NextResponse.json({ error: 'Dominio IXC nao permitido. Configure IXC_ALLOWED_HOSTS.' }, { status: 400 });
 
-    const { error: err1 } = await supabase
+    const { error: domainError } = await supabaseAdmin
       .from('settings')
       .upsert({ key: 'ixc_domain', value: domain });
+    if (domainError) throw domainError;
 
-    if (err1) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Tabela settings não encontrada. Certifique-se de executar o comando SQL no Supabase.' 
-      }, { status: 400 });
-    }
-
-    // Se o token fornecido não for mascarado (não começa com '*'), atualiza no banco
-    if (token && !token.startsWith('*')) {
-      const { error: err2 } = await supabase
+    if (parsed.data.token && !parsed.data.token.startsWith('*')) {
+      const { error: tokenError } = await supabaseAdmin
         .from('settings')
-        .upsert({ key: 'ixc_token', value: token });
-
-      if (err2) throw err2;
+        .upsert({ key: 'ixc_token', value: parsed.data.token });
+      if (tokenError) throw tokenError;
     }
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    console.error('IXC config write error:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ success: false, error: 'Nao foi possivel salvar a configuracao.' }, { status: 500 });
   }
 }

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
-import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, Lead, Colaborador, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
 import { PROGRAM_RULES } from '@/lib/rules';
 
@@ -22,6 +22,8 @@ const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.Respons
 const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false });
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const normalizeStr = (str: string) =>
+  str ? str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
 
 export function DashboardView() {
   const router = useRouter();
@@ -107,7 +109,7 @@ export function DashboardView() {
     };
     fetchData();
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseRealtimeEnabled()) {
       const dashboardChannel = supabase
         .channel('dashboard_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
@@ -251,9 +253,6 @@ export function DashboardView() {
   };
 
   const chartData = getDynamicChartData();
-
-  const normalizeStr = (str: string) => 
-    str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
   // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
   const clicks = colaboradores.reduce((acc, c) => {

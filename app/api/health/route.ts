@@ -2,101 +2,75 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { metricsRegistry } from '@/lib/metrics';
 import { cacheClient } from '@/lib/cache-client';
-import { supabase } from '@/lib/supabase';
-import { executeDbQuery } from '@/lib/db-client';
+import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
 
-/**
- * Health Check Detalhado (DevOps Regra 4)
- * 
- * Regra 4: Todo serviço deve ter Health Check com status detalhado dos componentes.
- */
 export async function GET(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
   const startTime = performance.now();
-
-  // 1. Diagnóstico do Banco de Dados
-  let dbStatus: 'UP' | 'DOWN' | 'DEGRADED' = 'UP';
+  let dbStatus: 'UP' | 'DOWN' = 'UP';
   let dbLatencyMs = 0;
-  let dbErrorDetails: string | null = null;
+  let dbError: string | null = null;
 
-  try {
-    const dbCheck = await executeDbQuery(
-      'health_check_ping',
-      async () => {
-        const { data, error } = await supabase.from('audit_logs').select('id').limit(1);
-        return { data, error };
-      },
-      requestId
-    );
-
-    dbLatencyMs = dbCheck.durationMs;
-    if (dbCheck.error) {
-      dbStatus = 'DEGRADED';
-      dbErrorDetails = dbCheck.error.message || String(dbCheck.error);
-    }
-  } catch (err: any) {
+  if (!isSupabaseAdminConfigured()) {
     dbStatus = 'DOWN';
-    dbErrorDetails = err?.message || String(err);
+    dbError = 'Supabase não configurado';
+  } else {
+    try {
+      const dbStart = performance.now();
+      const { error } = await supabaseAdmin.from('audit_logs').select('id').limit(1);
+      dbLatencyMs = Number((performance.now() - dbStart).toFixed(2));
+      if (error) {
+        dbStatus = 'DOWN';
+        dbError = error.message;
+      }
+    } catch (error) {
+      dbStatus = 'DOWN';
+      dbError = error instanceof Error ? error.message : 'falha desconhecida';
+    }
   }
 
-  // 2. Diagnóstico do Cache
   let cacheStatus: 'UP' | 'DOWN' = 'UP';
   let cacheLatencyMs = 0;
   try {
     const cacheStart = performance.now();
     await cacheClient.set('health_check_key', 'ok', 5, requestId);
-    const val = await cacheClient.get('health_check_key', requestId);
+    const value = await cacheClient.get('health_check_key', requestId);
     cacheLatencyMs = Number((performance.now() - cacheStart).toFixed(2));
-    if (val !== 'ok') {
-      cacheStatus = 'DOWN';
-    }
-  } catch (err) {
+    if (value !== 'ok') cacheStatus = 'DOWN';
+  } catch (error) {
     cacheStatus = 'DOWN';
+    logger.warn('[HEALTH CHECK] Cache indisponível', { error: error instanceof Error ? error.message : 'falha desconhecida' }, requestId);
   }
 
-  // 3. Métricas de Performance do Processo
   const snapshot = metricsRegistry.getSnapshot();
   const totalDurationMs = Number((performance.now() - startTime).toFixed(2));
-
-  // Registrar requisição HTTP no acumulador
-  metricsRegistry.recordHttpRequest(totalDurationMs, dbStatus === 'DOWN' ? 503 : 200);
-
-  const isHealthy = dbStatus !== 'DOWN' && cacheStatus !== 'DOWN';
+  const isHealthy = dbStatus === 'UP' && cacheStatus === 'UP';
   const statusCode = isHealthy ? 200 : 503;
 
-  const healthPayload = {
+  const internalDetails = {
+    requestId,
+    dbStatus,
+    dbError,
+    cacheStatus,
+    totalDurationMs,
+  };
+  if (isHealthy) logger.info('[HEALTH CHECK OK]', internalDetails, requestId);
+  else logger.error('[HEALTH CHECK FAIL]', new Error('health_check_failure'), internalDetails, requestId);
+
+  metricsRegistry.recordHttpRequest(totalDurationMs, statusCode);
+
+  return NextResponse.json({
     status: isHealthy ? 'healthy' : 'unhealthy',
     timestamp: new Date().toISOString(),
     service: 'gente-digital-api',
     requestId,
     durationMs: totalDurationMs,
     components: {
-      database: {
-        status: dbStatus,
-        latencyMs: dbLatencyMs,
-        error: dbErrorDetails,
-      },
-      cache: {
-        status: cacheStatus,
-        latencyMs: cacheLatencyMs,
-        hitRatioPercent: snapshot.cache.hit_ratio_percent,
-      },
-      system: {
-        status: 'UP',
-        uptimeSeconds: snapshot.uptime_seconds,
-        memoryUsage: snapshot.memory,
-        cpuUsage: snapshot.cpu,
-      },
+      database: { status: dbStatus, latencyMs: dbLatencyMs },
+      cache: { status: cacheStatus, latencyMs: cacheLatencyMs },
+      system: { status: 'UP', uptimeSeconds: snapshot.uptime_seconds },
     },
-  };
-
-  if (!isHealthy) {
-    logger.error('[HEALTH CHECK FAIL] Serviço degradado ou indisponível', new Error('Health check failure'), healthPayload, requestId);
-  } else {
-    logger.info('[HEALTH CHECK OK] Status dos componentes verificado', healthPayload, requestId);
-  }
-
-  return NextResponse.json(healthPayload, {
+  }, {
     status: statusCode,
     headers: {
       'x-request-id': requestId,

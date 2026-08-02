@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
-import { supabase, Lead, LeadHistory } from '@/lib/supabase';
+import { supabase, Lead, LeadHistory, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from 'boring-avatars';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/components/providers/toast-context';
@@ -211,11 +211,11 @@ export function LeadsView() {
     URL.revokeObjectURL(url);
   };
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<LeadFormData>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema)
   });
 
-  const selectedRef = watch('ref');
+  const selectedRef = useWatch({ control, name: 'ref' });
 
   useEffect(() => {
     if (isModalOpen) {
@@ -373,10 +373,12 @@ export function LeadsView() {
   };
 
   useEffect(() => {
-    fetchLeads(currentPage);
-    fetchColaboradores();
+    const initialLoad = window.setTimeout(() => {
+      void fetchLeads(currentPage);
+      void fetchColaboradores();
+    }, 0);
 
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    if (isSupabaseRealtimeEnabled()) {
       const colabChannel = supabase
         .channel('leads_colaboradores_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
@@ -385,9 +387,12 @@ export function LeadsView() {
         .subscribe();
 
       return () => {
+        window.clearTimeout(initialLoad);
         supabase.removeChannel(colabChannel);
       };
     }
+
+    return () => window.clearTimeout(initialLoad);
   }, [currentPage, fetchLeads]);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];

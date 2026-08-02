@@ -22,9 +22,10 @@ export interface CommissionItem {
   paid_at?: string;
   isBonus?: boolean;
   type: 'pix_colaborador' | 'desconto_cliente' | 'bonus_top';
+  payment_reference?: string;
 }
 
-type PaidMap = Record<string, string>;
+type PaidMap = Record<string, { paidAt: string; reference?: string | null }>;
 
 const itemKey = (id: string | number) => id.toString().replace(/^comm_/, '');
 
@@ -37,28 +38,33 @@ export function ComissoesView() {
   const [topColaborador, setTopColaborador] = useState<{ name: string; count: number } | null>(null);
   const [pendingPayment, setPendingPayment] = useState<CommissionItem | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const [paymentReference, setPaymentReference] = useState('');
 
   const normalizeStr = (str: string) =>
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
   // Busca o estado de pagamentos no servidor (fonte da verdade)
-  const fetchPaidMap = useCallback(async (): Promise<{ map: PaidMap; fromLocalFallback: boolean }> => {
+  const fetchPaidMap = useCallback(async (): Promise<PaidMap> => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      return {};
+    }
+
     try {
       const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
       const data = await res.json();
       if (data.success && Array.isArray(data.payments)) {
         const map: PaidMap = {};
         data.payments.forEach((p: any) => {
-          if (p.commission_key && p.paid_at) map[p.commission_key] = p.paid_at;
+          if (p.commission_ref && p.paid_at) {
+            map[p.commission_ref] = { paidAt: p.paid_at, reference: p.payment_reference };
+          }
         });
-        return { map, fromLocalFallback: false };
+        return map;
       }
       throw new Error(data.error || 'Falha ao carregar pagamentos');
     } catch (err) {
-      console.error('Erro ao carregar pagamentos do servidor, usando fallback local:', err);
-      const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
-      const map: PaidMap = paidStateRaw ? JSON.parse(paidStateRaw) : {};
-      return { map, fromLocalFallback: true };
+      console.error('Erro ao carregar baixas do servidor:', err);
+      throw err;
     }
   }, []);
 
@@ -84,7 +90,7 @@ export function ComissoesView() {
         colabsData = initialColaboradores;
       }
 
-      const { map: paidMap } = await fetchPaidMap();
+      const paidMap = await fetchPaidMap();
 
       // Helper para verificar se um ref é um Colaborador oficial da empresa (match EXATO)
       const isColaborador = (refStr: string): { isColab: boolean; officialName: string } => {
@@ -142,7 +148,7 @@ export function ComissoesView() {
       const items: CommissionItem[] = leadsData.map(lead => {
         const { isColab, officialName } = isColaborador(lead.ref);
         const leadKey = itemKey(lead.id);
-        const isPaid = paidMap[leadKey];
+        const payment = paidMap[leadKey];
 
         if (isColab) {
           const d = lead.created_at ? new Date(lead.created_at) : new Date();
@@ -159,9 +165,10 @@ export function ComissoesView() {
             colaborador_name: officialName,
             sale_value: lead.value || 0,
             commission_amount: ratePerLead,
-            status: isPaid ? 'Paga' as const : 'Pendente' as const,
+            status: payment ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
-            paid_at: isPaid || undefined,
+            paid_at: payment?.paidAt,
+            payment_reference: payment?.reference || undefined,
             type: 'pix_colaborador' as const
           };
         } else {
@@ -172,9 +179,10 @@ export function ComissoesView() {
             colaborador_name: officialName || 'Cliente Indicador',
             sale_value: lead.value || 0,
             commission_amount: PROGRAM_RULES.clienteIndicador.descontoMensalidade,
-            status: isPaid ? 'Paga' as const : 'Pendente' as const,
+            status: payment ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
-            paid_at: isPaid || undefined,
+            paid_at: payment?.paidAt,
+            payment_reference: payment?.reference || undefined,
             type: 'desconto_cliente' as const
           };
         }
@@ -183,7 +191,7 @@ export function ComissoesView() {
       // Adiciona bônus de R$ 100 EXCLUSIVAMENTE se o Colaborador TOP do mês atual atingiu o mínimo de indicações
       if (topColabName && meetsMinThreshold) {
         const bonusId = `bonus_top_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
-        const isBonusPaid = paidMap[bonusId];
+        const bonusPayment = paidMap[bonusId];
         items.unshift({
           id: bonusId,
           lead_id: 999999,
@@ -191,9 +199,10 @@ export function ComissoesView() {
           colaborador_name: topColabName,
           sale_value: 0,
           commission_amount: PROGRAM_RULES.bonusTop.valor,
-          status: isBonusPaid ? 'Paga' : 'Pendente',
+          status: bonusPayment ? 'Paga' : 'Pendente',
           date: new Date().toLocaleDateString('pt-BR'),
-          paid_at: isBonusPaid || undefined,
+          paid_at: bonusPayment?.paidAt,
+          payment_reference: bonusPayment?.reference || undefined,
           isBonus: true,
           type: 'bonus_top'
         });
@@ -202,53 +211,68 @@ export function ComissoesView() {
       setCommissions(items);
     } catch (err) {
       console.error('Error fetching commissions:', err);
+      toastError('Erro ao carregar comissões', 'Não foi possível consultar as baixas registradas no servidor.');
+      setCommissions([]);
     } finally {
       setIsLoading(false);
     }
-  }, [fetchPaidMap]);
+  }, [fetchPaidMap, toastError]);
 
   useEffect(() => {
+    // Sincronização inicial com dados externos; o estado é atualizado após a consulta.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCommissions();
   }, [fetchCommissions]);
 
   const handlePayCommission = (comm: CommissionItem) => {
     setPendingPayment(comm);
+    setPaymentReference('');
   };
 
   const confirmPayment = async () => {
     const comm = pendingPayment;
     if (!comm) return;
+    if (paymentReference.trim().length < 3) {
+      toastError('Comprovante obrigatório', 'Informe a referência do PIX, da fatura ou do protocolo antes de confirmar.');
+      return;
+    }
 
     setIsPaying(true);
     try {
-      const key = itemKey(comm.id);
+      const commissionRef = itemKey(comm.id);
       const res = await fetch('/api/commissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'pay',
-          key,
+          commissionRef,
           colaboradorName: comm.colaborador_name,
           leadName: comm.lead_name,
           amount: comm.commission_amount,
-          type: comm.type
+          type: comm.type,
+          paymentReference: paymentReference.trim()
         })
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Falha ao registrar pagamento');
 
-      const nowStr = new Date().toLocaleString('pt-BR');
+      const nowStr = data.payment?.paid_at || new Date().toISOString();
 
       await logAuditEvent(
         comm.type === 'desconto_cliente' ? 'Baixa de Desconto na Mensalidade' : 'Baixa Financeira (PIX)',
         `${comm.type === 'desconto_cliente' ? 'Desconto' : 'Pagamento'} de R$ ${comm.commission_amount.toFixed(2)} registrado para ${comm.colaborador_name} (Ref: ${comm.lead_name})`
       );
 
-      setCommissions(prev => prev.map(c => c.id === comm.id ? { ...c, status: 'Paga', paid_at: nowStr } : c));
+      setCommissions(prev => prev.map(c => c.id === comm.id ? {
+        ...c,
+        status: 'Paga',
+        paid_at: nowStr,
+        payment_reference: data.payment?.payment_reference || paymentReference.trim(),
+      } : c));
       setPendingPayment(null);
       toastSuccess(
-        'Pagamento registrado!',
-        `R$ ${comm.commission_amount.toFixed(2)} salvo no banco para ${comm.colaborador_name} (${comm.type === 'desconto_cliente' ? 'desconto na mensalidade' : 'PIX'}).`
+        'Baixa registrada!',
+        `R$ ${comm.commission_amount.toFixed(2)} foi salvo com a referência ${paymentReference.trim()}.`
       );
     } catch (err: any) {
       console.error('Erro ao registrar pagamento:', err);
@@ -556,7 +580,7 @@ export function ComissoesView() {
                   <td className="px-6 py-4">
                     {comm.status === 'Paga' ? (
                       <span className="px-3 py-1 bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
-                        <Check className="w-3.5 h-3.5" /> {comm.type === 'desconto_cliente' ? 'Desconto Aplicado' : 'Pago PIX'}
+                         <Check className="w-3.5 h-3.5" /> {comm.type === 'desconto_cliente' ? 'Desconto registrado' : 'Baixa registrada'}
                       </span>
                     ) : (
                       <span className="px-3 py-1 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
@@ -575,11 +599,12 @@ export function ComissoesView() {
                         }`}
                       >
                         <DollarSign className="w-3.5 h-3.5" />
-                        {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
+                         {comm.type === 'desconto_cliente' ? 'Registrar desconto' : 'Registrar baixa'}
                       </button>
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
-                        {comm.paid_at || comm.date}
+                        <span className="block">{comm.paid_at || comm.date}</span>
+                        {comm.payment_reference && <span className="mt-1 block max-w-40 truncate text-[10px]" title={comm.payment_reference}>Ref.: {comm.payment_reference}</span>}
                       </span>
                     )}
                   </td>
@@ -592,13 +617,17 @@ export function ComissoesView() {
 
       <ConfirmDialog
         open={!!pendingPayment}
-        title={pendingPayment?.type === 'desconto_cliente' ? 'Aplicar desconto na mensalidade' : 'Confirmar pagamento via PIX'}
+        title={pendingPayment?.type === 'desconto_cliente' ? 'Registrar desconto com referência' : 'Registrar baixa do PIX'}
         message={
           pendingPayment
-            ? `Confirma ${pendingPayment.type === 'desconto_cliente' ? 'o desconto de' : 'o pagamento de'} R$ ${pendingPayment.commission_amount.toFixed(2)} para ${pendingPayment.colaborador_name}${pendingPayment.type === 'desconto_cliente' ? ' (cliente indicador)' : ''}? O registro fica salvo no banco e poderá ser conferido em qualquer dispositivo.`
+            ? `Informe a referência da transação, fatura ou protocolo para registrar R$ ${pendingPayment.commission_amount.toFixed(2)} para ${pendingPayment.colaborador_name}${pendingPayment.type === 'desconto_cliente' ? ' (cliente indicador)' : ''}. O registro fica salvo no banco e poderá ser conferido em qualquer dispositivo.`
             : ''
         }
-        confirmLabel={pendingPayment?.type === 'desconto_cliente' ? 'Aplicar desconto' : 'Confirmar pagamento'}
+        inputLabel="Referência do comprovante"
+        inputValue={paymentReference}
+        inputPlaceholder="Ex.: E2E4... ou FAT-2026-001"
+        onInputChange={setPaymentReference}
+        confirmLabel={pendingPayment?.type === 'desconto_cliente' ? 'Registrar desconto' : 'Registrar baixa'}
         tone={pendingPayment?.type === 'desconto_cliente' ? 'primary' : 'success'}
         onConfirm={confirmPayment}
         onCancel={() => setPendingPayment(null)}

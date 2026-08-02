@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseRealtimeEnabled, supabase } from '@/lib/supabase';
 import { AnimatePresence, motion } from 'motion/react';
 import { Bell, X } from 'lucide-react';
 
@@ -9,9 +9,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notifications, setNotifications] = useState<{id: string, name: string}[]>([]);
 
   useEffect(() => {
-    // Only subscribe if Supabase is properly configured
-    const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseRealtimeEnabled()) return;
 
     const channel = supabase
       .channel('public:leads')

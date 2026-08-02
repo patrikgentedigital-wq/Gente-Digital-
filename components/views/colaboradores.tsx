@@ -1,10 +1,10 @@
 import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, Colaborador, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { initialColaboradores } from '@/lib/mock-data';
 import Avatar from 'boring-avatars';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/components/providers/toast-context';
@@ -40,11 +40,11 @@ export function ColaboradoresView() {
     return `EMP-${String(maxNum + 1).padStart(3, '0')}`;
   };
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ColaboradorFormData>({
+  const { register, handleSubmit, reset, setValue, control, formState: { errors } } = useForm<ColaboradorFormData>({
     resolver: zodResolver(colaboradorSchema)
   });
 
-  const watchPhotoUrl = watch('photo_url');
+  const watchPhotoUrl = useWatch({ control, name: 'photo_url' });
 
   const [baseLink, setBaseLink] = useState('gentedigital.com.br/indicar');
   const [isEditingBase, setIsEditingBase] = useState(false);
@@ -61,41 +61,35 @@ export function ColaboradoresView() {
 
   const loadBaseLink = async () => {
     try {
-      if (isSupabaseConfigured()) {
-        const { data } = await supabase
-          .from('settings')
-          .select('value')
-          .eq('key', 'base_link')
-          .maybeSingle();
-        if (data && data.value) {
-          setBaseLink(data.value);
-        }
-      }
+      const response = await fetch('/api/settings/base-link', { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json() as { value?: string | null };
+      if (data.value) setBaseLink(data.value);
     } catch (err) {
-      console.error("Error loading base link from Supabase settings:", err);
+      console.error("Error loading base link:", err);
     }
   };
 
   const handleSaveBaseLink = async () => {
     const trimmed = tempBaseLink.trim();
     if (!trimmed) return;
-    setBaseLink(trimmed);
-    setIsEditingBase(false);
-
     try {
-      if (isSupabaseConfigured()) {
-        const { error } = await supabase
-          .from('settings')
-          .upsert({ key: 'base_link', value: trimmed });
-        if (error) {
-          toastError("Erro ao salvar link base", error.message);
-        } else {
-          toastSuccess("Link base atualizado!", "Sincronizado em todos os dispositivos.");
-        }
+      const response = await fetch('/api/settings/base-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ value: trimmed }),
+      });
+      if (!response.ok) {
+        toastError("Erro ao salvar link base", "Confira a URL e tente novamente.");
+        return;
       }
-    } catch (err: any) {
+      setBaseLink(trimmed);
+      setIsEditingBase(false);
+      toastSuccess("Link base atualizado!", "Sincronizado em todos os dispositivos.");
+    } catch (err) {
       console.error("Error saving base link:", err);
-      toastError("Erro ao salvar link base", err?.message);
+      toastError("Erro ao salvar link base", "Não foi possível sincronizar a alteração.");
     }
   };
 
@@ -155,10 +149,12 @@ export function ColaboradoresView() {
   };
 
   useEffect(() => {
-    fetchColaboradores();
-    loadBaseLink();
+    const initialLoad = window.setTimeout(() => {
+      void fetchColaboradores();
+      void loadBaseLink();
+    }, 0);
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseRealtimeEnabled()) {
       const colabChannel = supabase
         .channel('colaboradores_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
@@ -166,18 +162,13 @@ export function ColaboradoresView() {
         })
         .subscribe();
 
-      const settingsChannel = supabase
-        .channel('settings_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
-          loadBaseLink();
-        })
-        .subscribe();
-
       return () => {
+        window.clearTimeout(initialLoad);
         supabase.removeChannel(colabChannel);
-        supabase.removeChannel(settingsChannel);
       };
     }
+
+    return () => window.clearTimeout(initialLoad);
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,196 +1,179 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { timingSafeEqual } from 'crypto';
+import { z } from 'zod';
+import { checkPublicRateLimit } from '@/lib/rate-limit';
+import { claimWebhookEvent, completeWebhookEvent, readWebhookBody, verifySignedWebhook } from '@/lib/webhook-security';
+import { fetchIxc, getIxcConfig } from '@/lib/ixc';
+import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
 
-export async function POST(req: NextRequest) {
+const WebhookObjectSchema = z.record(z.string(), z.unknown()).refine((value) => Object.keys(value).length <= 100, {
+  message: 'Payload muito grande',
+});
+
+const ExtractedPayloadSchema = z.object({
+  clientName: z.string().trim().max(160),
+  clientPhone: z.string().trim().max(40),
+  clientId: z.string().trim().max(80),
+  contractValue: z.number().finite().nonnegative().max(10_000_000),
+});
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function getString(payload: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+function parseMoney(value: unknown) {
+  const raw = String(value ?? '').replace(/[^0-9,.-]/g, '').replace(/(?!^)-/g, '');
+  const normalized = raw.includes(',') && raw.includes('.')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw.replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 10_000_000 ? parsed : 0;
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function normalizeName(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+async function getContractValue(clientId: string, currentValue: number) {
+  if (currentValue > 0 || !clientId) return currentValue;
+
   try {
-    // 1. Validação de Segurança (Token Secreto Obrigatório)
-    const secret = req.nextUrl.searchParams.get('secret');
-    const expectedSecret = process.env.IXC_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
-    
-    if (!expectedSecret) {
-      console.error("SEGURANÇA: IXC_WEBHOOK_SECRET / WEBHOOK_SECRET não configurado no servidor.");
-      return NextResponse.json({ success: false, error: 'Endpoint não configurado' }, { status: 503 });
+    const config = await getIxcConfig();
+    if (!config) return 0;
+    const response = await fetchIxc(`${config.host}/webservice/v1/cliente_contrato`, config.token, {
+      qtype: 'id_cliente',
+      query: clientId,
+      oper: '=',
+      page: '1',
+      rp: '10',
+    });
+    if (!response.ok) return 0;
+
+    const parsed: unknown = await response.json().catch(() => null);
+    const body = asRecord(parsed);
+    const records = body && Array.isArray(body.registros) ? body.registros : [];
+    const active = records
+      .map(asRecord)
+      .filter((record): record is Record<string, unknown> => Boolean(record))
+      .find((record) => String(record.status || '') === 'A') || asRecord(records[0]);
+    return active ? parseMoney(active.valor || active.valor_total || active.mensalidade) : 0;
+  } catch (error) {
+    console.warn('Falha ao consultar contrato no IXC:', error instanceof Error ? error.message : 'erro desconhecido');
+    return 0;
+  }
+}
+
+function noStoreJson(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { 'Cache-Control': 'no-store' },
+  });
+}
+
+export async function POST(request: NextRequest) {
+  const rateLimit = await checkPublicRateLimit('webhook-ixc', request);
+  if (!rateLimit.success) {
+    return noStoreJson({ success: false, error: rateLimit.unavailable ? 'Endpoint temporariamente indisponível.' : 'Muitas requisições.' }, rateLimit.unavailable ? 503 : 429);
+  }
+
+  if (!isSupabaseAdminConfigured()) return noStoreJson({ success: false, error: 'Endpoint temporariamente indisponível.' }, 503);
+
+  const rawBody = await readWebhookBody(request);
+  if (rawBody === null) return noStoreJson({ success: false, error: 'Payload inválido.' }, 413);
+
+  const signed = verifySignedWebhook(request, rawBody, process.env.IXC_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET);
+  if (!signed) return noStoreJson({ success: false, error: 'Não autorizado.' }, 401);
+
+  let claim: { duplicate: boolean; conflict: boolean };
+  try {
+    claim = await claimWebhookEvent('ixc', signed);
+  } catch (error) {
+    console.error('Falha ao registrar idempotência do webhook IXC:', error instanceof Error ? error.message : 'erro desconhecido');
+    return noStoreJson({ success: false, error: 'Não foi possível processar o webhook.' }, 500);
+  }
+  if (claim.conflict) return noStoreJson({ success: false, error: 'Identificador de evento já utilizado.' }, 409);
+  if (claim.duplicate) return noStoreJson({ success: true, duplicate: true }, 200);
+
+  try {
+    const decoded: unknown = JSON.parse(rawBody);
+    const rootResult = WebhookObjectSchema.safeParse(decoded);
+    if (!rootResult.success) {
+      await completeWebhookEvent('ixc', signed.eventId, 'failed');
+      return noStoreJson({ success: false, error: 'Payload inválido.' }, 400);
     }
 
-    let isValidSecret = false;
-    if (secret && secret.length === expectedSecret.length) {
-      try {
-        isValidSecret = timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
-      } catch (e) {
-        isValidSecret = false;
-      }
-    }
-
-    if (!isValidSecret) {
-      console.warn("Tentativa de acesso não autorizado ao Webhook IXC.");
-      return NextResponse.json({ success: false, error: 'Não Autorizado: Token de webhook inválido' }, { status: 401 });
-    }
-
-    const rawBody = await req.json().catch(() => ({}));
-    console.log('IXC Webhook recebido');
-
-    // Support both direct IXC trigger payloads and standard webhook formats
-    const payload = rawBody.data || rawBody.registro || rawBody;
-    
-    const clientName = payload.razao || payload.nome || payload.cliente_nome || payload.client_name || '';
-    const clientPhone = payload.telefone_celular || payload.telefone || payload.cellphone || payload.phone || '';
-    const clientId = payload.id_cliente || payload.cliente_id || payload.client_id || '';
-    const contractStatus = payload.status || payload.contrato_status || 'A';
-    
-    // Parse contract value if provided in webhook payload
-    let contractValue = parseFloat(payload.valor || payload.valor_total || payload.mensalidade || payload.valor_contrato || '0');
-
-    if (!clientName && !clientPhone && !clientId) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Payload de webhook recebido, porém sem identificação de cliente/lead.' 
-      }, { status: 400 });
-    }
-
-    // Check IXC credentials to fetch contract value if missing in payload
-    const { data: settingsData } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
-
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
-
-    // 1. Find matching lead in Supabase (not already marked as Ganho)
-    const { data: pendingLeads, error: leadsError } = await supabase
-      .from('leads')
-      .select('*')
-      .not('status', 'eq', 'Ganho');
-
-    if (leadsError) {
-      console.error('Error querying leads for IXC webhook:', leadsError);
-      return NextResponse.json({ success: false, error: leadsError.message }, { status: 500 });
-    }
-
-    if (!pendingLeads || pendingLeads.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Webhook processado, mas nenhum lead pendente foi encontrado no sistema.' 
-      });
-    }
-
-    const cleanStr = (s: string) => s ? s.toLowerCase().replace(/\D/g, '') : '';
-    const cleanPhoneTarget = cleanStr(clientPhone);
-
-    // Try finding lead by phone or name
-    let matchedLead = pendingLeads.find(l => {
-      if (cleanPhoneTarget && cleanPhoneTarget.length >= 8 && cleanStr(l.phone).includes(cleanPhoneTarget)) {
-        return true;
-      }
-      if (clientName && l.name && l.name.toLowerCase().trim() === clientName.toLowerCase().trim()) {
-        return true;
-      }
-      return false;
+    const root = rootResult.data;
+    const payload = asRecord(root.data) || asRecord(root.registro) || root;
+    const extracted = ExtractedPayloadSchema.safeParse({
+      clientName: getString(payload, ['razao', 'nome', 'cliente_nome', 'client_name']),
+      clientPhone: getString(payload, ['telefone_celular', 'telefone', 'cellphone', 'phone']),
+      clientId: getString(payload, ['id_cliente', 'cliente_id', 'client_id']),
+      contractValue: parseMoney(getString(payload, ['valor', 'valor_total', 'mensalidade', 'valor_contrato'])),
     });
 
-    if (!matchedLead && clientName) {
-      // Fuzzy name match if exact match wasn't found
-      matchedLead = pendingLeads.find(l => 
-        l.name.toLowerCase().includes(clientName.toLowerCase()) || 
-        clientName.toLowerCase().includes(l.name.toLowerCase())
-      );
+    if (!extracted.success || (!extracted.data.clientName && !extracted.data.clientPhone && !extracted.data.clientId)) {
+      await completeWebhookEvent('ixc', signed.eventId, 'failed');
+      return noStoreJson({ success: false, error: 'Payload sem identificação válida.' }, 400);
     }
 
-    if (!matchedLead) {
-      return NextResponse.json({ 
-        success: true, 
-        message: `Webhook recebido para "${clientName || clientPhone}", mas nenhum lead correspondente foi localizado no CRM.` 
-      });
+    const { data: pendingLeads, error: leadsError } = await supabaseAdmin
+      .from('leads')
+      .select('id, name, phone, value, status')
+      .neq('status', 'Ganho')
+      .limit(500);
+    if (leadsError) throw leadsError;
+
+    const phone = normalizePhone(extracted.data.clientPhone);
+    const name = normalizeName(extracted.data.clientName);
+    const matches = (pendingLeads || []).filter((lead) => {
+      const phoneMatches = phone.length >= 10 && normalizePhone(String(lead.phone || '')) === phone;
+      const nameMatches = name.length >= 2 && normalizeName(String(lead.name || '')) === name;
+      return phoneMatches || nameMatches;
+    });
+
+    if (matches.length === 0) {
+      await completeWebhookEvent('ixc', signed.eventId, 'completed');
+      return noStoreJson({ success: true, matched: false });
+    }
+    if (matches.length > 1) {
+      await completeWebhookEvent('ixc', signed.eventId, 'failed');
+      return noStoreJson({ success: false, error: 'Mais de um lead corresponde ao evento.' }, 409);
     }
 
-    // 2. If contractValue is not in payload, query IXC API for contract value if domain and token are available
-    if ((!contractValue || contractValue <= 0) && domain && token && clientId) {
-      try {
-        const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-        const base64Token = Buffer.from(token).toString('base64');
-        
-        const contractRes = await fetch(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${base64Token}`,
-            'Content-Type': 'application/json',
-            'ixcsoft': 'listar'
-          },
-          body: JSON.stringify({
-            qtype: 'id_cliente',
-            query: clientId,
-            oper: '=',
-            page: '1',
-            rp: '10'
-          })
-        });
+    const contractValue = await getContractValue(extracted.data.clientId, extracted.data.contractValue);
+    const updateFields: { status: string; value?: number } = { status: 'Ganho' };
+    if (contractValue > 0) updateFields.value = contractValue;
 
-        if (contractRes.ok) {
-          const contractData = await contractRes.json();
-          if (contractData.registros && contractData.registros.length > 0) {
-            const activeContract = contractData.registros.find((c: any) => c.status === 'A') || contractData.registros[0];
-            const val = parseFloat(activeContract.valor || activeContract.valor_total || activeContract.mensalidade || '0');
-            if (val > 0) {
-              contractValue = val;
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('Failed to query contract value from IXC API:', err.message);
-      }
-    }
-
-    // 3. Update Lead Status to 'Ganho' and update Value if available
-    const updateFields: Record<string, any> = { status: 'Ganho' };
-    if (contractValue > 0) {
-      updateFields.value = contractValue;
-    }
-
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('leads')
       .update(updateFields)
-      .eq('id', matchedLead.id);
+      .eq('id', matches[0].id)
+      .neq('status', 'Ganho');
+    if (updateError) throw updateError;
 
-    if (updateError) {
-      console.error('Error updating lead via IXC Webhook:', updateError);
-      return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
-    }
-
-    // 4. Record entry in lead history
-    const valueFormatted = contractValue > 0 
-      ? ` | Valor do Contrato: R$ ${contractValue.toFixed(2)}`
-      : '';
-
-    const historyData = {
-      lead_id: matchedLead.id,
-      date: new Date().toLocaleString('pt-BR').substring(0, 16),
+    await supabaseAdmin.from('lead_history').insert({
+      lead_id: matches[0].id,
+      date: new Date().toISOString(),
       action: 'Convertido via Webhook IXC Soft',
-      note: `Contrato ativado no IXC Soft em tempo real (Cliente: ${clientName || matchedLead.name}${valueFormatted})`
-    };
-
-    await supabase.from('lead_history').insert([historyData]);
-
-    return NextResponse.json({
-      success: true,
-      message: `Lead "${matchedLead.name}" atualizado para GANHO em tempo real com sucesso!`,
-      leadId: matchedLead.id,
-      contractValue: contractValue || matchedLead.value
+      note: contractValue > 0 ? 'Contrato ativado no IXC Soft.' : 'Contrato ativado no IXC Soft; valor não informado.',
     });
 
-  } catch (error: any) {
-    console.error('IXC Webhook Error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Erro no Webhook' }, { status: 500 });
+    await completeWebhookEvent('ixc', signed.eventId, 'completed');
+    return noStoreJson({ success: true, matched: true }, 200);
+  } catch (error) {
+    await completeWebhookEvent('ixc', signed.eventId, 'failed');
+    console.error('Erro interno no webhook IXC:', error instanceof Error ? error.message : 'erro desconhecido');
+    return noStoreJson({ success: false, error: 'Falha ao processar o webhook.' }, 500);
   }
 }
