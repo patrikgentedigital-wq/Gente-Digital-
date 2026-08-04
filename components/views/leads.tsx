@@ -1091,7 +1091,7 @@ export function LeadsView() {
                   {colaboradores.length > 0 && (
                     <optgroup label="--- Técnicos e Colaboradores Cadastrados ---">
                       {colaboradores.map(c => (
-                        <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
+                        <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
                       ))}
                     </optgroup>
                   )}

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getAdminUser } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isSameOriginRequest } from '@/lib/request-security';
+import { matchCollaboratorReference } from '@/lib/referral-matching';
+import { PROGRAM_RULES } from '@/lib/rules';
 
 const PayCommissionSchema = z.object({
   action: z.literal('pay'),
@@ -19,6 +21,67 @@ function noStoreJson(body: unknown, status = 200) {
     status,
     headers: { 'Cache-Control': 'private, no-store' },
   });
+}
+
+async function resolveCommission(commissionRef: string, fallbackName: string, fallbackLeadName: string) {
+  if (commissionRef.startsWith('bonus_top_')) {
+    return {
+      collaboratorName: fallbackName,
+      leadName: fallbackLeadName,
+      amount: PROGRAM_RULES.bonusTop.valor,
+      type: 'bonus_top' as const,
+    };
+  }
+
+  const leadId = Number(commissionRef.replace(/^comm_/, ''));
+  if (!Number.isInteger(leadId) || leadId <= 0) return null;
+
+  const [{ data: lead, error: leadError }, { data: collaborators, error: collaboratorsError }] = await Promise.all([
+    supabaseAdmin
+      .from('leads')
+      .select('id, name, ref, created_at')
+      .eq('id', leadId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('colaboradores')
+      .select('id, name'),
+  ]);
+
+  if (leadError || collaboratorsError || !lead) return null;
+
+  const collaborator = matchCollaboratorReference(lead.ref, collaborators || []);
+  if (!collaborator) {
+    return {
+      collaboratorName: lead.ref || 'Cliente Indicador',
+      leadName: lead.name,
+      amount: PROGRAM_RULES.clienteIndicador.descontoMensalidade,
+      type: 'desconto_cliente' as const,
+    };
+  }
+
+  const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
+  const monthStart = new Date(leadDate.getFullYear(), leadDate.getMonth(), 1);
+  const nextMonthStart = new Date(leadDate.getFullYear(), leadDate.getMonth() + 1, 1);
+  const { data: monthlyLeads, error: monthlyLeadsError } = await supabaseAdmin
+    .from('leads')
+    .select('ref, created_at')
+    .gte('created_at', monthStart.toISOString())
+    .lt('created_at', nextMonthStart.toISOString());
+
+  if (monthlyLeadsError) return null;
+
+  const monthlyCount = (monthlyLeads || []).filter((item) => (
+    matchCollaboratorReference(item.ref, collaborators || [])?.id === collaborator.id
+  )).length;
+
+  return {
+    collaboratorName: collaborator.name,
+    leadName: lead.name,
+    amount: monthlyCount >= PROGRAM_RULES.colaborador.volumeThreshold
+      ? PROGRAM_RULES.colaborador.taxaVolume
+      : PROGRAM_RULES.colaborador.taxaPorVenda,
+    type: 'pix_colaborador' as const,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -56,14 +119,22 @@ export async function POST(request: NextRequest) {
     }
 
     const { commissionRef, colaboradorName, leadName, amount, type, paymentReference } = parsed.data;
+    const resolved = await resolveCommission(commissionRef, colaboradorName, leadName);
+    if (!resolved) {
+      return noStoreJson({ success: false, error: 'Comissão não encontrada ou sem dados suficientes para validação.' }, 400);
+    }
+    if (resolved.type !== type || Math.abs(resolved.amount - amount) > 0.001) {
+      return noStoreJson({ success: false, error: 'Valor ou tipo de comissão não confere com os dados do lead.' }, 400);
+    }
+
     const { data, error } = await supabaseAdmin
       .from('commission_payments')
       .upsert({
         commission_ref: commissionRef,
-        colaborador_name: colaboradorName,
-        lead_name: leadName,
-        amount,
-        type,
+        colaborador_name: resolved.collaboratorName,
+        lead_name: resolved.leadName,
+        amount: resolved.amount,
+        type: resolved.type,
         status: 'baixa_registrada',
         payment_reference: paymentReference,
         confirmation_source: 'manual_admin',

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { checkPublicRateLimit } from '@/lib/rate-limit';
 import { normalizePhone, normalizeReferralCode, normalizeTrackingCode } from '@/lib/referrals';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canonicalizeReferral } from '@/lib/referral-resolver';
 
 const SubmitReferralSchema = z.object({
   name: z.string().trim().min(3).max(120),
@@ -70,13 +71,15 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ success: false, error: 'Confira os dados informados e tente novamente.' }, 400);
     }
 
+    const canonicalRef = ref === 'Orgânico' ? ref : await canonicalizeReferral(ref);
+
     const trackingCode = makeTrackingCode();
     const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .insert({
         name,
         phone,
-        ref,
+        ref: canonicalRef,
         status: 'Pendente',
         value: 0,
         responsible: 'Admin',
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
         lead_id: lead.id,
         date: new Date().toLocaleString('pt-BR'),
         action: 'Indicação recebida pela landing pública',
-        note: `Origem: ${ref}`,
+        note: `Origem: ${canonicalRef}`,
       });
       if (historyError) console.error('Indicação criada sem histórico:', historyError.message);
     }

@@ -4,6 +4,7 @@ import { checkPublicRateLimit } from '@/lib/rate-limit';
 import { claimWebhookEvent, completeWebhookEvent, readWebhookBody, verifyLegacyWebhook, verifySignedWebhook } from '@/lib/webhook-security';
 import { fetchIxc, formatIxcDate, getIxcConfig } from '@/lib/ixc';
 import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
+import { canonicalizeReferral } from '@/lib/referral-resolver';
 
 const FormPayloadSchema = z.record(z.string(), z.unknown()).refine((value) => Object.keys(value).length <= 100, {
   message: 'Payload muito grande',
@@ -156,12 +157,14 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ success: false, error: 'Payload inválido.' }, 400);
     }
 
+    const canonicalRef = await canonicalizeReferral(parsedData.data.ref);
+
     const { data: lead, error: leadError } = await supabaseAdmin
       .from('leads')
       .insert({
         name: parsedData.data.name.normalize('NFC').replace(/\s+/g, ' '),
         phone: parsedData.data.phone,
-        ref: parsedData.data.ref,
+        ref: canonicalRef,
         status: 'Pendente',
         value: parsedData.data.value,
         source: 'ms_forms_webhook',
@@ -175,10 +178,10 @@ export async function POST(request: NextRequest) {
       lead_id: lead.id,
       date: new Date().toISOString(),
       action: 'Criado via Webhook MS Forms',
-      note: `Lead recebido automaticamente. Canal de origem: ${parsedData.data.ref}`,
+      note: `Lead recebido automaticamente. Canal de origem: ${canonicalRef}`,
     });
 
-    const ixcResult = await createIxcProspect(parsedData.data.name, parsedData.data.phone, parsedData.data.ref);
+    const ixcResult = await createIxcProspect(parsedData.data.name, parsedData.data.phone, canonicalRef);
     await supabaseAdmin.from('lead_history').insert({
       lead_id: lead.id,
       date: new Date().toISOString(),
