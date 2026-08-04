@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAdminUser } from '@/lib/auth-server';
 import { isSameOriginRequest } from '@/lib/request-security';
-import { fetchIxc, getIxcConfig } from '@/lib/ixc';
+import { fetchIxc, formatIxcDate, getIxcConfig } from '@/lib/ixc';
 import { checkPublicRateLimit } from '@/lib/rate-limit';
 
 const ProspectSchema = z.object({
@@ -35,28 +35,25 @@ export async function POST(request: NextRequest) {
     const config = await getIxcConfig();
     if (!config) return NextResponse.json({ success: false, error: 'IXC nao configurado.' }, { status: 503 });
 
-    const now = new Date();
-    const localISOTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString().slice(0, 19).replace('T', ' ');
-
     const response = await fetchIxc(`${config.host}/webservice/v1/contato`, config.token, {
       nome: name,
       razao: name,
       fone_celular: phone,
       id_filial: '1',
-      data_cadastro: localISOTime,
+      data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
       obs: `Indicado via Gente Digital por: ${parsed.data.ref || 'Desconhecido'}`,
-    });
+    }, 'insert');
 
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.type === 'error') {
+    const id = data.id ? String(data.id).trim().slice(0, 100) : '';
+    if (!response.ok || data.type === 'error' || !id) {
       return NextResponse.json({ success: false, error: 'O IXC recusou a criacao do prospect.' }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true, message: 'Prospect criado no IXC.', id: String(data.id || '') });
+    return NextResponse.json({ success: true, message: 'Prospect criado no IXC.', id });
   } catch (error) {
     console.error('IXC prospect error:', error instanceof Error ? error.message : 'unknown error');
     return NextResponse.json({ success: false, error: 'Nao foi possivel criar o prospect.' }, { status: 500 });

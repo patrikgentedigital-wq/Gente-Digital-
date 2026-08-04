@@ -61,18 +61,40 @@ export async function getIxcConfig() {
   return { host, token: config.ixc_token };
 }
 
-export async function fetchIxc(path: string, token: string, body: unknown) {
+export type IxcRequestMode = 'list' | 'insert';
+
+export function formatIxcDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date).reduce<Record<string, string>>((accumulator, part) => {
+    if (part.type !== 'literal') accumulator[part.type] = part.value;
+    return accumulator;
+  }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export async function fetchIxc(path: string, token: string, body: unknown, mode: IxcRequestMode = 'list') {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10_000);
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Basic ${Buffer.from(token).toString('base64')}`,
+      'Content-Type': 'application/json',
+    };
+    if (mode === 'list') headers.ixcsoft = 'listar';
+
     return await fetch(`https://${path}`, {
       method: 'POST',
       redirect: 'error',
-      headers: {
-        Authorization: `Basic ${Buffer.from(token).toString('base64')}`,
-        'Content-Type': 'application/json',
-        ixcsoft: 'listar',
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });

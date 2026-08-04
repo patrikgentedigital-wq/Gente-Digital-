@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { checkPublicRateLimit } from '@/lib/rate-limit';
 import { claimWebhookEvent, completeWebhookEvent, readWebhookBody, verifyLegacyWebhook, verifySignedWebhook } from '@/lib/webhook-security';
-import { fetchIxc, getIxcConfig } from '@/lib/ixc';
+import { fetchIxc, formatIxcDate, getIxcConfig } from '@/lib/ixc';
 import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
 
 const FormPayloadSchema = z.record(z.string(), z.unknown()).refine((value) => Object.keys(value).length <= 100, {
@@ -67,12 +67,12 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
       razao: name,
       fone_celular: phone,
       id_filial: '1',
-      data_cadastro: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
       obs: `Indicado via Gente Digital por: ${ref}`,
-    });
+    }, 'insert');
 
     const responseBody = await response.text();
     let data: { id?: string | number; type?: string } = {};
@@ -82,8 +82,12 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
       // A resposta não JSON é tratada como falha sem devolvê-la ao cliente.
     }
 
-    if (!response.ok || data.type === 'error') return { success: false as const };
-    return { success: true as const, id: data.id ? String(data.id).slice(0, 100) : null };
+    const id = data.id ? String(data.id).trim().slice(0, 100) : '';
+    if (!response.ok || data.type === 'error' || !id) {
+      console.error('IXC não confirmou a criação do prospecto:', response.status);
+      return { success: false as const };
+    }
+    return { success: true as const, id };
   } catch (error) {
     console.error('Falha na sincronização do prospect com o IXC:', error instanceof Error ? error.message : 'erro desconhecido');
     return { success: false as const };
@@ -179,7 +183,9 @@ export async function POST(request: NextRequest) {
       lead_id: lead.id,
       date: new Date().toISOString(),
       action: ixcResult.success ? 'Sincronizado com IXC' : 'Falha na Sincronização IXC',
-      note: ixcResult.success ? 'Prospect criado automaticamente no IXC.' : 'A sincronização automática com o IXC falhou.',
+      note: ixcResult.success
+        ? `Prospect criado automaticamente no IXC com o ID: ${ixcResult.id}.`
+        : 'O IXC não confirmou a criação do prospecto.',
     });
 
     await completeWebhookEvent('ms-forms', signed.eventId, 'completed');
