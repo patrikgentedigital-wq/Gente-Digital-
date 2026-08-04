@@ -52,6 +52,7 @@ export function DashboardShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const tabParam = searchParams.get('tab');
   const activeTab: TabId = isTabId(tabParam) ? tabParam : 'colaboradores';
   const refParam = searchParams.get('ref');
@@ -59,8 +60,19 @@ export function DashboardShell() {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) router.push('/login');
+    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' });
+        const data = await response.json().catch(() => null);
+        setIsAdmin(response.ok && data?.isAdmin === true);
+      } catch {
+        setIsAdmin(false);
+      }
     });
 
     const {
@@ -71,6 +83,14 @@ export function DashboardShell() {
 
     return () => subscription.unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (isAdmin !== false || activeTab !== 'integracoes') return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'colaboradores');
+    router.replace(`?${params.toString()}`);
+  }, [activeTab, isAdmin, router, searchParams]);
 
   useEffect(() => {
     if (!refParam) return;
@@ -101,6 +121,7 @@ export function DashboardShell() {
         setActiveTab={handleTabChange}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        isAdmin={isAdmin}
       />
 
       <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-64">
@@ -116,7 +137,7 @@ export function DashboardShell() {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="h-full w-full"
             >
-              <ActiveView tab={activeTab} />
+              {activeTab === 'integracoes' && isAdmin !== true ? <ViewLoading /> : <ActiveView tab={activeTab} />}
             </motion.div>
           </AnimatePresence>
         </main>
