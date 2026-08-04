@@ -44,6 +44,8 @@ const tabNames = {
 
 type TabId = keyof typeof tabNames;
 
+const adminOnlyTabs = new Set<TabId>(['integracoes', 'gamificacao', 'comissoes']);
+
 function isTabId(value: string | null): value is TabId {
   return value !== null && value in tabNames;
 }
@@ -85,7 +87,7 @@ export function DashboardShell() {
   }, [router]);
 
   useEffect(() => {
-    if (isAdmin !== false || activeTab !== 'integracoes') return;
+    if (isAdmin !== false || !adminOnlyTabs.has(activeTab)) return;
 
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'colaboradores');
@@ -137,7 +139,7 @@ export function DashboardShell() {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="h-full w-full"
             >
-              {activeTab === 'integracoes' && isAdmin !== true ? <ViewLoading /> : <ActiveView tab={activeTab} />}
+              {adminOnlyTabs.has(activeTab) && isAdmin !== true ? <ViewLoading /> : <ActiveView tab={activeTab} />}
             </motion.div>
           </AnimatePresence>
         </main>

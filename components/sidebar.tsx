@@ -96,8 +96,12 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, isAdmin }:
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavItem id="leads" icon={Users} label="Leads & Funil" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
-          <NavItem id="gamificacao" icon={Trophy} label="Gamificação & Prêmios" active={activeTab === 'gamificacao'} onClick={() => setActiveTab('gamificacao')} />
-          <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
+          {isAdmin === true && (
+            <>
+              <NavItem id="gamificacao" icon={Trophy} label="Gamificação & Prêmios" active={activeTab === 'gamificacao'} onClick={() => setActiveTab('gamificacao')} />
+              <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
+            </>
+          )}
           {isAdmin === true && (
             <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
           )}
