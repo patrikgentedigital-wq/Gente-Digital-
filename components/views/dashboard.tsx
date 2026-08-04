@@ -10,6 +10,7 @@ import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
 import { PROGRAM_RULES } from '@/lib/rules';
+import { matchCollaboratorReference } from '@/lib/referral-matching';
 
 // Lazy load recharts para reduzir bundle inicial
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
@@ -171,11 +172,8 @@ export function DashboardView() {
     const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
     
     const allData = colaboradores.map(colab => {
-      const normColabName = normalizeStr(colab.name);
-      const normColabId = normalizeStr(colab.id);
       const referredLeads = leads.filter(l => {
-        const normRef = normalizeStr(l.ref);
-        return normRef === normColabId || normRef === normColabName;
+        return matchCollaboratorReference(l.ref, colaboradores)?.id === colab.id;
       });
       const convs = referredLeads.filter(l => l.status === 'Ganho').length;
       const points = referredLeads.length * PROGRAM_RULES.pontos.porIndicacao + convs * PROGRAM_RULES.pontos.porConversao;
@@ -280,14 +278,10 @@ export function DashboardView() {
   }, 0);
 
   const getTopColaboradores = () => {
-    return colaboradores
+      return colaboradores
       .map(colab => {
-        const normColabName = normalizeStr(colab.name);
-        const normColabId = normalizeStr(colab.id);
-
         const referredLeads = filteredLeads.filter(l => {
-          const normRef = normalizeStr(l.ref);
-          return normRef === normColabId || normRef === normColabName;
+          return matchCollaboratorReference(l.ref, colaboradores)?.id === colab.id;
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
@@ -321,12 +315,7 @@ export function DashboardView() {
        const normRef = normalizeStr(ref);
        if (!normRef || normRef === "organico" || normRef === "") return false;
        
-       const isColab = colaboradores.some(c => {
-         const nName = normalizeStr(c.name);
-         const nId = normalizeStr(c.id);
-         return normRef === nId || normRef === nName;
-       });
-       return !isColab;
+       return !matchCollaboratorReference(ref, colaboradores);
     });
 
     const uniqueRefs = Array.from(new Set(clientRefs.map(r => normalizeStr(r))));

@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useToast } from '@/components/providers/toast-context';
 import Avatar from 'boring-avatars';
 import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
+import { matchCollaboratorReference } from '@/lib/referral-matching';
 
 export interface CommissionItem {
   id: string | number;
@@ -99,11 +100,7 @@ export function ComissoesView() {
           return { isColab: false, officialName: refStr || 'Orgânico' };
         }
 
-        const found = colabsData.find(c => {
-          const normId = normalizeStr(c.id);
-          const normName = normalizeStr(c.name);
-          return norm === normId || norm === normName;
-        });
+        const found = matchCollaboratorReference(refStr, colabsData);
 
         if (found) {
           return { isColab: true, officialName: found.name };
