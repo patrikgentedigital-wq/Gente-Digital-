@@ -1,35 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth } from '@/lib/auth-server';
+import { z } from 'zod';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyAdmin } from '@/lib/auth-server';
+import { isSameOriginRequest } from '@/lib/request-security';
 
-export async function POST(req: NextRequest) {
+const ClearLeadsSchema = z.object({ confirm: z.literal(true) });
+
+export async function POST(request: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
-    if (!isAuthenticated) {
-      return NextResponse.json({ success: false, error: 'Não autorizado. Faça login para continuar.' }, { status: 401 });
+    if (!await verifyAdmin(request)) return NextResponse.json({ success: false, error: 'Nao autorizado.' }, { status: 401 });
+    if (!isSameOriginRequest(request)) return NextResponse.json({ success: false, error: 'Origem nao permitida.' }, { status: 403 });
+
+    const body = await request.json().catch(() => null);
+    if (!ClearLeadsSchema.safeParse(body).success) {
+      return NextResponse.json({ success: false, error: 'A confirmacao e obrigatoria.' }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    if (body.confirm !== true) {
-      return NextResponse.json({ success: false, error: 'Ação destrutiva. Requer { confirm: true } no corpo da requisição.' }, { status: 400 });
-    }
+    const { error: historyError } = await supabaseAdmin.from('lead_history').delete().neq('id', 0);
+    if (historyError) throw historyError;
+    const { error: leadsError } = await supabaseAdmin.from('leads').delete().neq('id', 0);
+    if (leadsError) throw leadsError;
 
-    // Deleta os históricos de leads primeiro (para evitar erros de FK se não houver CASCADE)
-    const { error: historyError } = await supabase.from('lead_history').delete().neq('id', 0);
-    if (historyError) {
-      console.warn('Erro ao limpar histórico de leads:', historyError.message);
-    }
-
-    // Deleta todos os leads
-    const { error: leadsError } = await supabase.from('leads').delete().neq('id', 0);
-    if (leadsError) {
-      throw leadsError;
-    }
-
-    return NextResponse.json({ success: true, message: 'Todos os leads e históricos foram excluídos com sucesso.' });
-
-  } catch (err: any) {
-    console.error('Error in clear leads endpoint:', err);
-    return NextResponse.json({ success: false, error: err.message || 'Falha ao apagar os leads.' }, { status: 500 });
+    return NextResponse.json({ success: true, message: 'Leads e historicos excluidos.' }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    console.error('Clear leads error:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ success: false, error: 'Falha ao apagar os leads.' }, { status: 500 });
   }
 }

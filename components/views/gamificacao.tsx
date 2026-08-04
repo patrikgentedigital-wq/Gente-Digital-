@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/providers/toast-context';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 
 interface Badge {
   id: string;
@@ -64,33 +64,16 @@ export function GamificacaoView() {
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [userPoints, setUserPoints] = useState<number>(1450);
-  const [totalEarned, setTotalEarned] = useState<number>(2250);
-  const [wonLeadsCount, setWonLeadsCount] = useState<number>(12);
+  const [userPoints, setUserPoints] = useState<number>(0);
+  const [totalEarned, setTotalEarned] = useState<number>(0);
+  const [wonLeadsCount, setWonLeadsCount] = useState<number>(0);
 
   const [selectedReward, setSelectedReward] = useState<RewardItem | null>(null);
   const [pixKey, setPixKey] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [filterCategory, setFilterCategory] = useState<string>('todos');
 
-  const [resgates, setResgates] = useState<ResgateHistory[]>([
-    {
-      id: 'RES-001',
-      rewardTitle: 'R$ 50,00 PIX na Conta',
-      pointsUsed: 500,
-      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-      status: 'Concluído',
-      pixKeyOrDetail: 'chavetestepix@email.com'
-    },
-    {
-      id: 'RES-002',
-      rewardTitle: 'Par de Ingressos de Cinema',
-      pointsUsed: 800,
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
-      status: 'Concluído',
-      pixKeyOrDetail: 'Código: CINEMA-9821'
-    }
-  ]);
+  const [resgates, setResgates] = useState<ResgateHistory[]>([]);
 
   // Carregar dados reais do Supabase
   const loadGamificationData = async () => {
@@ -129,11 +112,11 @@ export function GamificacaoView() {
         const count = wonLeads.length;
         setWonLeadsCount(count);
         // Cada indicação ganha vale 200 pontos acumulados
-        const totalPointsEarned = Math.max(2250, count * 200);
+        const totalPointsEarned = count * 200;
         setTotalEarned(totalPointsEarned);
 
         // Calcula total de pontos já utilizados em resgates
-        const pointsSpent = dbResgates ? dbResgates.reduce((acc, curr) => acc + (curr.points_used || 0), 0) : 1300;
+        const pointsSpent = dbResgates ? dbResgates.reduce((acc, curr) => acc + (curr.points_used || 0), 0) : 0;
         setUserPoints(Math.max(0, totalPointsEarned - pointsSpent));
       }
 
@@ -145,9 +128,11 @@ export function GamificacaoView() {
   };
 
   useEffect(() => {
+    // Sincronização inicial com o banco externo; a atualização ocorre após a consulta.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadGamificationData();
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseRealtimeEnabled()) {
       const channel = supabase
         .channel('redemptions_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'redemptions' }, () => {
@@ -192,9 +177,9 @@ export function GamificacaoView() {
       title: 'Top Indicador do Mês',
       description: 'Ficou em 1º lugar no ranking comercial mensal.',
       icon: Flame,
-      unlocked: true,
-      progress: 100,
-      currentCount: 1,
+      unlocked: false,
+      progress: 0,
+      currentCount: 0,
       maxCount: 1,
       color: 'from-orange-500 to-rose-500',
       bgGradient: 'bg-orange-500/10 border-orange-500/30'

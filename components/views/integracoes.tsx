@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { Network, Database, CheckCircle2, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/providers/toast-context';
+
+const subscribeToLocation = () => () => undefined;
+const getLocationOrigin = () => (typeof window === 'undefined' ? '' : window.location.origin);
+const getServerLocationOrigin = () => '';
 
 export function IntegracoesView() {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [ixcSaved, setIxcSaved] = useState(false);
   const [formsSaved, setFormsSaved] = useState(false);
-  const [origin, setOrigin] = useState('');
+  const origin = useSyncExternalStore(subscribeToLocation, getLocationOrigin, getServerLocationOrigin);
   
   const [ixcDomain, setIxcDomain] = useState('');
   const [ixcToken, setIxcToken] = useState('');
@@ -30,12 +34,6 @@ export function IntegracoesView() {
       }
     }
     loadConfig();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrigin(window.location.origin);
-    }
   }, []);
 
   const handleSaveIxc = async () => {
@@ -223,6 +221,16 @@ export function IntegracoesView() {
               </button>
             </div>
             <p className="text-sm text-brand-muted dark:text-gray-400 mt-3">Cole esta URL no <span className="font-semibold text-brand-charcoal dark:text-white">Microsoft Power Automate</span> para direcionar as respostas do Forms para sua base de leads.</p>
+
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+              <p className="font-bold">Configuração compatível com o fluxo antigo</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4">
+                <li>Use uma ação HTTP com método <strong>POST</strong> e esta URL.</li>
+                <li>Adicione o cabeçalho <code className="font-mono">x-webhook-secret</code> com o mesmo valor de <code className="font-mono">WEBHOOK_SECRET</code> configurado na Vercel.</li>
+                <li>O formato antigo com <code className="font-mono">?secret=...</code> continua aceito temporariamente para não interromper automações existentes.</li>
+              </ol>
+              <p className="mt-2">O formato HMAC com <code className="font-mono">x-webhook-timestamp</code>, <code className="font-mono">x-webhook-id</code> e <code className="font-mono">x-webhook-signature</code> continua sendo o recomendado.</p>
+            </div>
             
             <div className="mt-6 pt-5 border-t border-brand-border dark:border-gray-700">
               <h4 className="text-sm font-bold text-brand-charcoal dark:text-white mb-3">🏷️ Mapeamento Inteligente de Campos</h4>

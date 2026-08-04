@@ -1,117 +1,186 @@
-name: CI/CD Observability & Automatic Rollback Pipeline
-
-# DevOps Regra 10: Todo deploy deve ter monitoramento e rollback automático.
+name: CI, Vercel Deployment Verification & Rollback
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
+      - "agent/**"
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
+    inputs:
+      verify_production:
+        description: "Validar o ambiente de producao apos os testes"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  statuses: read
+
+concurrency:
+  group: observability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   regression-tests-and-build:
-    name: 1. Regressão & Build
+    name: 1. Regression tests and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
+          cache: npm
 
-      - name: Instalar Dependências
+      - name: Install dependencies
         run: npm ci
 
-      - name: Executar Testes de Regressão Automatizados (Regra 8)
-        run: npx tsx --test tests/regression/observability.test.ts
+      - name: Run observability regression tests
+        run: npm exec -- tsx --test tests/regression/observability.test.ts
 
-      - name: Validar Build de Produção
+      - name: Validate production build
         run: npm run build
 
-  deploy-and-auto-rollback:
-    name: 2. Deploy Canary/Produção com Rollback Automático
+  production-verification:
+    name: 2. Verify Vercel production deployment
     needs: regression-tests-and-build
+    if: >-
+      (github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.verify_production)
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://gente-digital.vercel.app' }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
-
-      - name: Executar Deploy
-        id: deploy_step
+      - name: Wait for the Vercel Git deployment
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::notice::Iniciando deployment de produção..."
-          # Exemplo de comando de deploy (Vercel / Kubernetes / Cloud Run)
-          # npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
-          echo "DEPLOY_ID=$(date +%s)" >> $GITHUB_OUTPUT
+          max_retries=30
+          retry_interval=10
 
-      - name: Monitoramento Pós-Deploy (Smoke Tests & Health Check Poller)
-        id: post_deploy_check
-        run: |
-          echo "::notice::Iniciando monitoramento pós-deploy de 60 segundos..."
-          HEALTH_URL="${{ secrets.PRODUCTION_URL }}/api/health"
-          
-          # Se não houver URL de prod configurada nos secrets, usar mock local de validação
-          if [ -z "${{ secrets.PRODUCTION_URL }}" ]; then
-            HEALTH_URL="http://localhost:3000/api/health"
-            echo "Aviso: PRODUCTION_URL não definida, executando verificação de estrutura local."
-            exit 0
-          fi
+          for attempt in $(seq 1 "$max_retries"); do
+            status_json="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status")"
+            vercel_state="$(echo "$status_json" | jq -r '[.statuses[] | select(.context == "Vercel")][0].state // "pending"')"
+            deployment_url="$(echo "$status_json" | jq -r '[.statuses[] | select(.context == "Vercel")][0].target_url // ""')"
 
-          MAX_RETRIES=6
-          RETRY_INTERVAL=10
-          SUCCESS=false
+            echo "Vercel status attempt ${attempt}/${max_retries}: ${vercel_state}"
 
-          for i in $(seq 1 $MAX_RETRIES); do
-            echo "Tentativa $i/$MAX_RETRIES: Verificando $HEALTH_URL..."
-            HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" -H "x-request-id: cd-check-$i" "$HEALTH_URL")
-            
-            if [ "$HTTP_CODE" -eq 200 ]; then
-              STATUS=$(jq -r '.status' /tmp/health_response.json 2>/dev/null || echo "unknown")
-              if [ "$STATUS" = "healthy" ]; then
-                echo "SUCCESS: Health Check saudável (HTTP 200, status=healthy)"
-                cat /tmp/health_response.json
-                SUCCESS=true
-                break
+            if [ "$vercel_state" = "success" ]; then
+              echo "Vercel deployment completed successfully."
+              if [ -n "$deployment_url" ]; then
+                echo "Deployment details: $deployment_url"
               fi
+              exit 0
             fi
 
-            echo "Health Check com resposta insatisfatória (HTTP $HTTP_CODE). Aguardando ${RETRY_INTERVAL}s..."
-            sleep $RETRY_INTERVAL
+            if [ "$vercel_state" = "failure" ] || [ "$vercel_state" = "error" ]; then
+              echo "::error::Vercel reported deployment status '${vercel_state}'."
+              exit 1
+            fi
+
+            sleep "$retry_interval"
           done
 
-          if [ "$SUCCESS" = "false" ]; then
-            echo "ERROR: Monitoramento pós-deploy detectou falha no Health Check!"
-            exit 1
-          fi
+          echo "::error::Timed out waiting for the Vercel deployment status."
+          exit 1
 
-      - name: Trigger de Rollback Automático em Caso de Falha
-        if: failure() && steps.deploy_step.outcome == 'success'
+      - name: Run production health check
+        id: health_check
         run: |
-          echo "::error::🚨 ANOMALIA DETECTADA NO PÓS-DEPLOY! Executando ROLLBACK AUTOMÁTICO..."
-          # Exemplo de comando de rollback automático:
-          # npx vercel rollback --token=${{ secrets.VERCEL_TOKEN }} --yes
-          # ou via kubectl / helm rollback:
-          # kubectl rollout undo deployment/gente-digital-api
-          echo "::warning::Rollback concluído com sucesso. A versão anterior está ativa."
+          base_url="${PRODUCTION_URL%/}"
+          health_url="${base_url}/api/health"
+          max_retries=6
+          retry_interval=10
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
 
-      - name: Notificar Falha / Rollback no Microsoft Teams
-        if: failure() && secrets.TEAMS_WEBHOOK_URL != ''
+          for attempt in $(seq 1 "$max_retries"); do
+            http_code="$(curl --silent --show-error --location \
+              --connect-timeout 10 --max-time 20 \
+              --output "$response_file" --write-out "%{http_code}" \
+              --header "x-request-id: ci-health-${GITHUB_RUN_ID}-${attempt}" \
+              "$health_url" || true)"
+            health_status="$(jq -r '.status // empty' "$response_file" 2>/dev/null || true)"
+
+            if [ "$http_code" = "200" ] && [ "$health_status" = "healthy" ]; then
+              echo "Production health check passed: HTTP 200, status=healthy."
+              exit 0
+            fi
+
+            echo "Attempt ${attempt}/${max_retries} failed: HTTP ${http_code:-unknown}, status=${health_status:-unknown}."
+            if [ "$attempt" -lt "$max_retries" ]; then
+              sleep "$retry_interval"
+            fi
+          done
+
+          echo "::error::Production health check failed for $health_url."
+          exit 1
+
+      - name: Roll back the Vercel production deployment
+        if: >-
+          failure() && steps.health_check.outcome == 'failure' &&
+          env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' &&
+          env.VERCEL_PROJECT_ID != ''
         run: |
-          curl -H "Content-Type: application/json" -d '{
-            "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
-            "themeColor": "FF0000",
-            "summary": "🚨 ALERTA CI/CD: Rollback Automático Executado",
-            "sections": [{
-              "activityTitle": "🚨 ALERTA CI/CD: Rollback Automático Executado",
-              "activitySubtitle": "Repositório: '${{ github.repository }}'",
-              "facts": [
-                { "name": "Branch:", "value": "'${{ github.ref_name }}'" },
-                { "name": "Commit:", "value": "'${{ github.sha }}'" },
-                { "name": "Status:", "value": "FALHA PÓS-DEPLOY -> ROLLBACK CONCLUÍDO" }
-              ],
-              "text": "O Health Check pós-deploy falhou. O rollback automático foi disparado para manter a estabilidade do sistema."
-            }]
-          }' "${{ secrets.TEAMS_WEBHOOK_URL }}"
+          npx --yes vercel@56.5.0 pull --yes --environment=production --token "$VERCEL_TOKEN"
+          npx --yes vercel@56.5.0 rollback --yes --token "$VERCEL_TOKEN"
+
+      - name: Report unavailable automatic rollback
+        if: >-
+          failure() && steps.health_check.outcome == 'failure' &&
+          (env.VERCEL_TOKEN == '' || env.VERCEL_ORG_ID == '' ||
+          env.VERCEL_PROJECT_ID == '')
+        run: |
+          echo "::warning::Health check failed, but automatic rollback is not configured."
+          echo "Configure VERCEL_TOKEN and the VERCEL_ORG_ID/VERCEL_PROJECT_ID repository variables."
+
+      - name: Notify Microsoft Teams
+        if: failure() && env.TEAMS_WEBHOOK_URL != ''
+        continue-on-error: true
+        env:
+          REPOSITORY_NAME: ${{ github.repository }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          payload="$(jq -n \
+            --arg repository "$REPOSITORY_NAME" \
+            --arg branch "$BRANCH_NAME" \
+            --arg commit "$COMMIT_SHA" \
+            '{
+              "@type": "MessageCard",
+              "@context": "http://schema.org/extensions",
+              "themeColor": "FF0000",
+              "summary": "CI/CD production verification failed",
+              "sections": [{
+                "activityTitle": "CI/CD production verification failed",
+                "facts": [
+                  {"name": "Repository", "value": $repository},
+                  {"name": "Branch", "value": $branch},
+                  {"name": "Commit", "value": $commit}
+                ],
+                "text": "Review the Vercel deployment and health-check logs in GitHub Actions."
+              }]
+            }')"
+
+          curl --fail-with-body --silent --show-error \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            "$TEAMS_WEBHOOK_URL"

@@ -10,6 +10,10 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'danger' | 'success' | 'primary';
+  inputLabel?: string;
+  inputValue?: string;
+  inputPlaceholder?: string;
+  onInputChange?: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,6 +25,10 @@ export function ConfirmDialog({
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   tone = 'primary',
+  inputLabel,
+  inputValue = '',
+  inputPlaceholder,
+  onInputChange,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -66,6 +74,20 @@ export function ConfirmDialog({
           <h3 className="font-display font-bold text-lg text-brand-charcoal dark:text-white leading-snug pt-1">{title}</h3>
         </div>
         <div className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed mb-6">{message}</div>
+        {inputLabel && onInputChange && (
+          <div className="mb-6">
+            <label htmlFor="confirm-dialog-input" className="mb-2 block text-sm font-bold text-brand-charcoal dark:text-gray-200">{inputLabel}</label>
+            <input
+              id="confirm-dialog-input"
+              value={inputValue}
+              onChange={(event) => onInputChange(event.target.value)}
+              placeholder={inputPlaceholder}
+              required
+              autoComplete="off"
+              className="w-full rounded-xl border border-brand-border bg-gray-50 px-4 py-3 text-sm text-brand-charcoal outline-none transition focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/30 dark:border-gray-700 dark:bg-zinc-800 dark:text-white"
+            />
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -78,7 +100,8 @@ export function ConfirmDialog({
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-3 font-bold text-sm rounded-xl shadow-sm transition-all ${toneClasses}`}
+            disabled={Boolean(inputLabel && inputValue.trim().length < 3)}
+            className={`flex-1 py-3 font-bold text-sm rounded-xl shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 ${toneClasses}`}
           >
             {confirmLabel}
           </button>

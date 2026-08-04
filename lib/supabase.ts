@@ -25,6 +25,13 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 export const isSupabaseConfigured = () => {
   return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
 };
+
+// Realtime fica opt-in para evitar reconexões infinitas quando o endpoint WebSocket
+// está indisponível ou bloqueado pela rede do usuário. As telas continuam usando
+// consultas HTTP normalmente e o recurso pode ser reativado via ambiente.
+export const isSupabaseRealtimeEnabled = () => {
+  return isSupabaseConfigured() && process.env.NEXT_PUBLIC_ENABLE_REALTIME === 'true';
+};
 // Interfaces for our tables
 export interface Lead {
   id: number;
@@ -34,6 +41,10 @@ export interface Lead {
   status: string;
   value?: number;
   created_at?: string;
+  tracking_code?: string | null;
+  submission_key?: string | null;
+  source?: string | null;
+  consent_at?: string | null;
 }
 
 export interface LeadHistory {

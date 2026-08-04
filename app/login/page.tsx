@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, Mail, Loader2, AlertCircle, Eye, EyeOff, Sun, Moon, ArrowRight } from 'lucide-react';
@@ -9,18 +9,13 @@ import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,9 +32,9 @@ export default function LoginPage() {
       
       router.push('/');
       router.refresh();
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Credenciais inválidas. Tente novamente.');
+    } catch (err) {
+      console.error('Login error:', err instanceof Error ? err.name : 'unknown_error');
+      setError('Credenciais inválidas. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -49,17 +44,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-[#09090B] p-4 text-slate-900 dark:text-slate-100 transition-colors relative overflow-hidden">
       
       {/* Theme Toggle Button */}
-      {mounted && (
-        <motion.button
+      <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
           className="absolute top-6 right-6 p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors shadow-xs z-20"
-          title="Alternar Tema"
+          title="Alternar tema"
+          aria-label="Alternar tema"
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          <Sun className="hidden h-4 w-4 text-amber-400 dark:block" aria-hidden="true" />
+          <Moon className="h-4 w-4 text-slate-700 dark:hidden" aria-hidden="true" />
         </motion.button>
-      )}
 
       {/* Main Login Box */}
       <motion.div

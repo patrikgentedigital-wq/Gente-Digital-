@@ -11,8 +11,8 @@
   --color-brand-muted: #64748B;
   --color-brand-success: #10B981;
   --color-brand-link: #2563EB;
-  --font-sans: var(--font-jakarta), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-jakarta), var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Clean SaaS Panel & Surface Styles */

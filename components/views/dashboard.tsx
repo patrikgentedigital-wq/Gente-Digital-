@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
-import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, Lead, Colaborador, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
 import { PROGRAM_RULES } from '@/lib/rules';
+import { matchCollaboratorReference } from '@/lib/referral-matching';
 
 // Lazy load recharts para reduzir bundle inicial
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
@@ -22,6 +23,8 @@ const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.Respons
 const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false });
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const normalizeStr = (str: string) =>
+  str ? str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
 
 export function DashboardView() {
   const router = useRouter();
@@ -107,7 +110,15 @@ export function DashboardView() {
     };
     fetchData();
 
-    if (isSupabaseConfigured()) {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void fetchData();
+    };
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshInterval = window.setInterval(refreshWhenVisible, 30_000);
+
+    if (isSupabaseRealtimeEnabled()) {
       const dashboardChannel = supabase
         .channel('dashboard_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
@@ -119,9 +130,18 @@ export function DashboardView() {
         .subscribe();
 
       return () => {
+        window.clearInterval(refreshInterval);
+        window.removeEventListener('focus', refreshWhenVisible);
+        document.removeEventListener('visibilitychange', refreshWhenVisible);
         supabase.removeChannel(dashboardChannel);
       };
     }
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   const now = new Date();
@@ -152,11 +172,8 @@ export function DashboardView() {
     const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
     
     const allData = colaboradores.map(colab => {
-      const normColabName = normalizeStr(colab.name);
-      const normColabId = normalizeStr(colab.id);
       const referredLeads = leads.filter(l => {
-        const normRef = normalizeStr(l.ref);
-        return normRef === normColabId || normRef === normColabName;
+        return matchCollaboratorReference(l.ref, colaboradores)?.id === colab.id;
       });
       const convs = referredLeads.filter(l => l.status === 'Ganho').length;
       const points = referredLeads.length * PROGRAM_RULES.pontos.porIndicacao + convs * PROGRAM_RULES.pontos.porConversao;
@@ -252,9 +269,6 @@ export function DashboardView() {
 
   const chartData = getDynamicChartData();
 
-  const normalizeStr = (str: string) => 
-    str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
-
   // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
   const clicks = colaboradores.reduce((acc, c) => {
     const normId = normalizeStr(c.id);
@@ -264,14 +278,10 @@ export function DashboardView() {
   }, 0);
 
   const getTopColaboradores = () => {
-    return colaboradores
+      return colaboradores
       .map(colab => {
-        const normColabName = normalizeStr(colab.name);
-        const normColabId = normalizeStr(colab.id);
-
         const referredLeads = filteredLeads.filter(l => {
-          const normRef = normalizeStr(l.ref);
-          return normRef === normColabId || normRef === normColabName;
+          return matchCollaboratorReference(l.ref, colaboradores)?.id === colab.id;
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
@@ -305,12 +315,7 @@ export function DashboardView() {
        const normRef = normalizeStr(ref);
        if (!normRef || normRef === "organico" || normRef === "") return false;
        
-       const isColab = colaboradores.some(c => {
-         const nName = normalizeStr(c.name);
-         const nId = normalizeStr(c.id);
-         return normRef === nId || normRef === nName;
-       });
-       return !isColab;
+       return !matchCollaboratorReference(ref, colaboradores);
     });
 
     const uniqueRefs = Array.from(new Set(clientRefs.map(r => normalizeStr(r))));

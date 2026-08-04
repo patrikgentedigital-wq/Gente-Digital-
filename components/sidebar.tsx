@@ -12,12 +12,12 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  isAdmin: boolean | null;
 }
 
-export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, isAdmin }: SidebarProps) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string>('');
-  const [isAdmin, setIsAdmin] = useState<boolean>(true);
 
   useEffect(() => {
     async function getEmail() {
@@ -25,12 +25,6 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) {
           setUserEmail(user.email);
-          const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS
-            ? process.env.NEXT_PUBLIC_ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
-            : [];
-          if (adminEmails.length > 0 && !adminEmails.includes(user.email.toLowerCase())) {
-            setIsAdmin(false);
-          }
         }
       } catch (e) {}
     }
@@ -102,9 +96,15 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavItem id="leads" icon={Users} label="Leads & Funil" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
-          <NavItem id="gamificacao" icon={Trophy} label="Gamificação & Prêmios" active={activeTab === 'gamificacao'} onClick={() => setActiveTab('gamificacao')} />
-          <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
-          <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
+          {isAdmin === true && (
+            <>
+              <NavItem id="gamificacao" icon={Trophy} label="Gamificação & Prêmios" active={activeTab === 'gamificacao'} onClick={() => setActiveTab('gamificacao')} />
+              <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
+            </>
+          )}
+          {isAdmin === true && (
+            <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
+          )}
         </nav>
 
         {/* User Profile Card */}

@@ -1,110 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth } from '@/lib/auth-server';
+import { z } from 'zod';
+import { getAdminUser } from '@/lib/auth-server';
+import { isSameOriginRequest } from '@/lib/request-security';
+import { fetchIxc, normalizeIxcHost, getIxcConfig } from '@/lib/ixc';
+import { checkPublicRateLimit } from '@/lib/rate-limit';
 
-export async function POST(req: NextRequest) {
+const TestSchema = z.object({
+  domain: z.string().trim().min(1).max(253),
+  token: z.string().trim().max(300).optional().default(''),
+});
+
+export async function POST(request: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    const admin = await getAdminUser(request);
+    if (!admin) return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
+    if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem nao permitida.' }, { status: 403 });
 
-    let { domain, token } = await req.json();
+    const rateLimit = await checkPublicRateLimit('ixc-test', request, `user:${admin.id}`);
+    if (rateLimit.unavailable) return NextResponse.json({ error: 'Rate limit indisponivel.' }, { status: 503 });
+    if (!rateLimit.success) return NextResponse.json({ error: 'Muitos testes de conexao.' }, { status: 429 });
 
-    if (!domain) {
-      return NextResponse.json({ error: 'Domínio é obrigatório.' }, { status: 400 });
-    }
+    const body = await request.json().catch(() => null);
+    const parsed = TestSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: 'Dominio invalido.' }, { status: 400 });
 
-    // Se o token fornecido for mascarado ou em branco, recupera o token salvo no banco/env
-    if (!token || token.startsWith('*')) {
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'ixc_token')
-        .maybeSingle();
+    const host = normalizeIxcHost(parsed.data.domain);
+    if (!host) return NextResponse.json({ error: 'Dominio IXC nao permitido.' }, { status: 400 });
 
-      token = settingsData?.value || process.env.IXC_TOKEN || '';
-    }
+    let token = parsed.data.token;
+    if (!token || token.startsWith('*')) token = (await getIxcConfig())?.token || '';
+    if (!token) return NextResponse.json({ error: 'Token do IXC nao encontrado.' }, { status: 400 });
 
-    if (!token) {
-      return NextResponse.json({ error: 'Token do IXC não encontrado.' }, { status: 400 });
-    }
-
-    // Normalize domain
-    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-    
-    // Test URL
-    const url = `https://${cleanDomain}/webservice/v1/cliente`;
-
-    // Base64 encode the token
-    const base64Token = Buffer.from(token).toString('base64');
-
-    console.log(`Testing IXC integration. URL: ${url}`);
-
-    // Request to IXC Webservice API with a 10s timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${base64Token}`,
-          'Content-Type': 'application/json',
-          'ixcsoft': 'listar'
-        },
-        body: JSON.stringify({
-          qtype: 'cliente.id',
-          query: '0',
-          oper: '>',
-          page: '1',
-          rp: '1'
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`IXC test connection returned status ${response.status}: ${errorText}`);
-        
-        if (response.status === 401 || response.status === 403) {
-          return NextResponse.json({ 
-            success: false, 
-            error: 'Credenciais inválidas (Token inválido ou não autorizado no IXC).' 
-          });
-        }
-        
-        return NextResponse.json({ 
-          success: false, 
-          error: `Servidor IXC respondeu com código de erro ${response.status}.` 
-        });
-      }
-
-      const data = await response.json();
-      return NextResponse.json({
-        success: true,
-        message: 'Conectado ao IXC Soft com sucesso!',
-        totalClientes: data.total || 0
-      });
-
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        return NextResponse.json({
-          success: false,
-          error: 'Tempo limite esgotado ao conectar ao IXC Soft (Timeout de 10s). Verifique se o IP deste servidor está liberado no firewall do IXC.'
-        });
-      }
-      throw fetchError;
-    }
-
-  } catch (error: any) {
-    console.error('IXC Test Connection Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: `Não foi possível conectar ao servidor IXC: ${error.message || 'Verifique se o domínio está correto e se o servidor está online.'}`
+    const response = await fetchIxc(`${host}/webservice/v1/cliente`, token, {
+      qtype: 'cliente.id',
+      query: '0',
+      oper: '>',
+      page: '1',
+      rp: '1',
     });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return NextResponse.json({ success: false, error: 'Credenciais invalidas no IXC.' });
+      }
+      return NextResponse.json({ success: false, error: `Servidor IXC respondeu com codigo ${response.status}.` });
+    }
+
+    const data = await response.json();
+    return NextResponse.json({ success: true, message: 'Conexao validada.', totalClientes: Number(data.total) || 0 });
+  } catch (error) {
+    console.error('IXC test error:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ success: false, error: 'Nao foi possivel conectar ao IXC.' }, { status: 500 });
   }
 }

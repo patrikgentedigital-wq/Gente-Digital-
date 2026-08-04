@@ -1,4 +1,3 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -12,6 +11,22 @@ export async function middleware(request: NextRequest) {
 
   // Garantir que a resposta HTTP sempre retorne o header x-request-id
   supabaseResponse.headers.set('x-request-id', requestId);
+
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname.startsWith('/login');
+  const isPublicLanding = pathname.startsWith('/indicar') || pathname.startsWith('/indique-e-ganhe');
+  const isPublicApi = pathname.startsWith('/api/referrals') || pathname.startsWith('/api/web-vitals');
+  const isWebhookRoute = pathname.startsWith('/api/webhooks');
+  const isIxcWebhookRoute = pathname === '/api/integrations/ixc/webhook';
+  const isHealthRoute = pathname.startsWith('/api/health');
+  const isMetricsRoute = pathname.startsWith('/api/metrics');
+  const isTrackClickRoute = pathname.startsWith('/api/track-click');
+
+  // Rotas públicas não precisam aguardar a sessão do Supabase no middleware.
+  // Isso remove uma chamada bloqueante antes do primeiro HTML da landing.
+  if (isPublicLanding || isPublicApi || isWebhookRoute || isIxcWebhookRoute || isHealthRoute || isMetricsRoute || isTrackClickRoute) {
+    return supabaseResponse;
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
@@ -28,6 +43,7 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const { createServerClient } = await import('@supabase/ssr');
   const supabase = createServerClient(
     supabaseUrl,
     supabaseAnonKey,
@@ -55,14 +71,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protect all routes except /login, /indicar, /api/webhooks, /api/health, /api/metrics e /api/track-click
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
-  const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
-  const isHealthRoute = request.nextUrl.pathname.startsWith('/api/health')
-  const isMetricsRoute = request.nextUrl.pathname.startsWith('/api/metrics')
-  const isTrackClickRoute = request.nextUrl.pathname.startsWith('/api/track-click')
-
-  if (!user && !isAuthRoute && !isPublicLanding && !isWebhookRoute && !isHealthRoute && !isMetricsRoute && !isTrackClickRoute) {
+  if (!user && !isAuthRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
       unauthRes.headers.set('x-request-id', requestId);
