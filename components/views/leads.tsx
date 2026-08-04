@@ -378,21 +378,42 @@ export function LeadsView() {
       void fetchColaboradores();
     }, 0);
 
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchLeads(currentPage);
+      }
+    };
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshInterval = window.setInterval(refreshWhenVisible, 30_000);
+
     if (isSupabaseRealtimeEnabled()) {
       const colabChannel = supabase
         .channel('leads_colaboradores_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
           fetchColaboradores();
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+          void fetchLeads(currentPage);
+        })
         .subscribe();
 
       return () => {
         window.clearTimeout(initialLoad);
+        window.clearInterval(refreshInterval);
+        window.removeEventListener('focus', refreshWhenVisible);
+        document.removeEventListener('visibilitychange', refreshWhenVisible);
         supabase.removeChannel(colabChannel);
       };
     }
 
-    return () => window.clearTimeout(initialLoad);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [currentPage, fetchLeads]);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];

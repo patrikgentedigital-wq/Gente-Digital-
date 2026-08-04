@@ -109,6 +109,14 @@ export function DashboardView() {
     };
     fetchData();
 
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void fetchData();
+    };
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshInterval = window.setInterval(refreshWhenVisible, 30_000);
+
     if (isSupabaseRealtimeEnabled()) {
       const dashboardChannel = supabase
         .channel('dashboard_realtime')
@@ -121,9 +129,18 @@ export function DashboardView() {
         .subscribe();
 
       return () => {
+        window.clearInterval(refreshInterval);
+        window.removeEventListener('focus', refreshWhenVisible);
+        document.removeEventListener('visibilitychange', refreshWhenVisible);
         supabase.removeChannel(dashboardChannel);
       };
     }
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   const now = new Date();
