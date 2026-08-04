@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { checkPublicRateLimit } from '@/lib/rate-limit';
-import { claimWebhookEvent, completeWebhookEvent, readWebhookBody, verifySignedWebhook } from '@/lib/webhook-security';
+import { claimWebhookEvent, completeWebhookEvent, readWebhookBody, verifyLegacyWebhook, verifySignedWebhook } from '@/lib/webhook-security';
 import { fetchIxc, getIxcConfig } from '@/lib/ixc';
 import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabase-admin';
 
@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
   const rawBody = await readWebhookBody(request);
   if (rawBody === null) return noStoreJson({ success: false, error: 'Payload inválido.' }, 413);
 
-  const signed = verifySignedWebhook(request, rawBody, process.env.WEBHOOK_SECRET);
+  const signed = verifySignedWebhook(request, rawBody, process.env.WEBHOOK_SECRET)
+    || verifyLegacyWebhook(request, rawBody, process.env.WEBHOOK_SECRET);
   if (!signed) return noStoreJson({ success: false, error: 'Não autorizado.' }, 401);
 
   let claim: { duplicate: boolean; conflict: boolean };

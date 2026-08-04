@@ -57,6 +57,38 @@ export function verifySignedWebhook(
   };
 }
 
+/**
+ * Compatibility for Power Automate flows created before HMAC signing was added.
+ * Header authentication is preferred; the query-string form is retained only
+ * so existing flows can be migrated without dropping submissions.
+ */
+export function verifyLegacyWebhook(
+  request: NextRequest,
+  rawBody: string,
+  secret: string | undefined,
+): SignedWebhook | null {
+  if (!secret) return null;
+
+  const providedSecret = request.headers.get('x-webhook-secret')?.trim()
+    || request.nextUrl.searchParams.get('secret')?.trim();
+  if (!providedSecret) return null;
+
+  const expectedBuffer = Buffer.from(secret);
+  const providedBuffer = Buffer.from(providedSecret);
+  if (expectedBuffer.length !== providedBuffer.length) return null;
+  if (!timingSafeEqual(providedBuffer, expectedBuffer)) return null;
+
+  const payloadHash = createHash('sha256').update(rawBody).digest('hex');
+  const suppliedEventId = request.headers.get('x-webhook-id')?.trim()
+    || request.headers.get('x-ms-workflow-run-id')?.trim()
+    || request.headers.get('x-ms-client-tracking-id')?.trim();
+  const eventId = suppliedEventId && suppliedEventId.length <= 160
+    ? `legacy-${suppliedEventId}`
+    : `legacy-${payloadHash}`;
+
+  return { eventId, rawBody, payloadHash };
+}
+
 export async function claimWebhookEvent(source: string, event: SignedWebhook) {
   const { error } = await supabaseAdmin.from('webhook_events').insert({
     source,
