@@ -16,9 +16,24 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
 
+  // Rotas públicas não precisam consultar a sessão antes de renderizar.
+  // Isso mantém a landing de indicação rápida e permite que o fluxo funcione
+  // mesmo quando o Supabase ainda não foi configurado no ambiente local.
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
+  const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
+  const isHealthRoute = request.nextUrl.pathname.startsWith('/api/health')
+  const isMetricsRoute = request.nextUrl.pathname.startsWith('/api/metrics')
+  const isTrackClickRoute = request.nextUrl.pathname.startsWith('/api/track-click')
+
+  if (isPublicLanding || isWebhookRoute || isHealthRoute || isMetricsRoute || isTrackClickRoute) {
+    return supabaseResponse;
+  }
+
   // Se não estiver configurado corretamente, não travar o build, mas bloquear em produção
   if (supabaseUrl.includes('placeholder')) {
     if (process.env.NODE_ENV === 'production') {
+      if (isAuthRoute) return supabaseResponse;
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       const redirectRes = NextResponse.redirect(url);
@@ -54,14 +69,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect all routes except /login, /indicar, /api/webhooks, /api/health, /api/metrics e /api/track-click
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
-  const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
-  const isHealthRoute = request.nextUrl.pathname.startsWith('/api/health')
-  const isMetricsRoute = request.nextUrl.pathname.startsWith('/api/metrics')
-  const isTrackClickRoute = request.nextUrl.pathname.startsWith('/api/track-click')
-
+  // Protect all remaining application and API routes.
   if (!user && !isAuthRoute && !isPublicLanding && !isWebhookRoute && !isHealthRoute && !isMetricsRoute && !isTrackClickRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })

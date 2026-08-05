@@ -57,6 +57,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
       <aside className={`fixed left-0 top-0 h-screen w-64 bg-[#0d0d11] border-r border-zinc-800/80 flex flex-col py-5 z-50 text-slate-100 shadow-xl transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         {/* Mobile close button */}
         <button 
+          type="button"
+          aria-label="Fechar menu de navegação"
           className="md:hidden absolute top-5 right-5 text-slate-400 hover:text-white transition-colors"
           onClick={() => setIsOpen(false)}
         >
@@ -132,6 +134,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <motion.button 
             whileHover={{ x: 2 }}
             onClick={handleLogout}
+            type="button"
+            aria-label="Sair do sistema"
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs font-medium"
           >
             <LogOut className="w-4 h-4" />

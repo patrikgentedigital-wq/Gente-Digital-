@@ -26,6 +26,8 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-3">
         <button 
           onClick={onMenuClick}
+          type="button"
+          aria-label="Abrir menu de navegação"
           className="md:hidden p-2 -ml-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
         >
           <Menu className="w-5 h-5" />
@@ -45,6 +47,8 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            type="button"
+            aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
             className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/60 dark:border-zinc-700/50 transition-colors"
             title="Alternar Tema"
           >

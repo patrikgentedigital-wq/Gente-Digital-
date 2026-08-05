@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import { Network, Database, CheckCircle2, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/providers/toast-context';
 
@@ -6,7 +6,11 @@ export function IntegracoesView() {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [ixcSaved, setIxcSaved] = useState(false);
   const [formsSaved, setFormsSaved] = useState(false);
-  const [origin, setOrigin] = useState('');
+  const origin = useSyncExternalStore(
+    () => () => {},
+    () => window.location.origin,
+    () => '',
+  );
   
   const [ixcDomain, setIxcDomain] = useState('');
   const [ixcToken, setIxcToken] = useState('');
@@ -30,12 +34,6 @@ export function IntegracoesView() {
       }
     }
     loadConfig();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrigin(window.location.origin);
-    }
   }, []);
 
   const handleSaveIxc = async () => {

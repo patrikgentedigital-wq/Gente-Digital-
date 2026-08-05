@@ -8,6 +8,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/components/providers/toast-context';
+import QRCode from 'qrcode';
+import { PROGRAM_RULES } from '@/lib/rules';
 
 const colaboradorSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
@@ -27,6 +29,46 @@ export function ColaboradoresView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedColabForQr, setSelectedColabForQr] = useState<Colaborador | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [baseLink, setBaseLink] = useState<string>(PROGRAM_RULES.linkBasePadrao);
+  const [isEditingBase, setIsEditingBase] = useState(false);
+  const [tempBaseLink, setTempBaseLink] = useState('');
+
+  // Fechar modais com a tecla Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false);
+        setSelectedColabForQr(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Gera o QR Code localmente (sem dependência de serviços de terceiros)
+  useEffect(() => {
+    if (!selectedColabForQr) return;
+    let cancelled = false;
+    QRCode.toDataURL(getFullReferralLink(baseLink, selectedColabForQr.id), { width: 180, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch((err) => console.error('Erro ao gerar QR Code:', err));
+    return () => { cancelled = true; };
+  }, [selectedColabForQr, baseLink]);
+
+  const handleCopyLink = async (link: string, name: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toastSuccess('Link copiado!', `Link de ${name} copiado para a área de transferência.`);
+      return true;
+    } catch (err) {
+      console.error('Erro ao copiar link:', err);
+      toastError('Erro ao Copiar', 'Não foi possível copiar o link. Copie manualmente.');
+      return false;
+    }
+  };
 
   const getNextColabId = () => {
     let maxNum = 0;
@@ -45,10 +87,6 @@ export function ColaboradoresView() {
   });
 
   const watchPhotoUrl = watch('photo_url');
-
-  const [baseLink, setBaseLink] = useState('gentedigital.com.br/indicar');
-  const [isEditingBase, setIsEditingBase] = useState(false);
-  const [tempBaseLink, setTempBaseLink] = useState('');
 
   const getFullReferralLink = (base: string, refId: string) => {
     let cleanBase = base.trim();
@@ -140,7 +178,7 @@ export function ColaboradoresView() {
         
         const colabCount = leadsData.length > 0 ? leadsData.filter(lead => {
           const normRef = normalizeStr(lead.ref);
-          return normRef === normColabId || normRef === normColabName || (!!normRef && !!normColabName && (normRef.includes(normColabName) || normColabName.includes(normRef)));
+          return normRef === normColabId || normRef === normColabName;
         }).length : (colab.count || 0);
         
         return { ...colab, count: colabCount };
@@ -422,9 +460,11 @@ export function ColaboradoresView() {
                       <span className="text-sm text-brand-link dark:text-blue-400 hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={getFullReferralLink(baseLink, colab.id)}>
                         {getFullReferralLink(baseLink, colab.id)}
                       </span>
-                      <button 
-                        onClick={() => navigator.clipboard.writeText(getFullReferralLink(baseLink, colab.id))}
-                        className="text-brand-muted hover:text-brand-charcoal dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyLink(getFullReferralLink(baseLink, colab.id), colab.name)}
+                        aria-label={`Copiar link de ${colab.name}`}
+                        className="text-brand-muted hover:text-brand-charcoal focus-visible:opacity-100 dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Copiar link"
                       >
                         <Copy className="w-4 h-4" />
@@ -491,11 +531,11 @@ export function ColaboradoresView() {
 
       {/* Modal Novo Colaborador */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="new-colaborator-title">
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Colaborador</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
+              <h3 id="new-colaborator-title" className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Colaborador</h3>
+              <button type="button" aria-label="Fechar cadastro de colaborador" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
             </div>
             <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
@@ -557,14 +597,16 @@ export function ColaboradoresView() {
 
       {/* Modal QR Code e Link de Indicação */}
       {selectedColabForQr && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="referral-link-title">
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Link de Indicação</h3>
+                <h3 id="referral-link-title" className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Link de Indicação</h3>
                 <p className="text-xs text-brand-muted mt-1">{selectedColabForQr.name}</p>
               </div>
-              <button 
+              <button
+                type="button"
+                aria-label="Fechar link de indicação"
                 onClick={() => setSelectedColabForQr(null)} 
                 className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
               >
@@ -575,14 +617,12 @@ export function ColaboradoresView() {
             <div className="space-y-6 text-center">
               {/* QR Code Container */}
               <div className="bg-gray-50 border border-brand-border rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner">
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getFullReferralLink(baseLink, selectedColabForQr.id))}`} 
-                    alt="QR Code de Indicação" 
-                    className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" 
-                  />
-                </>
+                {qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrDataUrl} alt="QR Code de Indicação" className="w-44 h-44 border-4 border-white shadow-md rounded-xl hover:scale-105 transition-transform" />
+                ) : (
+                  <div className="w-44 h-44 flex items-center justify-center rounded-xl border-4 border-white bg-white text-xs text-brand-muted" role="status">Gerando QR Code...</div>
+                )}
                 <p className="text-[11px] text-brand-muted font-bold mt-4 uppercase tracking-wider">
                   Escaneie para indicar
                 </p>
@@ -599,10 +639,14 @@ export function ColaboradoresView() {
                     className="flex-1 bg-gray-50 border border-brand-border rounded-xl px-4 py-3 font-mono text-xs text-brand-charcoal focus:outline-none"
                   />
                   <button
+                    type="button"
+                    aria-label={`Copiar link de ${selectedColabForQr.name}`}
                     onClick={() => {
-                      navigator.clipboard.writeText(getFullReferralLink(baseLink, selectedColabForQr.id));
-                      setCopiedLink(true);
-                      setTimeout(() => setCopiedLink(false), 2000);
+                      void handleCopyLink(getFullReferralLink(baseLink, selectedColabForQr.id), selectedColabForQr.name).then((wasCopied) => {
+                        if (!wasCopied) return;
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      });
                     }}
                     className={`px-4 py-3 ${copiedLink ? 'bg-green-600 text-white' : 'bg-brand-charcoal text-white hover:bg-gray-800'} font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all`}
                   >
@@ -629,7 +673,8 @@ export function ColaboradoresView() {
                   Compartilhar no WhatsApp
                 </a>
 
-                <button 
+                <button
+                  type="button"
                   onClick={() => setSelectedColabForQr(null)}
                   className="w-full py-3.5 border-2 border-brand-charcoal dark:border-gray-700 text-brand-charcoal dark:text-white font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all text-sm"
                 >

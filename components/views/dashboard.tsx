@@ -22,6 +22,8 @@ const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.Respons
 const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false });
 
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const normalizeStr = (str: string) =>
+  str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
 export function DashboardView() {
   const router = useRouter();
@@ -37,66 +39,62 @@ export function DashboardView() {
   const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const fetchClickCounts = async () => {
-      try {
-        const res = await fetch('/api/track-click');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.clicks)) {
-          const map: Record<string, number> = {};
-          data.clicks.forEach((c: { ref: string; count: number }) => {
-            map[normalizeStr(c.ref)] = (map[normalizeStr(c.ref)] || 0) + c.count;
-          });
-          setClickCounts(map);
-        }
-      } catch (err) {
-        console.error('Erro ao buscar cliques:', err);
-      }
-    };
-    fetchClickCounts();
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
         let leadsData: Lead[] = [];
         let colabsData: Colaborador[] = [];
+        const clicksMap: Record<string, number> = {};
 
-        if (isSupabaseConfigured()) {
-          const { data: lData } = await supabase.from('leads').select('*');
-          if (lData) leadsData = lData;
+        const clicksPromise = fetch('/api/track-click')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && Array.isArray(data.clicks)) {
+              data.clicks.forEach((c: { ref: string; count: number }) => {
+                clicksMap[normalizeStr(c.ref)] = (clicksMap[normalizeStr(c.ref)] || 0) + c.count;
+              });
+            }
+          })
+          .catch(err => console.error('Erro ao buscar cliques:', err));
 
-          const { data: cData } = await supabase.from('colaboradores').select('*');
-          if (cData) {
-            colabsData = cData;
+        const mainDataPromise = (async () => {
+          if (isSupabaseConfigured()) {
+            const [{ data: lData }, { data: cData }] = await Promise.all([
+              supabase.from('leads').select('*'),
+              supabase.from('colaboradores').select('*'),
+            ]);
+            if (lData) leadsData = lData;
+            if (cData) colabsData = cData;
+          } else {
+            leadsData = initialLeads as Lead[];
+            colabsData = initialColaboradores;
+
+            if (typeof window !== 'undefined') {
+              try {
+                const locRaw = localStorage.getItem('gente_digital_local_colaboradores');
+                if (locRaw) {
+                  const localColabs: Colaborador[] = JSON.parse(locRaw);
+                  const map = new Map<string, Colaborador>();
+                  localColabs.forEach(c => map.set(c.id, c));
+                  colabsData.forEach(c => {
+                    if (!map.has(c.id)) map.set(c.id, c);
+                  });
+                  colabsData = Array.from(map.values());
+                }
+
+                const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
+                if (delRaw) {
+                  const delIds: string[] = JSON.parse(delRaw);
+                  colabsData = colabsData.filter(c => !delIds.includes(c.id));
+                }
+              } catch (e) {}
+            }
           }
-        } else {
-          // Mocks for local display if DB is not configured
-          leadsData = initialLeads as Lead[];
-          colabsData = initialColaboradores;
+        })();
 
-          if (typeof window !== 'undefined') {
-            try {
-              const locRaw = localStorage.getItem('gente_digital_local_colaboradores');
-              if (locRaw) {
-                const localColabs: Colaborador[] = JSON.parse(locRaw);
-                const map = new Map<string, Colaborador>();
-                localColabs.forEach(c => map.set(c.id, c));
-                colabsData.forEach(c => {
-                  if (!map.has(c.id)) map.set(c.id, c);
-                });
-                colabsData = Array.from(map.values());
-              }
+        await Promise.allSettled([clicksPromise, mainDataPromise]);
 
-              const delRaw = localStorage.getItem('gente_digital_deleted_colaboradores');
-              if (delRaw) {
-                const delIds: string[] = JSON.parse(delRaw);
-                colabsData = colabsData.filter(c => !delIds.includes(c.id));
-              }
-            } catch (e) {}
-          }
-        }
-
+        setClickCounts(clicksMap);
         setLeads(leadsData);
         setColaboradores(colabsData);
       } catch (err) {
@@ -105,16 +103,17 @@ export function DashboardView() {
         setIsLoading(false);
       }
     };
-    fetchData();
+
+    fetchDashboardData();
 
     if (isSupabaseConfigured()) {
       const dashboardChannel = supabase
         .channel('dashboard_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
-          fetchData();
+          fetchDashboardData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-          fetchData();
+          fetchDashboardData();
         })
         .subscribe();
 
@@ -251,9 +250,6 @@ export function DashboardView() {
   };
 
   const chartData = getDynamicChartData();
-
-  const normalizeStr = (str: string) => 
-    str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
   // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
   const clicks = colaboradores.reduce((acc, c) => {

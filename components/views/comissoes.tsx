@@ -37,35 +37,31 @@ export function ComissoesView() {
   const [topColaborador, setTopColaborador] = useState<{ name: string; count: number } | null>(null);
   const [pendingPayment, setPendingPayment] = useState<CommissionItem | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const normalizeStr = (str: string) =>
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
   // Busca o estado de pagamentos no servidor (fonte da verdade)
-  const fetchPaidMap = useCallback(async (): Promise<{ map: PaidMap; fromLocalFallback: boolean }> => {
-    try {
-      const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.payments)) {
-        const map: PaidMap = {};
-        data.payments.forEach((p: any) => {
-          if (p.commission_key && p.paid_at) map[p.commission_key] = p.paid_at;
-        });
-        return { map, fromLocalFallback: false };
-      }
+  const fetchPaidMap = useCallback(async (): Promise<PaidMap> => {
+    const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (!res.ok || !data.success || !Array.isArray(data.payments)) {
       throw new Error(data.error || 'Falha ao carregar pagamentos');
-    } catch (err) {
-      console.error('Erro ao carregar pagamentos do servidor, usando fallback local:', err);
-      const paidStateRaw = localStorage.getItem('gente_digital_paid_commissions');
-      const map: PaidMap = paidStateRaw ? JSON.parse(paidStateRaw) : {};
-      return { map, fromLocalFallback: true };
     }
+
+    const map: PaidMap = {};
+    data.payments.forEach((p: any) => {
+      if (p.commission_key && p.paid_at) map[p.commission_key] = p.paid_at;
+    });
+    return map;
   }, []);
 
   // Fetch leads and calculate commissions using official rules
   const fetchCommissions = useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
 
       const isConfigured = typeof window !== 'undefined' &&
         !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -84,7 +80,7 @@ export function ComissoesView() {
         colabsData = initialColaboradores;
       }
 
-      const { map: paidMap } = await fetchPaidMap();
+      const paidMap = await fetchPaidMap();
 
       // Helper para verificar se um ref é um Colaborador oficial da empresa (match EXATO)
       const isColaborador = (refStr: string): { isColab: boolean; officialName: string } => {
@@ -202,13 +198,18 @@ export function ComissoesView() {
       setCommissions(items);
     } catch (err) {
       console.error('Error fetching commissions:', err);
+      setLoadError('Não foi possível carregar os pagamentos confirmados no servidor.');
+      toastError('Dados financeiros indisponíveis', 'Tente novamente em instantes.');
     } finally {
       setIsLoading(false);
     }
-  }, [fetchPaidMap]);
+  }, [fetchPaidMap, toastError]);
 
   useEffect(() => {
-    fetchCommissions();
+    const timer = window.setTimeout(() => {
+      void fetchCommissions();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchCommissions]);
 
   const handlePayCommission = (comm: CommissionItem) => {
@@ -315,9 +316,16 @@ export function ComissoesView() {
             Exportar Extrato (CSV)
           </button>
         </div>
-      </div>
+        </div>
 
-      {/* Regras Comerciais Banner */}
+        {loadError && (
+          <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 sm:flex-row sm:items-center sm:justify-between">
+            <span>{loadError} O status exibido não foi substituído por dados locais.</span>
+            <button type="button" onClick={() => fetchCommissions()} className="w-fit rounded-lg border border-red-300 px-3 py-2 text-xs font-bold hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-900/40">Tentar novamente</button>
+          </div>
+        )}
+
+        {/* Regras Comerciais Banner */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-500/30">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">

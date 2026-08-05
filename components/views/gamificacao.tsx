@@ -78,7 +78,7 @@ export function GamificacaoView() {
       id: 'RES-001',
       rewardTitle: 'R$ 50,00 PIX na Conta',
       pointsUsed: 500,
-      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+      date: '28/07/2026',
       status: 'Concluído',
       pixKeyOrDetail: 'chavetestepix@email.com'
     },
@@ -86,7 +86,7 @@ export function GamificacaoView() {
       id: 'RES-002',
       rewardTitle: 'Par de Ingressos de Cinema',
       pointsUsed: 800,
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+      date: '21/07/2026',
       status: 'Concluído',
       pixKeyOrDetail: 'Código: CINEMA-9821'
     }
@@ -145,20 +145,24 @@ export function GamificacaoView() {
   };
 
   useEffect(() => {
-    loadGamificationData();
+    const timer = window.setTimeout(() => {
+      void loadGamificationData();
+    }, 0);
 
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     if (isSupabaseConfigured()) {
-      const channel = supabase
+      channel = supabase
         .channel('redemptions_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'redemptions' }, () => {
-          loadGamificationData();
+          void loadGamificationData();
         })
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
+
+    return () => {
+      window.clearTimeout(timer);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   // Badges calculados dinamicamente
