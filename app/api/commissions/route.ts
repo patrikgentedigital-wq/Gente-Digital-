@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth } from '@/lib/auth-server';
+import { verifyAuth, verifyAuthAny } from '@/lib/auth-server';
 import { z } from 'zod';
 
 const PayCommissionSchema = z.object({
@@ -14,7 +14,7 @@ const PayCommissionSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
+    const isAuthenticated = await verifyAuthAny(req);
     if (!isAuthenticated) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
