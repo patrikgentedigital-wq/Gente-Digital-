@@ -1,76 +1,81 @@
 import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function createSupabaseServerClient(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  return { supabaseUrl, supabaseAnonKey, client: createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() { return req.cookies.getAll(); },
-        setAll() {},
-      },
-    }
-  )};
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() { return req.cookies.getAll(); },
+      setAll() {},
+    },
+  });
 }
 
 /**
- * verifyAuth — autentica apenas emails na lista ADMIN_EMAILS.
- * Use em rotas administrativas (ex: salvar config do IXC).
+ * Retorna o usuário autenticado via cookies de sessão do Supabase.
+ * Retorna null se não autenticado ou se Supabase não estiver configurado.
+ */
+async function getAuthenticatedUser(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
+  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('ALERTA DE SEGURANÇA: NEXT_PUBLIC_SUPABASE_URL ausente em produção.');
+      return null;
+    }
+    // Dev local sem Supabase: simula usuário admin
+    return { id: 'dev-local', email: 'dev@local' };
+  }
+
+  const client = createSupabaseServerClient(req);
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user) return null;
+  return user;
+}
+
+/**
+ * Retorna o role do usuário consultando a tabela user_roles no Supabase.
+ * Retorna null se o usuário não tiver role cadastrado.
+ */
+export async function getUserRole(userId: string): Promise<'admin' | 'vendedor' | null> {
+  const { data, error } = await supabaseAdmin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) return null;
+  return data.role as 'admin' | 'vendedor';
+}
+
+/**
+ * verifyAuth — autentica e verifica se o usuário tem role 'admin' no Supabase.
+ * Use em rotas administrativas (ex: salvar config do IXC, registrar pagamento).
  */
 export async function verifyAuth(req: NextRequest): Promise<boolean> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const user = await getAuthenticatedUser(req);
+  if (!user) return false;
 
-  // Modo offline/dev local sem Supabase configurado
-  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('ALERTA DE SEGURANÇA: NEXT_PUBLIC_SUPABASE_URL ausente em ambiente de produção.');
-      return false;
-    }
-    return true;
-  }
+  // Dev local sem Supabase
+  if (user.id === 'dev-local') return true;
 
-  const { client } = createSupabaseServerClient(req);
-  const { data: { user }, error } = await client.auth.getUser();
-  
-  if (error || !user) return false;
-
-  const adminEmails = process.env.ADMIN_EMAILS
-    ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
-    : [];
-
-  if (adminEmails.length > 0 && user.email) {
-    if (!adminEmails.includes(user.email.toLowerCase())) {
-      console.warn(`Acesso bloqueado: ${user.email} tentou acessar rota protegida.`);
-      return false;
-    }
+  const role = await getUserRole(user.id);
+  if (role !== 'admin') {
+    console.warn(`Acesso negado: ${user.email} (role: ${role ?? 'sem role'}) tentou acessar rota admin.`);
+    return false;
   }
 
   return true;
 }
 
 /**
- * verifyAuthAny — autentica qualquer usuário logado, independente do email.
- * Use em rotas que vendedores também precisam acessar (ex: sincronização IXC).
+ * verifyAuthAny — autentica qualquer usuário logado, independente do role.
+ * Use em rotas que vendedores também precisam acessar (ex: sync IXC, ver comissões).
  */
 export async function verifyAuthAny(req: NextRequest): Promise<boolean> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-
-  // Modo offline/dev local sem Supabase configurado
-  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('ALERTA DE SEGURANÇA: NEXT_PUBLIC_SUPABASE_URL ausente em ambiente de produção.');
-      return false;
-    }
-    return true;
-  }
-
-  const { client } = createSupabaseServerClient(req);
-  const { data: { user }, error } = await client.auth.getUser();
-
-  if (error || !user) return false;
-
-  return true;
+  const user = await getAuthenticatedUser(req);
+  return !!user;
 }
+

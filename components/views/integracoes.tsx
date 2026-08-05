@@ -1,11 +1,16 @@
-import { useState, useEffect, useSyncExternalStore } from 'react';
-import { Network, Database, CheckCircle2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useSyncExternalStore, useCallback } from 'react';
+import { Network, Database, CheckCircle2, Loader2, Users, ShieldCheck, UserCog, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/providers/toast-context';
+import { supabase } from '@/lib/supabase';
 
 export function IntegracoesView() {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [ixcSaved, setIxcSaved] = useState(false);
   const [formsSaved, setFormsSaved] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState<{ id: string; email: string; role: string; last_sign_in_at: string | null }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const origin = useSyncExternalStore(
     () => () => {},
     () => window.location.origin,
@@ -33,8 +38,56 @@ export function IntegracoesView() {
         console.error('Error loading IXC config:', err);
       }
     }
+
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        setIsAdmin(true);
+        const data = await res.json();
+        setUsers(data.users || []);
+      }
+    }
+
     loadConfig();
+    checkAdmin();
   }, []);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (data.success) setUsers(data.users || []);
+    } catch (err) {
+      console.error('Erro ao carregar usuários:', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    setUpdatingRole(userId);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toastSuccess('Role atualizado', `Usuário definido como ${newRole}.`);
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      } else {
+        toastError('Erro', data.error || 'Não foi possível atualizar o role.');
+      }
+    } catch (err) {
+      toastError('Erro de conexão', 'Não foi possível atualizar o role.');
+    } finally {
+      setUpdatingRole(null);
+    }
+  };
 
   const handleSaveIxc = async () => {
     setIxcLoading(true);
@@ -258,6 +311,84 @@ export function IntegracoesView() {
           </div>
         </div>
       </div>
+      {/* User Management Panel — somente admin */}
+      {isAdmin && (
+        <div className="saas-card p-8 transition-colors">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-violet-500/10 text-violet-500 rounded-2xl">
+                <Users className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Gestão de Usuários</h3>
+                <p className="text-sm text-brand-muted dark:text-gray-400 mt-1">Defina o nível de acesso de cada usuário do sistema.</p>
+              </div>
+            </div>
+            <button
+              onClick={fetchUsers}
+              disabled={usersLoading}
+              className="p-2 rounded-xl border border-brand-border dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              title="Atualizar lista"
+            >
+              <RefreshCw className={`w-4 h-4 text-brand-muted ${usersLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {users.map((user) => (
+              <div
+                key={user.id}
+                className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-zinc-900/60 rounded-xl border border-brand-border dark:border-gray-700"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                    <UserCog className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-brand-charcoal dark:text-white truncate">{user.email}</p>
+                    <p className="text-xs text-brand-muted dark:text-gray-500">
+                      {user.last_sign_in_at
+                        ? `Último login: ${new Date(user.last_sign_in_at).toLocaleString('pt-BR')}`
+                        : 'Nunca fez login'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {updatingRole === user.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-brand-muted" />
+                  ) : (
+                    <>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        user.role === 'admin'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        <ShieldCheck className="w-3 h-3" />
+                        {user.role === 'admin' ? 'Admin' : 'Vendedor'}
+                      </span>
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        className="text-xs px-3 py-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-lg text-brand-charcoal dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-yellow cursor-pointer"
+                      >
+                        <option value="vendedor">Vendedor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {users.length === 0 && !usersLoading && (
+              <p className="text-sm text-brand-muted dark:text-gray-500 text-center py-6">
+                Nenhum usuário encontrado. Execute o SQL de migração no Supabase.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
