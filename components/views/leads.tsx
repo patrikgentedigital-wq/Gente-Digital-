@@ -172,18 +172,20 @@ export function LeadsView() {
     setConfirmDelete(null);
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        await supabase.from('lead_history').delete().eq('lead_id', id);
-        const { error } = await supabase.from('leads').delete().eq('id', id);
-        if (error) throw error;
+        const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Falha ao excluir no banco de dados.');
+        }
       }
       await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
       setLeads(leads.filter(l => l.id !== id));
       setTotalLeadsCount(prev => Math.max(0, prev - 1));
       setSelectedLead(null);
       toastSuccess('Lead Excluído', `O lead "${leadName}" foi removido com sucesso.`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao excluir lead:", err);
-      toastError('Erro ao Excluir', 'Falha ao excluir o lead. Verifique suas permissões.');
+      toastError('Erro ao Excluir', err.message || 'Falha ao excluir o lead. Verifique suas permissões.');
     }
   };
 
