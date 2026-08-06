@@ -267,7 +267,8 @@ export function DashboardView() {
 
         const referredLeads = filteredLeads.filter(l => {
           const normRef = normalizeStr(l.ref);
-          return normRef === normColabId || normRef === normColabName;
+          if (!normRef) return false;
+          return normRef === normColabId || normRef === normColabName || (normColabName.length >= 4 && (normRef.includes(normColabName) || normColabName.includes(normRef)));
         });
         
         const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
@@ -304,7 +305,8 @@ export function DashboardView() {
        const isColab = colaboradores.some(c => {
          const nName = normalizeStr(c.name);
          const nId = normalizeStr(c.id);
-         return normRef === nId || normRef === nName;
+         if (!nName && !nId) return false;
+         return normRef === nId || normRef === nName || nName.includes(normRef) || normRef.includes(nName);
        });
        return !isColab;
     });
