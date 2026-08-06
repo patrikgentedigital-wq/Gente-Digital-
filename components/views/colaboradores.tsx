@@ -99,18 +99,15 @@ export function ColaboradoresView() {
 
   const loadBaseLink = async () => {
     try {
-      if (isSupabaseConfigured()) {
-        const { data } = await supabase
-          .from('settings')
-          .select('value')
-          .eq('key', 'base_link')
-          .maybeSingle();
-        if (data && data.value) {
-          setBaseLink(data.value);
+      const res = await fetch('/api/settings/base-link');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.base_link) {
+          setBaseLink(data.base_link);
         }
       }
     } catch (err) {
-      console.error("Error loading base link from Supabase settings:", err);
+      console.error("Error loading base link:", err);
     }
   };
 
@@ -121,15 +118,16 @@ export function ColaboradoresView() {
     setIsEditingBase(false);
 
     try {
-      if (isSupabaseConfigured()) {
-        const { error } = await supabase
-          .from('settings')
-          .upsert({ key: 'base_link', value: trimmed });
-        if (error) {
-          toastError("Erro ao salvar link base", error.message);
-        } else {
-          toastSuccess("Link base atualizado!", "Sincronizado em todos os dispositivos.");
-        }
+      const res = await fetch('/api/settings/base-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        toastError("Erro ao salvar link base", data.error || 'Falha ao salvar');
+      } else {
+        toastSuccess("Link base atualizado!", "Sincronizado com sucesso.");
       }
     } catch (err: any) {
       console.error("Error saving base link:", err);

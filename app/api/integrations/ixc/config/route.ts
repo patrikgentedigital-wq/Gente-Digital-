@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuth } from '@/lib/auth-server';
 
+export const dynamic = 'force-dynamic';
+
 function maskToken(token: string): string {
   if (!token) return '';
   if (token.length <= 6) return '****';

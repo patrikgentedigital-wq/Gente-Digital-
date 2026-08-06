@@ -198,6 +198,7 @@ export function IntegracoesView() {
               value={ixcDomain}
               onChange={(e) => setIxcDomain(e.target.value)}
               placeholder="ixc.suaprovedor.com.br"
+              autoComplete="off"
               className="w-full px-4 py-3 bg-gray-50 dark:bg-[#18181b] border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-yellow transition-all"
             />
           </div>
@@ -209,6 +210,7 @@ export function IntegracoesView() {
               value={ixcToken}
               onChange={(e) => setIxcToken(e.target.value)}
               placeholder="Cole seu token gerado no IXC Soft"
+              autoComplete="new-password"
               className="w-full px-4 py-3 bg-gray-50 dark:bg-[#18181b] border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-yellow transition-all font-mono"
             />
           </div>

@@ -17,7 +17,7 @@ export const PROGRAM_RULES = {
   },
   prazoPagamento: 'em até 7 dias úteis após a instalação do cliente',
   cookieDuracaoDias: 30,
-  linkBasePadrao: 'https://gentedigital.com.br/indicar',
+  linkBasePadrao: 'https://forms.cloud.microsoft/r/xwCZ3REw80',
 } as const;
 
 export const RULES_COPY = {

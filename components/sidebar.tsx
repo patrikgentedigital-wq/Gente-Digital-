@@ -17,24 +17,28 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string>('');
-  const [isAdmin, setIsAdmin] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<'admin' | 'vendedor' | null>(null);
 
   useEffect(() => {
-    async function getEmail() {
+    async function loadUserInfo() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) {
           setUserEmail(user.email);
-          const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS
-            ? process.env.NEXT_PUBLIC_ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
-            : [];
-          if (adminEmails.length > 0 && !adminEmails.includes(user.email.toLowerCase())) {
-            setIsAdmin(false);
-          }
         }
-      } catch (e) {}
+        // Busca role real do Supabase user_roles
+        const res = await fetch('/api/users/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUserRole(data.role ?? 'vendedor');
+        } else {
+          setUserRole('vendedor');
+        }
+      } catch (e) {
+        setUserRole('vendedor');
+      }
     }
-    getEmail();
+    loadUserInfo();
   }, []);
 
   const handleLogout = async () => {
@@ -118,13 +122,17 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
                 {userEmail ? userEmail.split('@')[0] : 'Administrador'}
               </span>
               <div className="flex items-center gap-1 mt-0.5">
-                {isAdmin ? (
+                {userRole === 'admin' ? (
                   <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 bg-amber-500/10 text-amber-400 rounded border border-amber-500/20 uppercase tracking-wider">
                     <ShieldCheck className="w-2.5 h-2.5" /> Admin
                   </span>
-                ) : (
+                ) : userRole === 'vendedor' ? (
                   <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 uppercase tracking-wider">
                     <UserIcon className="w-2.5 h-2.5" /> Vendedor
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 bg-zinc-700/40 text-zinc-400 rounded border border-zinc-700/30 uppercase tracking-wider">
+                    <UserIcon className="w-2.5 h-2.5" /> ...
                   </span>
                 )}
               </div>

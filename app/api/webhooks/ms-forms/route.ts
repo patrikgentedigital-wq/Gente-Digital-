@@ -3,6 +3,8 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 function normalizeString(str: string): string {
   return str
     .toLowerCase()
