@@ -14,19 +14,19 @@ const ratelimit = redis
 
 // Schemas Zod
 const LeadHistorySchema = z.object({
-  date: z.string().max(50).optional(),
-  action: z.string().max(100).optional(),
-  note: z.string().max(250).optional()
+  date: z.string().max(50).nullable().optional(),
+  action: z.string().max(100).nullable().optional(),
+  note: z.string().max(250).nullable().optional()
 });
 
 const AiPayloadSchema = z.object({
   action: z.string().min(1),
   lead: z.object({
-    name: z.string().max(100).optional().default('Cliente'),
-    status: z.string().max(50).optional().default('Pendente'),
-    value: z.number().optional().default(0),
+    name: z.string().max(100).nullable().optional().default('Cliente'),
+    status: z.string().max(50).nullable().optional().default('Pendente'),
+    value: z.number().nullable().optional().default(0),
     history: z.array(LeadHistorySchema).optional().default([])
-  }).optional().default({}),
+  }).nullable().optional().default({}),
   metrics: z.record(z.any()).optional().default({})
 });
 
@@ -39,7 +39,7 @@ function sanitizeString(str: any, maxLength = 250): string {
     .trim();
 }
 
-function sanitizeHistory(history: any[]): any[] {
+function sanitizeHistory(history: any[] | undefined): any[] {
   if (!Array.isArray(history)) return [];
   return history.slice(0, 10).map(item => ({
     date: sanitizeString(item?.date, 50),
@@ -97,10 +97,10 @@ export async function POST(req: NextRequest) {
     }
 
     const safeLead = {
-      name: sanitizeString(lead.name, 100) || 'Cliente',
-      status: sanitizeString(lead.status, 50) || 'Pendente',
-      value: typeof lead.value === 'number' ? lead.value : 0,
-      history: sanitizeHistory(lead.history)
+      name: sanitizeString(lead?.name, 100) || 'Cliente',
+      status: sanitizeString(lead?.status, 50) || 'Pendente',
+      value: typeof lead?.value === 'number' ? lead.value : 0,
+      history: sanitizeHistory(lead?.history)
     };
 
     const openrouterKey = process.env.OPENROUTER_API_KEY;

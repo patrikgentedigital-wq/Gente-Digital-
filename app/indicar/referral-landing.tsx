@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { CheckCircle2, ClipboardList, Copy, Gift, Link2, Loader2, MousePointerClick, ShieldCheck, Sparkles, Timer, Users, Wallet } from 'lucide-react';
 import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
 
@@ -23,8 +23,13 @@ export function ReferralLanding() {
   const ref = useMemo(() => normalizeRef(searchParams.get('ref')), [searchParams]);
   const trackedRef = useRef<string | null>(null);
 
-  // Evita hydration mismatch preenchendo fullLink apenas no cliente após o mount
-  const [fullLink, setFullLink] = useState('');
+  // Lê a URL atual de forma segura para SSR (evita hydration mismatch)
+  const fullLink = useSyncExternalStore(
+    () => () => {},
+    () => (typeof window !== 'undefined' ? window.location.href : ''),
+    () => '',
+  );
+  const [baseLink, setBaseLink] = useState<string>(PROGRAM_RULES.linkBasePadrao);
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,10 +37,18 @@ export function ReferralLanding() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '' });
 
+  // Carrega o link base configurado no painel admin (fallback: constante padrão)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setFullLink(window.location.href);
-    }
+    let cancelled = false;
+    fetch('/api/settings/base-link')
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data?.base_link) {
+          setBaseLink(data.base_link);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -66,9 +79,9 @@ export function ReferralLanding() {
   // Garante que o link de compartilhamento sempre carregue o ref para manter rastreabilidade
   const getShareLink = () => {
     if (ref) {
-      return `${PROGRAM_RULES.linkBasePadrao}?ref=${encodeURIComponent(ref)}`;
+      return `${baseLink}${baseLink.includes('?') ? '&' : '?'}ref=${encodeURIComponent(ref)}`;
     }
-    return fullLink || PROGRAM_RULES.linkBasePadrao;
+    return fullLink || baseLink;
   };
 
   const handleShareWhatsApp = () => {

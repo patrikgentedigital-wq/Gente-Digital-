@@ -64,13 +64,16 @@ export async function POST(req: NextRequest) {
 
     const { domain, token } = await req.json();
 
-    if (domain === undefined) {
+    // Rejeita domínio vazio/em branco para não apagar o domínio previamente salvo
+    if (domain === undefined || typeof domain !== 'string' || domain.trim() === '') {
       return NextResponse.json({ error: 'Domínio é obrigatório.' }, { status: 400 });
     }
 
+    const trimmedDomain = domain.trim();
+
     const { error: err1 } = await supabase
       .from('settings')
-      .upsert({ key: 'ixc_domain', value: domain });
+      .upsert({ key: 'ixc_domain', value: trimmedDomain });
 
     if (err1) {
       return NextResponse.json({ 

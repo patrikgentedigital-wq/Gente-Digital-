@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2 } from 'lucide-react';
 import { supabase, Lead, Colaborador } from '@/lib/supabase';
-import { initialColaboradores } from '@/lib/mock-data';
+import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useToast } from '@/components/providers/toast-context';
@@ -38,6 +38,14 @@ export function ComissoesView() {
   const [pendingPayment, setPendingPayment] = useState<CommissionItem | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/users/me')
+      .then(res => res.json())
+      .then(data => setUserRole(data.role || 'vendedor'))
+      .catch(() => setUserRole(null));
+  }, []);
 
   const normalizeStr = (str: string) =>
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
@@ -52,7 +60,7 @@ export function ComissoesView() {
 
     const map: PaidMap = {};
     data.payments.forEach((p: any) => {
-      if (p.commission_key && p.paid_at) map[p.commission_key] = p.paid_at;
+      if (p.commission_ref && p.paid_at) map[p.commission_ref] = p.paid_at;
     });
     return map;
   }, []);
@@ -69,6 +77,7 @@ export function ComissoesView() {
 
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
+      let paidMap: PaidMap = {};
 
       if (isConfigured) {
         const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
@@ -76,11 +85,13 @@ export function ComissoesView() {
 
         const { data: cData } = await supabase.from('colaboradores').select('*');
         if (cData) colabsData = cData;
-      } else {
-        colabsData = initialColaboradores;
-      }
 
-      const paidMap = await fetchPaidMap();
+        paidMap = await fetchPaidMap();
+      } else {
+        // Modo demo: simula leads ganhos e colaboradores para o painel não ficar vazio
+        colabsData = initialColaboradores;
+        leadsData = initialLeads.filter(l => l.status === 'Ganho');
+      }
 
       // Helper para verificar se um ref é um Colaborador oficial da empresa (match EXATO)
       const isColaborador = (refStr: string): { isColab: boolean; officialName: string } => {
@@ -161,6 +172,12 @@ export function ComissoesView() {
             type: 'pix_colaborador' as const
           };
         } else {
+          // Desconto de cliente indicador SÓ para quem indicou de verdade
+          // (leads "Orgânico", "não especificado" ou "Manual" não geram comissão)
+          const norm = normalizeStr(lead.ref);
+          if (!norm || norm === 'organico' || norm === 'nao especificado' || norm === 'manual') {
+            return null;
+          }
           return {
             id: `comm_${lead.id}`,
             lead_id: lead.id,
@@ -174,11 +191,12 @@ export function ComissoesView() {
             type: 'desconto_cliente' as const
           };
         }
-      });
+      }).filter((item) => item !== null) as CommissionItem[];
 
       // Adiciona bônus de R$ 100 EXCLUSIVAMENTE se o Colaborador TOP do mês atual atingiu o mínimo de indicações
       if (topColabName && meetsMinThreshold) {
-        const bonusId = `bonus_top_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
+        // Key com mês/ano para o bônus não sobrescrever o registro do mês anterior
+        const bonusId = `bonus_top_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
         const isBonusPaid = paidMap[bonusId];
         items.unshift({
           id: bonusId,
@@ -574,17 +592,23 @@ export function ComissoesView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comm.status === 'Pendente' ? (
-                      <button
-                        onClick={() => handlePayCommission(comm)}
-                        className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto ${
-                          comm.type === 'desconto_cliente'
-                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                            : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                      >
-                        <DollarSign className="w-3.5 h-3.5" />
-                        {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
-                      </button>
+                      userRole === 'admin' ? (
+                        <button
+                          onClick={() => handlePayCommission(comm)}
+                          className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto ${
+                            comm.type === 'desconto_cliente'
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
+                        >
+                          <DollarSign className="w-3.5 h-3.5" />
+                          {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
+                          Requer permissão de administrador
+                        </span>
+                      )
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
                         {comm.paid_at || comm.date}

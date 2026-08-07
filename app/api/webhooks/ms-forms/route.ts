@@ -176,7 +176,20 @@ export async function POST(req: NextRequest) {
     }
 
     const rawValue = findField(body, ['valor', 'value', 'preco', 'preço', 'plano', 'mensalidade'], '0');
-    const value = parseFloat(rawValue.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+
+    // Parsing robusto de valor monetário (suporta "R$ 1.234,56", "1.234,56", "1234.56", "99,90")
+    const value = (() => {
+      const cleaned = rawValue.replace(/[^0-9.,]/g, '');
+      if (!cleaned) return 0;
+      const lastComma = cleaned.lastIndexOf(',');
+      const lastDot = cleaned.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        // Formato brasileiro: vírgula decimal, ponto milhar
+        return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+      }
+      // Formato US: ponto decimal, vírgula milhar
+      return parseFloat(cleaned.replace(/,/g, '')) || 0;
+    })();
 
     // 2. Zod Validation das extrações
     const ExtractedDataSchema = z.object({

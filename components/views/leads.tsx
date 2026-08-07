@@ -45,35 +45,35 @@ export type UILead = Lead & {
 const initialLeads: UILead[] = [
   { 
     id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'LEANDRO COSTA SILVA', status: 'Em negociação', value: 0,
-    responsible: 'Emmyly', waitingDays: 5,
+    responsible: 'Emmyly', waitingDays: 5, created_at: '2026-08-03T14:30:00Z',
     history: [
       { id: 101, lead_id: 1, date: '12/10/2026 14:30', action: 'Lead criado por indicação', note: 'Indicado por Leandro Costa Silva.' }
     ]
   },
   { 
     id: 2, name: 'Ilza Maria Ferreira Correa', phone: '(55) 91991-7195', ref: 'CLAUDIANE DE SOUSA RIBEIRO MELO', status: 'Ganho', value: 99.90,
-    responsible: 'NIVEA',
+    responsible: 'NIVEA', created_at: '2026-08-01T16:45:00Z',
     history: [
       { id: 201, lead_id: 2, date: '15/10/2026 16:45', action: 'Venda realizada', note: 'Plano contratado com sucesso.' }
     ]
   },
   { 
     id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Ganho', value: 1200,
-    responsible: 'NIVEA',
+    responsible: 'NIVEA', created_at: '2026-07-15T11:20:00Z',
     history: [
       { id: 301, lead_id: 3, date: '08/10/2026 11:20', action: 'Lead convertido', note: 'Assinou o plano fibra 500MB.' }
     ]
   },
   { 
     id: 4, name: 'Maria Oliveira', phone: '(11) 95555-4444', ref: 'EMP-043', status: 'Contato inicial', value: 850,
-    responsible: 'Emmyly', waitingDays: 2,
+    responsible: 'Emmyly', waitingDays: 2, created_at: '2026-06-20T10:00:00Z',
     history: [
       { id: 401, lead_id: 4, date: '14/10/2026 10:00', action: 'Lead criado', note: null }
     ]
   },
   { 
     id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500,
-    responsible: 'Admin', waitingDays: 1,
+    responsible: 'Admin', waitingDays: 1, created_at: '2026-08-05T08:30:00Z',
     history: [
       { id: 501, lead_id: 5, date: '17/10/2026 08:30', action: 'Lead criado', note: 'Veio pela página inicial.' }
     ]
@@ -107,7 +107,7 @@ export function LeadsView() {
     setCopiedMessage(false);
   };
 
-  // Helper to read cookie
+  // Helper to read cookie (o valor é gravado com encodeURIComponent)
   const getReferralCookie = () => {
     if (typeof document === 'undefined') return null;
     const nameEQ = "gente_digital_ref=";
@@ -115,7 +115,14 @@ export function LeadsView() {
     for (let i = 0; i < ca.length; i++) {
       let c = ca[i];
       while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+      if (c.indexOf(nameEQ) === 0) {
+        const raw = c.substring(nameEQ.length, c.length);
+        try {
+          return decodeURIComponent(raw);
+        } catch (e) {
+          return raw;
+        }
+      }
     }
     return null;
   };
@@ -148,7 +155,7 @@ export function LeadsView() {
       const data = await response.json();
       if (data.success) {
         toastSuccess('Sincronização IXC', data.message || 'Sincronização realizada com sucesso.');
-        await fetchLeads(currentPage);
+        await fetchLeads();
       } else {
         toastError('Erro na Sincronização', data.error || 'Não foi possível sincronizar com o IXC.');
       }
@@ -179,7 +186,7 @@ export function LeadsView() {
         }
       }
       await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
-      setLeads(leads.filter(l => l.id !== id));
+      setLeads(prev => prev.filter(l => l.id !== id));
       setTotalLeadsCount(prev => Math.max(0, prev - 1));
       setSelectedLead(null);
       toastSuccess('Lead Excluído', `O lead "${leadName}" foi removido com sucesso.`);
@@ -191,7 +198,7 @@ export function LeadsView() {
 
   const handleExportCSV = () => {
     const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Status', 'Valor (R$)', 'Ultima Interacao'];
-    const rows = leads.map(l => [
+    const rows = filteredLeads.map(l => [
       l.id,
       `"${l.name.replace(/"/g, '""')}"`,
       `"${l.phone}"`,
@@ -241,8 +248,57 @@ export function LeadsView() {
     message?: string;
   } | null>(null);
   const [copiedMessage, setCopiedMessage] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  const handleSaveNote = async () => {
+    if (!selectedLead || !noteText.trim()) return;
+    setIsSavingNote(true);
+    try {
+      const nowStr = new Date().toLocaleString('pt-BR').substring(0, 16);
+      const historyEntry: LeadHistory = {
+        id: Date.now(),
+        lead_id: selectedLead.id,
+        date: nowStr,
+        action: 'Nota registrada',
+        note: noteText.trim(),
+      };
+
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+        const { error } = await supabase.from('lead_history').insert([{
+          lead_id: selectedLead.id,
+          date: nowStr,
+          action: 'Nota registrada',
+          note: noteText.trim(),
+        }]);
+        if (error) throw error;
+      }
+
+      setSelectedLead(prev => prev ? { ...prev, history: [historyEntry, ...(prev.history || [])] } : prev);
+      setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, history: [historyEntry, ...(l.history || [])] } : l));
+      setNoteText('');
+      toastSuccess('Nota salva', 'Interação registrada no histórico do lead.');
+    } catch (err: any) {
+      console.error('Erro ao salvar nota:', err);
+      toastError('Erro ao Salvar Nota', err?.message || 'Não foi possível registrar a nota.');
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
   // AI results are now cleared inside the custom selectLead handler to avoid synchronous useEffect state updates.
+
+  // Monta payload seguro para a IA: remove campos nulos/indefinidos que o backend rejeita
+  const buildAiLeadPayload = (lead: UILead) => ({
+    name: lead.name || 'Cliente',
+    status: lead.status || 'Pendente',
+    value: typeof lead.value === 'number' ? lead.value : 0,
+    history: (lead.history || []).map(h => ({
+      date: h.date ?? undefined,
+      action: h.action ?? undefined,
+      note: h.note ?? undefined,
+    })),
+  });
 
   const handleAIQualify = async () => {
     if (!selectedLead) return;
@@ -252,7 +308,7 @@ export function LeadsView() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'qualify', lead: selectedLead }),
+        body: JSON.stringify({ action: 'qualify', lead: buildAiLeadPayload(selectedLead) }),
       });
       const data = await response.json();
       if (data.status === 'success') {
@@ -282,7 +338,7 @@ export function LeadsView() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate-message', lead: selectedLead }),
+        body: JSON.stringify({ action: 'generate-message', lead: buildAiLeadPayload(selectedLead) }),
       });
       const data = await response.json();
       if (data.status === 'success') {
@@ -302,18 +358,16 @@ export function LeadsView() {
     }
   };
 
-  const fetchLeads = useCallback(async (page = 1) => {
+  const fetchLeads = useCallback(async () => {
     try {
       setIsLoading(true);
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize - 1;
-
-        const { data: leadsData, count, error: leadsError } = await supabase
+        // Carrega TODOS os leads para busca, filtros e exportação operarem no dataset completo.
+        // (No dataset atual, a paginação é feita no cliente.)
+        const { data: leadsData, error: leadsError } = await supabase
           .from('leads')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .range(from, to);
+          .select('*')
+          .order('created_at', { ascending: false });
 
         if (leadsError) throw leadsError;
 
@@ -332,10 +386,10 @@ export function LeadsView() {
             history: historyData ? historyData.filter(h => h.lead_id === lead.id) : []
           }));
           setLeads(uiLeads);
-          setTotalLeadsCount(count || uiLeads.length);
+          setTotalLeadsCount(uiLeads.length);
         } else {
           setLeads([]);
-          setTotalLeadsCount(count || 0);
+          setTotalLeadsCount(0);
         }
       } else {
         setLeads(initialLeads);
@@ -349,7 +403,7 @@ export function LeadsView() {
     } finally {
       setIsLoading(false);
     }
-  }, [pageSize, toastError]);
+  }, [toastError]);
 
   const fetchColaboradores = async () => {
     try {
@@ -375,7 +429,7 @@ export function LeadsView() {
   };
 
   useEffect(() => {
-    fetchLeads(currentPage);
+    fetchLeads();
     fetchColaboradores();
 
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
@@ -390,7 +444,7 @@ export function LeadsView() {
         supabase.removeChannel(colabChannel);
       };
     }
-  }, [currentPage, fetchLeads]);
+  }, [fetchLeads]);
 
   const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
 
@@ -414,16 +468,19 @@ export function LeadsView() {
          if (inserted && inserted[0]) {
            const historyData = { lead_id: inserted[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
            await supabase.from('lead_history').insert([historyData]);
-           setLeads([{ ...inserted[0], history: [{...historyData, id: inserted[0].id + 9999}] }, ...leads]);
+           setLeads(prev => [{ ...inserted[0], history: [{...historyData, id: inserted[0].id + 9999}] }, ...prev]);
            setTotalLeadsCount(prev => prev + 1);
          }
        } else {
-         const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
-         setLeads([{
-            ...newLeadData,
-            id: newId,
-            history: [{ id: newId + 5000, lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
-         }, ...leads]);
+         setLeads(prev => {
+           const newId = prev.length > 0 ? Math.max(...prev.map(l => l.id)) + 1 : 1;
+           return [{
+             ...newLeadData,
+             id: newId,
+             created_at: new Date().toISOString(),
+             history: [{ id: newId + 5000, lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
+           }, ...prev];
+         });
          setTotalLeadsCount(prev => prev + 1);
        }
 
@@ -459,10 +516,10 @@ export function LeadsView() {
          const historyData = { lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null };
          await supabase.from('lead_history').insert([historyData]);
       }
-      setLeads(leads.map(l => l.id === id ? { 
-        ...l, 
-        status, 
-        history: [{ id: id + 9000, lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
+      setLeads(prev => prev.map(l => l.id === id ? {
+        ...l,
+        status,
+        history: [{ id: Date.now(), lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
       } : l));
 
       toastInfo('Status Atualizado', `Lead "${currentLead.name}" movido para "${status}".`);
@@ -539,7 +596,8 @@ export function LeadsView() {
     let matchesDate = true;
     if (dateFilter !== 'all') {
       if (!l.created_at) {
-        matchesDate = false;
+        // Sem data cadastrada: mantém o lead visível (não esconde dados)
+        matchesDate = true;
       } else {
         const d = new Date(l.created_at);
         const currentDate = new Date();
@@ -557,6 +615,18 @@ export function LeadsView() {
 
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
   }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
+
+  // Paginação no cliente: o scroll/lista mostra apenas a página atual do dataset filtrado
+  const pageLeads = useMemo(
+    () => filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredLeads, currentPage, pageSize]
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+
+  // Ao mudar filtros/busca, volta para a primeira página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
 
   return (
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
@@ -743,7 +813,7 @@ export function LeadsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border dark:divide-gray-800 text-sm">
-                {leads.length === 0 ? (
+                {pageLeads.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-16">
                       <div className="flex flex-col items-center justify-center text-center">
@@ -759,7 +829,7 @@ export function LeadsView() {
                       </div>
                     </td>
                   </tr>
-                ) : filteredLeads.map(lead => (
+                ) : pageLeads.map(lead => (
                   <tr key={lead.id} onClick={() => selectLead(lead)} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer group font-sans">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -909,9 +979,9 @@ export function LeadsView() {
 
                           {/* Footer Colaborador */}
                           <div className="text-[11px] text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
-                            <span className="font-semibold text-gray-600 dark:text-gray-400">
-                              Indicador {lead.ref.toUpperCase()}
-                            </span>
+<span className="font-semibold text-gray-600 dark:text-gray-400">
+                            Indicador {(lead.ref || 'Não especificado').toUpperCase()}
+                          </span>
                           </div>
                         </motion.div>
                       ))
@@ -932,7 +1002,7 @@ export function LeadsView() {
       {/* Pagination Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-brand-border dark:border-gray-800 text-sm mt-2">
         <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">
-          Mostrando <span className="font-bold text-brand-charcoal dark:text-white">{leads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a <span className="font-bold text-brand-charcoal dark:text-white">{Math.min(currentPage * pageSize, totalLeadsCount)}</span> de <span className="font-bold text-brand-charcoal dark:text-white">{totalLeadsCount}</span> leads
+          Mostrando <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + pageLeads.length : 0}</span> de <span className="font-bold text-brand-charcoal dark:text-white">{filteredLeads.length}</span> leads
         </div>
 
         <div className="flex items-center gap-2">
@@ -945,11 +1015,11 @@ export function LeadsView() {
             Anterior
           </button>
           <span className="px-3.5 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-brand-charcoal dark:text-gray-200 border border-brand-border dark:border-gray-700">
-            Página {currentPage} de {Math.max(1, Math.ceil(totalLeadsCount / pageSize))}
+            Página {currentPage} de {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(prev => prev + 1)}
-            disabled={currentPage >= Math.ceil(totalLeadsCount / pageSize) || isLoading}
+            disabled={currentPage >= totalPages || isLoading}
             className="flex items-center gap-1 px-3.5 py-1.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 rounded-xl font-medium text-xs hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
           >
             Próximo
@@ -1261,11 +1331,17 @@ export function LeadsView() {
               <div className="mt-8 pt-6 border-t border-brand-border dark:border-gray-800">
                 <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-3">Registrar Interação</h4>
                 <textarea 
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
                   placeholder="Descreva a nova interação com o lead..." 
                   className="w-full bg-gray-50 dark:bg-[#27272a]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow resize-none h-28 transition-all dark:text-white dark:placeholder-gray-500"
                 ></textarea>
-                <button className="w-full mt-3 py-3.5 bg-brand-charcoal dark:bg-brand-yellow dark:text-brand-charcoal text-white font-bold text-sm rounded-xl hover:bg-black dark:hover:bg-yellow-400 hover:shadow-level-2 hover:scale-[1.01] active:scale-95 transition-all">
-                  Salvar Nota
+                <button
+                  onClick={handleSaveNote}
+                  disabled={isSavingNote || !noteText.trim()}
+                  className="w-full mt-3 py-3.5 bg-brand-charcoal dark:bg-brand-yellow dark:text-brand-charcoal text-white font-bold text-sm rounded-xl hover:bg-black dark:hover:bg-yellow-400 hover:shadow-level-2 hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingNote ? 'Salvando...' : 'Salvar Nota'}
                 </button>
               </div>
             </div>

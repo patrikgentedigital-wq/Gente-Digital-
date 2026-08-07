@@ -26,6 +26,10 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/providers/toast-context';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { PROGRAM_RULES } from '@/lib/rules';
+
+const normalizeStr = (str: any) =>
+  str ? String(str).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
 
 interface Badge {
   id: string;
@@ -64,35 +68,19 @@ export function GamificacaoView() {
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [userPoints, setUserPoints] = useState<number>(1450);
-  const [totalEarned, setTotalEarned] = useState<number>(2250);
-  const [wonLeadsCount, setWonLeadsCount] = useState<number>(12);
+  const [userPoints, setUserPoints] = useState<number>(0);
+  const [totalEarned, setTotalEarned] = useState<number>(0);
+  const [wonLeadsCount, setWonLeadsCount] = useState<number>(0);
+  const [isTopMonth, setIsTopMonth] = useState<boolean>(false);
 
   const [selectedReward, setSelectedReward] = useState<RewardItem | null>(null);
   const [pixKey, setPixKey] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [filterCategory, setFilterCategory] = useState<string>('todos');
 
-  const [resgates, setResgates] = useState<ResgateHistory[]>([
-    {
-      id: 'RES-001',
-      rewardTitle: 'R$ 50,00 PIX na Conta',
-      pointsUsed: 500,
-      date: '28/07/2026',
-      status: 'Concluído',
-      pixKeyOrDetail: 'chavetestepix@email.com'
-    },
-    {
-      id: 'RES-002',
-      rewardTitle: 'Par de Ingressos de Cinema',
-      pointsUsed: 800,
-      date: '21/07/2026',
-      status: 'Concluído',
-      pixKeyOrDetail: 'Código: CINEMA-9821'
-    }
-  ]);
+  const [resgates, setResgates] = useState<ResgateHistory[]>([]);
 
-  // Carregar dados reais do Supabase
+  // Carregar dados reais do Supabase (escopo individual do usuário logado)
   const loadGamificationData = async () => {
     try {
       setIsLoading(true);
@@ -101,13 +89,37 @@ export function GamificacaoView() {
         return;
       }
 
-      // 1. Carrega histórico de resgates salvos no banco
-      const { data: dbResgates, error: resgateErr } = await supabase
+      // Identifica o usuário logado e o colaborador vinculado (por e-mail)
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id ?? null;
+      const userEmail = user?.email ?? '';
+
+      let colabRefKeys: string[] = [];
+      if (userEmail) {
+        const { data: colabRows } = await supabase
+          .from('colaboradores')
+          .select('id, name, email')
+          .ilike('email', userEmail);
+        if (colabRows && colabRows.length > 0) {
+          colabRefKeys = [colabRows[0].id, colabRows[0].name]
+            .filter(Boolean)
+            .map(normalizeStr)
+            .filter(Boolean);
+        }
+      }
+
+      // 1. Histórico de resgates APENAS do usuário logado
+      let pointsSpent = 0;
+      let redemptionsQuery = supabase
         .from('redemptions')
         .select('*')
         .order('created_at', { ascending: false });
+      if (userId) redemptionsQuery = redemptionsQuery.eq('user_id', userId);
+
+      const { data: dbResgates, error: resgateErr } = await redemptionsQuery;
 
       if (!resgateErr && dbResgates) {
+        pointsSpent = dbResgates.reduce((acc, curr) => acc + (curr.points_used || 0), 0);
         const formatted: ResgateHistory[] = dbResgates.map(r => ({
           id: r.id.substring(0, 8).toUpperCase(),
           rewardTitle: r.reward_title,
@@ -117,24 +129,46 @@ export function GamificacaoView() {
           pixKeyOrDetail: r.pix_key
         }));
         setResgates(formatted);
+      } else if (resgateErr) {
+        console.warn('Erro ao carregar resgates:', resgateErr.message);
       }
 
-      // 2. Calcula pontos reais baseados nas vendas/indicações ganhas
-      const { data: wonLeads, error: leadsErr } = await supabase
+      // 2. Pontos baseados nas regras oficiais (20 pts/indicação + 50 pts/conversão)
+      const { data: allLeads, error: leadsErr } = await supabase
         .from('leads')
-        .select('id')
-        .eq('status', 'Ganho');
+        .select('*');
 
-      if (!leadsErr && wonLeads) {
-        const count = wonLeads.length;
-        setWonLeadsCount(count);
-        // Cada indicação ganha vale 200 pontos acumulados
-        const totalPointsEarned = Math.max(2250, count * 200);
+      if (!leadsErr && allLeads) {
+        const referredLeads = allLeads.filter(l =>
+          colabRefKeys.length > 0 && colabRefKeys.includes(normalizeStr(l.ref))
+        );
+        const conversionCount = referredLeads.filter(l => l.status === 'Ganho').length;
+        setWonLeadsCount(conversionCount);
+
+        const totalPointsEarned =
+          referredLeads.length * PROGRAM_RULES.pontos.porIndicacao +
+          conversionCount * PROGRAM_RULES.pontos.porConversao;
         setTotalEarned(totalPointsEarned);
-
-        // Calcula total de pontos já utilizados em resgates
-        const pointsSpent = dbResgates ? dbResgates.reduce((acc, curr) => acc + (curr.points_used || 0), 0) : 1300;
         setUserPoints(Math.max(0, totalPointsEarned - pointsSpent));
+
+        // 3. Badge "Top Indicador do Mês": compara as conversões do mês por indicador
+        const now = new Date();
+        const monthCounts: Record<string, number> = {};
+        allLeads.forEach(l => {
+          if (l.status !== 'Ganho') return;
+          const d = l.created_at ? new Date(l.created_at) : new Date();
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return;
+          const norm = normalizeStr(l.ref);
+          if (norm) monthCounts[norm] = (monthCounts[norm] || 0) + 1;
+        });
+        let maxCount = 0;
+        Object.values(monthCounts).forEach(c => {
+          if (c > maxCount) maxCount = c;
+        });
+        const userMonthly = colabRefKeys.reduce((acc, k) => acc + (monthCounts[k] || 0), 0);
+        setIsTopMonth(maxCount > 0 && userMonthly >= maxCount);
+      } else if (leadsErr) {
+        console.warn('Erro ao carregar leads:', leadsErr.message);
       }
 
     } catch (err) {
@@ -196,9 +230,9 @@ export function GamificacaoView() {
       title: 'Top Indicador do Mês',
       description: 'Ficou em 1º lugar no ranking comercial mensal.',
       icon: Flame,
-      unlocked: true,
-      progress: 100,
-      currentCount: 1,
+      unlocked: isTopMonth,
+      progress: isTopMonth ? 100 : 0,
+      currentCount: isTopMonth ? 1 : 0,
       maxCount: 1,
       color: 'from-orange-500 to-rose-500',
       bgGradient: 'bg-orange-500/10 border-orange-500/30'
@@ -222,7 +256,7 @@ export function GamificacaoView() {
       icon: Zap,
       unlocked: wonLeadsCount >= 25,
       progress: Math.min(100, Math.floor((wonLeadsCount / 25) * 100)),
-      currentCount: wonLeadsCount,
+      currentCount: Math.min(25, wonLeadsCount),
       maxCount: 25,
       color: 'from-purple-400 to-pink-500',
       bgGradient: 'bg-purple-500/10 border-purple-500/30'
@@ -326,10 +360,14 @@ export function GamificacaoView() {
 
     setIsSubmitting(true);
 
+    let savedInDatabase = false;
+
     try {
       if (isSupabaseConfigured()) {
-        // Salva resgate de forma persistente no Supabase
+        // Salva resgate de forma persistente no Supabase, vinculado ao usuário logado
+        const { data: { user } } = await supabase.auth.getUser();
         const { error } = await supabase.from('redemptions').insert([{
+          user_id: user?.id ?? null,
           reward_title: selectedReward.title,
           points_used: selectedReward.points,
           status: 'Pendente',
@@ -339,6 +377,7 @@ export function GamificacaoView() {
         if (error) {
           throw error;
         }
+        savedInDatabase = true;
       }
 
       // Atualiza estado local
@@ -357,8 +396,10 @@ export function GamificacaoView() {
       setResgates(prev => [newResgate, ...prev]);
 
       toastSuccess(
-        'Resgate Salvo no Supabase! 🎉',
-        `Seu pedido de "${selectedReward.title}" foi gravado no banco e enviado para processamento.`
+        savedInDatabase ? 'Resgate Salvo no Supabase! 🎉' : 'Resgate Registrado! 🎉',
+        savedInDatabase
+          ? `Seu pedido de "${selectedReward.title}" foi gravado no banco e enviado para processamento.`
+          : `Seu pedido de "${selectedReward.title}" foi registrado localmente. Conecte-se ao Supabase para persistir.`
       );
 
       setSelectedReward(null);

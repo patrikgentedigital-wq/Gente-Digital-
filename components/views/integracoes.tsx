@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useSyncExternalStore, useCallback } from 'react';
 import { Network, Database, CheckCircle2, Loader2, Users, ShieldCheck, UserCog, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/providers/toast-context';
@@ -30,9 +32,6 @@ export function IntegracoesView() {
         if (data.success) {
           setIxcDomain(data.domain || '');
           setIxcToken(data.token || '');
-          if (data.domain && data.token && !data.tableMissing) {
-            setIxcSaved(true);
-          }
         }
       } catch (err) {
         console.error('Error loading IXC config:', err);
@@ -94,6 +93,14 @@ export function IntegracoesView() {
     setIxcError(null);
     setIxcSaved(false);
 
+    const trimmedDomain = (ixcDomain || '').trim();
+    if (!trimmedDomain) {
+      setIxcError('Informe o domínio do IXC antes de salvar.');
+      toastError('Domínio Obrigatório', 'O domínio do IXC não pode ficar vazio.');
+      setIxcLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/integrations/ixc/config', {
         method: 'POST',
@@ -101,7 +108,7 @@ export function IntegracoesView() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          domain: ixcDomain,
+          domain: trimmedDomain,
           token: ixcToken,
         }),
       });
@@ -347,7 +354,7 @@ export function IntegracoesView() {
                     <UserCog className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-brand-charcoal dark:text-white truncate">{user.email}</p>
+                    <p className="text-sm font-semibold text-brand-charcoal dark:text-white truncate">{user.email || 'Sem e-mail'}</p>
                     <p className="text-xs text-brand-muted dark:text-gray-500">
                       {user.last_sign_in_at
                         ? `Último login: ${new Date(user.last_sign_in_at).toLocaleString('pt-BR')}`

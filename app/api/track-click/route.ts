@@ -11,6 +11,48 @@ const TrackClickSchema = z.object({
 
 const REF_PATTERN = /^[A-Za-z0-9 _\-.\u00C0-\u024F]+$/;
 
+// Conta cliques do mês atual e do mês anterior para tendência real no Dashboard
+async function getMonthClickCounts(): Promise<{ currentMonthClicks: number; previousMonthClicks: number }> {
+  const fallback = { currentMonthClicks: 0, previousMonthClicks: 0 };
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    return fallback;
+  }
+
+  const now = new Date();
+  const startCurrent = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const startPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+
+  const countForRange = async (gte: string, lt?: string): Promise<number> => {
+    try {
+      const query = supabase
+        .from('link_clicks')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', gte);
+      if (lt) query.lt('created_at', lt);
+      const { count, error } = await query;
+      if (error) {
+        console.warn('Erro ao contar cliques por período:', error.message);
+        return 0;
+      }
+      return count ?? 0;
+    } catch (err: any) {
+      console.warn('Exceção ao contar cliques por período:', err?.message || err);
+      return 0;
+    }
+  };
+
+  try {
+    const [current, previous] = await Promise.all([
+      countForRange(startCurrent),
+      countForRange(startPrevious, startCurrent),
+    ]);
+    return { currentMonthClicks: current, previousMonthClicks: previous };
+  } catch (err) {
+    console.warn('Falha ao obter contagens mensais de cliques:', err);
+    return fallback;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
@@ -63,7 +105,8 @@ export async function GET(req: NextRequest) {
 
     const cachedClicks = await cacheClient.get<{ ref: string; count: number }[]>('link_clicks_summary');
     if (cachedClicks) {
-      return NextResponse.json({ success: true, clicks: cachedClicks, cached: true });
+      const monthCounts = await getMonthClickCounts();
+      return NextResponse.json({ success: true, clicks: cachedClicks, cached: true, ...monthCounts });
     }
 
     const { data, error } = await supabase
@@ -86,7 +129,9 @@ export async function GET(req: NextRequest) {
     // Cache por 30 segundos
     await cacheClient.set('link_clicks_summary', clicks, 30);
 
-    return NextResponse.json({ success: true, clicks });
+    const monthCounts = await getMonthClickCounts();
+
+    return NextResponse.json({ success: true, clicks, ...monthCounts });
   } catch (err: any) {
     console.error('Exceção ao buscar cliques:', err);
     return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 });

@@ -1,3 +1,5 @@
+'use client';
+
 import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -70,7 +72,7 @@ export function ColaboradoresView() {
     }
   };
 
-  const getNextColabId = () => {
+  const getNextColabId = async (): Promise<string> => {
     let maxNum = 0;
     colaboradores.forEach(c => {
       const match = c.id.match(/\d+/);
@@ -79,6 +81,23 @@ export function ColaboradoresView() {
         if (num > maxNum) maxNum = num;
       }
     });
+
+    // Consulta o banco para evitar colisão de IDs entre sessões/dispositivos
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.from('colaboradores').select('id');
+        (data || []).forEach(c => {
+          const match = c.id?.match(/\d+/);
+          if (match) {
+            const num = parseInt(match[0], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        });
+      } catch (e) {
+        console.error("Erro ao consultar IDs no banco:", e);
+      }
+    }
+
     return `EMP-${String(maxNum + 1).padStart(3, '0')}`;
   };
 
@@ -114,8 +133,6 @@ export function ColaboradoresView() {
   const handleSaveBaseLink = async () => {
     const trimmed = tempBaseLink.trim();
     if (!trimmed) return;
-    setBaseLink(trimmed);
-    setIsEditingBase(false);
 
     try {
       const res = await fetch('/api/settings/base-link', {
@@ -126,9 +143,11 @@ export function ColaboradoresView() {
       const data = await res.json();
       if (!res.ok || !data.success) {
         toastError("Erro ao salvar link base", data.error || 'Falha ao salvar');
-      } else {
-        toastSuccess("Link base atualizado!", "Sincronizado com sucesso.");
+        return;
       }
+      setBaseLink(trimmed);
+      setIsEditingBase(false);
+      toastSuccess("Link base atualizado!", "Sincronizado com sucesso.");
     } catch (err: any) {
       console.error("Error saving base link:", err);
       toastError("Erro ao salvar link base", err?.message);
@@ -174,10 +193,12 @@ export function ColaboradoresView() {
         const normColabName = normalizeStr(colab.name);
         const normColabId = normalizeStr(colab.id);
         
-        const colabCount = leadsData.length > 0 ? leadsData.filter(lead => {
+        // Contagem de indicações efetivas (todas as origens associadas ao colaborador).
+        // Sem fallback para colab.count, que congelava em 0/valores defasados.
+        const colabCount = leadsData.filter(lead => {
           const normRef = normalizeStr(lead.ref);
           return normRef === normColabId || normRef === normColabName;
-        }).length : (colab.count || 0);
+        }).length;
         
         return { ...colab, count: colabCount };
       });
@@ -258,7 +279,7 @@ export function ColaboradoresView() {
 
   const handleAdd = async (data: ColaboradorFormData) => {
     const initials = data.name.substring(0, 2).toUpperCase();
-    const id = getNextColabId();
+    const id = await getNextColabId();
     
     const newColab: Colaborador = { 
       id, 
@@ -325,9 +346,9 @@ export function ColaboradoresView() {
   };
 
   const filteredColabs = colaboradores.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (c.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (c.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -470,7 +491,7 @@ export function ColaboradoresView() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-brand-charcoal dark:text-white text-base">{colab.count.toString().padStart(2, '0')}</span>
+                    <span className="font-bold text-brand-charcoal dark:text-white text-base">{(colab.count ?? 0).toString().padStart(2, '0')}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">

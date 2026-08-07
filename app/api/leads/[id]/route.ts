@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyAuth } from '@/lib/auth-server';
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const isAdmin = await verifyAuth(req);
+    if (!isAdmin) {
+      return NextResponse.json({ success: false, error: 'Não autorizado.' }, { status: 401 });
+    }
+
     const { id } = await params;
     const leadId = parseInt(id, 10);
 

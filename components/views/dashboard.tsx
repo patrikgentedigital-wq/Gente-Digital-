@@ -37,6 +37,7 @@ export function DashboardView() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [showExecutiveModal, setShowExecutiveModal] = useState(false);
   const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
+  const [monthClickStats, setMonthClickStats] = useState<{ current: number; previous: number }>({ current: 0, previous: 0 });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -53,6 +54,9 @@ export function DashboardView() {
               data.clicks.forEach((c: { ref: string; count: number }) => {
                 clicksMap[normalizeStr(c.ref)] = (clicksMap[normalizeStr(c.ref)] || 0) + c.count;
               });
+            }
+            if (typeof data.currentMonthClicks === 'number' && typeof data.previousMonthClicks === 'number') {
+              setMonthClickStats({ current: data.currentMonthClicks, previous: data.previousMonthClicks });
             }
           })
           .catch(err => console.error('Erro ao buscar cliques:', err));
@@ -394,11 +398,18 @@ export function DashboardView() {
       convsTrendUp = true;
     }
 
+    // Tendência REAL de cliques (mês atual vs mês anterior) calculada no servidor
     let clicksTrend = '0% este mês';
     let clicksTrendUp = true;
-    if (clicks > 0) {
-      clicksTrend = leadsTrend;
-      clicksTrendUp = leadsTrendUp;
+    const curClicks = monthClickStats.current;
+    const prevClicks = monthClickStats.previous;
+    if (prevClicks > 0) {
+      const diff = ((curClicks - prevClicks) / prevClicks) * 100;
+      clicksTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
+      clicksTrendUp = diff >= 0;
+    } else if (curClicks > 0) {
+      clicksTrend = '+100% este mês';
+      clicksTrendUp = true;
     }
 
     const curRate = curLeadsCount > 0 ? (curConvs / curLeadsCount) * 100 : 0;

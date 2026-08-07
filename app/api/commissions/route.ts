@@ -55,13 +55,13 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from('commission_payments')
       .upsert({
-        commission_key: key,
+        commission_ref: key,
         colaborador_name: colaboradorName,
         lead_name: leadName,
         amount,
         type,
         paid_at: new Date().toISOString(),
-      }, { onConflict: 'commission_key' })
+      }, { onConflict: 'commission_ref' })
       .select();
 
     if (error) {
