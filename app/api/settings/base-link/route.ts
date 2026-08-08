@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { PROGRAM_RULES } from '@/lib/rules';
+import { verifyAuth } from '@/lib/auth-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const isAdmin = await verifyAuth(req);
+    if (!isAdmin) {
+      return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+    }
+
     const { value } = await req.json();
     if (!value || typeof value !== 'string') {
       return NextResponse.json({ error: 'Link base inválido.' }, { status: 400 });

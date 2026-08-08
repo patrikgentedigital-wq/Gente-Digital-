@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth, verifyAuthAny } from '@/lib/auth-server';
+import { verifyAuth, verifyAuthAny, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
 import { z } from 'zod';
 
 const PayCommissionSchema = z.object({
@@ -14,15 +14,37 @@ const PayCommissionSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuthAny(req);
-    if (!isAuthenticated) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { data: payments, error } = await supabase
+    const isDevLocal = user.id === 'dev-local';
+    const role = isDevLocal ? 'admin' : await getUserRole(user.id);
+
+    let query = supabase
       .from('commission_payments')
       .select('*')
       .order('paid_at', { ascending: false });
+
+    if (role !== 'admin') {
+      // Vendedor só visualiza os próprios pagamentos de comissão
+      const userEmail = user.email || '';
+      const { data: colabData } = await supabase
+        .from('colaboradores')
+        .select('name, id')
+        .or(`user_id.eq.${user.id}${userEmail ? `,email.ilike.${userEmail}` : ''}`);
+
+      const allowedNames = (colabData || []).flatMap(c => [c.name, c.id]).filter(Boolean);
+
+      if (allowedNames.length === 0) {
+        return NextResponse.json({ success: true, payments: [] });
+      }
+
+      query = query.in('colaborador_name', allowedNames);
+    }
+
+    const { data: payments, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar pagamentos:', error.message);

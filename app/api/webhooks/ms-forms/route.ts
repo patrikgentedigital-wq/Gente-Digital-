@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/ratelimit';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
 
 function normalizeString(str: string): string {
   return str
@@ -152,6 +158,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não Autorizado: Token inválido' }, { status: 401 });
     }
 
+    // 2. Rate Limit (por token secret / IP)
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
+    const rateLimitKey = `msforms_webhook_${secret ? secret.slice(-6) : ip}`;
+    const rateLimitResult = await checkRateLimit(rateLimitKey, 10, 60);
+
+    if (!rateLimitResult.success) {
+      logger.warn('Rate limit excedido no webhook MS Forms', { ip, secretSub: secret ? secret.slice(-6) : 'none' });
+      return NextResponse.json(
+        { success: false, error: 'Muitas requisições. Aguarde um momento.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     console.log('Received MS Forms webhook com chaves:', Object.keys(body || {}));
 
@@ -165,8 +184,10 @@ export async function POST(req: NextRequest) {
     // Mapeamento inteligente usando palavras-chave comuns em português/inglês
     const name = findField(body, ['nome', 'name', 'cliente', 'lead', 'completo'], 'Lead MS Forms');
     
-    const phone = findField(body, ['telefone', 'celular', 'whatsapp', 'phone', 'whats', 'fone', 'contato'], '');
+    const rawPhone = findField(body, ['telefone', 'celular', 'whatsapp', 'phone', 'whats', 'fone', 'contato'], '');
     
+    const externalRef = findField(body, ['responseid', 'id', 'response_id', 'submission_id', 'submissionid'], '');
+
     let ref = findField(body, ['colaborador', 'indicador', 'indicacao', 'ref', 'quem', 'vendedor', 'codigo', 'cod'], '');
     if (!ref && queryRef) {
       ref = queryRef.toString().trim();
@@ -191,7 +212,7 @@ export async function POST(req: NextRequest) {
       return parseFloat(cleaned.replace(/,/g, '')) || 0;
     })();
 
-    // 2. Zod Validation das extrações
+    // 3. Zod Validation das extrações
     const ExtractedDataSchema = z.object({
       name: z.string().max(100),
       phone: z.string().max(30),
@@ -199,13 +220,14 @@ export async function POST(req: NextRequest) {
       value: z.number().nonnegative()
     });
 
-    const parsedData = ExtractedDataSchema.safeParse({ name, phone, ref, value });
+    const parsedData = ExtractedDataSchema.safeParse({ name, phone: rawPhone, ref, value });
     if (!parsedData.success) {
       console.warn("Validação falhou para o payload extraído:", parsedData.error.format());
       return NextResponse.json({ success: false, error: 'Payload validation failed', details: parsedData.error.format() }, { status: 400 });
     }
 
     const validData = parsedData.data;
+    const normalizedPhone = normalizePhone(validData.phone);
 
     // Check if Supabase is configured (avoid crashing on local mock state)
     const isSupabaseConfigured = 
@@ -215,10 +237,72 @@ export async function POST(req: NextRequest) {
     let insertedLead = null;
 
     if (isSupabaseConfigured) {
-      // 1. Insert Lead into Supabase
+      // 4. Deduplicação por external_ref e por telefone + janela de tempo
+      const windowHours = parseInt(process.env.MSFORMS_DEDUP_WINDOW_HOURS || '72', 10);
+      const sinceDate = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
+
+      let existingLead: { id: number; name?: string; phone?: string } | null = null;
+
+      if (externalRef) {
+        const { data: refMatches } = await supabase
+          .from('leads')
+          .select('id, name, phone')
+          .eq('external_ref', externalRef)
+          .limit(1);
+        if (refMatches && refMatches[0]) {
+          existingLead = refMatches[0];
+        }
+      }
+
+      if (!existingLead && normalizedPhone.length >= 10) {
+        const { data: phoneMatches } = await supabase
+          .from('leads')
+          .select('id, name, phone')
+          .eq('phone', normalizedPhone)
+          .gte('created_at', sinceDate)
+          .limit(1);
+        if (phoneMatches && phoneMatches[0]) {
+          existingLead = phoneMatches[0];
+        }
+      }
+
+      if (existingLead) {
+        logger.warn('Reenvio via MS Forms detectado e ignorado (Duplicata)', {
+          existingLeadId: existingLead.id,
+          phone: normalizedPhone,
+          externalRef: externalRef || undefined,
+          rawPayload: body,
+        });
+
+        await supabase.from('lead_history').insert([{
+          lead_id: existingLead.id,
+          date: new Date().toLocaleString('pt-BR').substring(0, 16),
+          action: 'Reenvio via MS Forms detectado e ignorado',
+          note: `Payload duplicado recebido. Telefone: ${normalizedPhone}${externalRef ? ` | Ref: ${externalRef}` : ''}`,
+        }]);
+
+        return NextResponse.json(
+          { success: true, duplicate: true, leadId: existingLead.id, message: 'Lead duplicado ignorado' },
+          { status: 200 }
+        );
+      }
+
+      // 5. Insert Lead into Supabase
+      const insertPayload: Record<string, any> = {
+        name: validData.name,
+        phone: normalizedPhone || validData.phone,
+        ref: validData.ref,
+        status: 'Pendente',
+        value: validData.value,
+        source: 'ms_forms'
+      };
+      if (externalRef) {
+        insertPayload.external_ref = externalRef;
+      }
+
       const { data: leadData, error: leadError } = await supabase
         .from('leads')
-        .insert([{ name: validData.name, phone: validData.phone, ref: validData.ref, status: 'Pendente', value: validData.value }])
+        .insert([insertPayload])
         .select();
 
       if (leadError) {
@@ -228,7 +312,7 @@ export async function POST(req: NextRequest) {
       if (leadData && leadData[0]) {
         insertedLead = leadData[0];
         
-        // 2. Insert Lead History Entry
+        // Insert Lead History Entry
         const historyData = {
           lead_id: insertedLead.id,
           date: new Date().toLocaleString('pt-BR').substring(0, 16),
@@ -244,8 +328,8 @@ export async function POST(req: NextRequest) {
           console.error('Error inserting webhook history:', historyError);
         }
 
-        // 3. Enviar para o IXC Soft como prospect
-        const ixcResult = await createIxcProspect(validData.name, validData.phone, validData.ref);
+        // Enviar para o IXC Soft como prospect
+        const ixcResult = await createIxcProspect(validData.name, normalizedPhone || validData.phone, validData.ref);
         if (ixcResult.success) {
           await supabase
             .from('lead_history')
@@ -271,10 +355,12 @@ export async function POST(req: NextRequest) {
       insertedLead = {
         id: Math.floor(Math.random() * 1000) + 100,
         name: validData.name,
-        phone: validData.phone,
+        phone: normalizedPhone || validData.phone,
         ref: validData.ref,
         status: 'Pendente',
         value: validData.value,
+        source: 'ms_forms',
+        external_ref: externalRef || null,
         created_at: new Date().toISOString()
       };
       console.log('Mocked MS Forms webhook registration (Supabase offline):', insertedLead);

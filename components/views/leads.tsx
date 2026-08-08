@@ -197,15 +197,25 @@ export function LeadsView() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Status', 'Valor (R$)', 'Ultima Interacao'];
+    const sanitizeCsvField = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      if (/^[=+\-@\t\r]/.test(str)) {
+        return `"'${str}"`;
+      }
+      return `"${str}"`;
+    };
+
+    const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Canal', 'Status', 'Valor (R$)', 'Ultima Interacao'];
     const rows = filteredLeads.map(l => [
       l.id,
-      `"${l.name.replace(/"/g, '""')}"`,
-      `"${l.phone}"`,
-      `"${l.ref}"`,
-      `"${l.status}"`,
+      sanitizeCsvField(l.name),
+      sanitizeCsvField(l.phone),
+      sanitizeCsvField(l.ref),
+      sanitizeCsvField(l.source || 'manual'),
+      sanitizeCsvField(l.status),
       l.value || 0,
-      `"${l.history[0]?.date || 'Novo'}"`
+      sanitizeCsvField(l.history[0]?.date || 'Novo')
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -1199,6 +1209,14 @@ export function LeadsView() {
                       <Avatar size={14} name={selectedLead.responsible || selectedLead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} />
                       {selectedLead.responsible || selectedLead.ref || 'Admin'}
                     </span>
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full">
+                      {selectedLead.source === 'ms_forms' ? 'MS Forms' : selectedLead.source === 'landing' ? 'Landing' : 'Manual'}
+                    </span>
+                    {selectedLead.history && selectedLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length > 0 && (
+                      <span className="text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 px-3 py-1 rounded-full">
+                        Duplicata ignorada ({selectedLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length}x)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

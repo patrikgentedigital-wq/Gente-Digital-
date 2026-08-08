@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuthAny } from '@/lib/auth-server';
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const isAuthenticated = await verifyAuthAny(req);
@@ -53,18 +63,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         success: true, 
         message: 'Nenhum lead pendente de sincronização.', 
-        updatedCount: 0 
+        updatedCount: 0,
+        details: []
       });
     }
 
     let updatedCount = 0;
     const syncResults = [];
 
-    // 3. Process each lead (limit parallel calls to prevent rate limiting/timeouts)
+    // 3. Process each lead with timeout and detailed report
     for (const lead of leads) {
       try {
-        // Query client by name in IXC
-        const ixcResponse = await fetch(`https://${cleanDomain}/webservice/v1/cliente`, {
+        const ixcResponse = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente`, {
           method: 'POST',
           headers: {
             'Authorization': `Basic ${base64Token}`,
@@ -78,10 +88,11 @@ export async function POST(req: NextRequest) {
             page: '1',
             rp: '5'
           })
-        });
+        }, 10000);
 
         if (!ixcResponse.ok) {
           console.warn(`IXC request failed for lead ${lead.name}: Status ${ixcResponse.status}`);
+          syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: `Status HTTP ${ixcResponse.status}` });
           continue;
         }
 
@@ -92,15 +103,13 @@ export async function POST(req: NextRequest) {
           let matchedClient = null;
           let activeContractId = null;
           
-          // Calculate a threshold date (e.g. 30 days before lead creation)
           const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
           leadDate.setDate(leadDate.getDate() - 30);
           
           let activeContractValue = 0;
           
           for (const client of ixcData.registros) {
-            // Check contracts for this client
-            const contractRes = await fetch(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
+            const contractRes = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
               method: 'POST',
               headers: {
                 'Authorization': `Basic ${base64Token}`,
@@ -114,13 +123,12 @@ export async function POST(req: NextRequest) {
                 page: '1',
                 rp: '50'
               })
-            });
+            }, 10000);
             
             if (!contractRes.ok) continue;
             
             const contractData = await contractRes.json();
             if (contractData.registros && contractData.registros.length > 0) {
-              // Look for a recent active contract
               for (const contract of contractData.registros) {
                 if (contract.status === 'A') {
                   const contractDate = new Date(contract.data);
@@ -141,11 +149,10 @@ export async function POST(req: NextRequest) {
           }
           
           if (!foundValidContract || !matchedClient) {
-            // No recent active contract found for this lead
+            syncResults.push({ leadId: lead.id, name: lead.name, status: 'no_contract', reason: 'Cliente encontrado sem contrato ativo recente' });
             continue;
           }
           
-          // Update lead status and contract value in Supabase
           const updateFields: Record<string, any> = { status: 'Ganho' };
           if (activeContractValue > 0) {
             updateFields.value = activeContractValue;
@@ -158,10 +165,10 @@ export async function POST(req: NextRequest) {
 
           if (updateError) {
             console.error(`Error updating lead ${lead.id} to Ganho:`, updateError);
+            syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: updateError.message });
             continue;
           }
 
-          // Insert into lead history
           const valueText = activeContractValue > 0 ? ` | Valor: R$ ${activeContractValue.toFixed(2)}` : '';
           const historyData = {
             lead_id: lead.id,
@@ -176,14 +183,18 @@ export async function POST(req: NextRequest) {
           syncResults.push({
             leadId: lead.id,
             name: lead.name,
+            status: 'success',
             matchedAs: matchedClient.razao,
             code: matchedClient.id,
             contract: activeContractId,
             value: activeContractValue
           });
+        } else {
+          syncResults.push({ leadId: lead.id, name: lead.name, status: 'not_found', reason: 'Cliente não localizado no cadastro IXC' });
         }
       } catch (err: any) {
         console.error(`Failed to sync lead ${lead.name} with IXC:`, err.message);
+        syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: err.message || String(err) });
       }
     }
 

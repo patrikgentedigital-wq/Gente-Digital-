@@ -17,7 +17,7 @@ function createSupabaseServerClient(req: NextRequest) {
  * Retorna o usuário autenticado via cookies de sessão do Supabase.
  * Retorna null se não autenticado ou se Supabase não estiver configurado.
  */
-async function getAuthenticatedUser(req: NextRequest) {
+export async function getAuthenticatedUser(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
   if (!supabaseUrl || supabaseUrl.includes('placeholder')) {

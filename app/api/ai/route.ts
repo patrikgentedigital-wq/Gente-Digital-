@@ -64,11 +64,11 @@ function generateDynamicSummary(metrics: any): string {
     `• Foque no acompanhamento dos leads nas etapas "Contato Inicial" e "Em Negociação" no funil Kanban para maximizar a conversão nesta semana.`;
 }
 
-import { verifyAuth } from '@/lib/auth-server';
+import { verifyAuthAny } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
+    const isAuthenticated = await verifyAuthAny(req);
     if (!isAuthenticated) {
       return NextResponse.json({ error: 'Não autorizado. Faça login para continuar.' }, { status: 401 });
     }

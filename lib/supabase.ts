@@ -33,6 +33,8 @@ export interface Lead {
   ref: string;
   status: string;
   value?: number;
+  source?: string;
+  external_ref?: string;
   created_at?: string;
 }
 
@@ -52,5 +54,6 @@ export interface Colaborador {
   count: number;
   photo_url?: string;
   role?: 'admin' | 'colaborador';
+  user_id?: string;
   created_at?: string;
 }
