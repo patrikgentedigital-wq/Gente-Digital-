@@ -277,7 +277,7 @@ export function IntegracoesView() {
                   toastSuccess('Copiado!', 'URL do Webhook copiada para a área de transferência.');
                   setTimeout(() => setFormsSaved(false), 2000);
                 }}
-                className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-white dark:bg-gray-850 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+                className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-white dark:bg-gray-900 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
               >
                 {formsSaved ? 'Copiado!' : 'Copiar'}
               </button>

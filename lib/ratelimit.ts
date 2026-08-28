@@ -10,6 +10,20 @@ const redis = (url && token && !url.includes('placeholder'))
 
 // Armazenamento em memória caso o Redis não esteja disponível
 const memoryStore = new Map<string, number[]>();
+const MEMORY_STORE_MAX_KEYS = 5000;
+
+// Remove chaves cujas janelas já expiraram para evitar crescimento ilimitado
+function sweepExpiredKeys(windowMs: number) {
+  const now = Date.now();
+  for (const [key, timestamps] of memoryStore) {
+    const alive = timestamps.filter(ts => now - ts < windowMs);
+    if (alive.length === 0) {
+      memoryStore.delete(key);
+    } else {
+      memoryStore.set(key, alive);
+    }
+  }
+}
 
 /**
  * Utilitário universal de Rate Limit (Redis com fallback em memória)
@@ -38,10 +52,17 @@ export async function checkRateLimit(
   const timestamps = (memoryStore.get(key) || []).filter(ts => now - ts < windowMs);
 
   if (timestamps.length >= limit) {
+    memoryStore.set(key, timestamps);
+    if (memoryStore.size > MEMORY_STORE_MAX_KEYS) {
+      sweepExpiredKeys(windowMs);
+    }
     return { success: false, remaining: 0 };
   }
 
   timestamps.push(now);
   memoryStore.set(key, timestamps);
+  if (memoryStore.size > MEMORY_STORE_MAX_KEYS) {
+    sweepExpiredKeys(windowMs);
+  }
   return { success: true, remaining: limit - timestamps.length };
 }

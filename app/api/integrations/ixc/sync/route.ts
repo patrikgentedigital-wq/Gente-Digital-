@@ -69,10 +69,9 @@ export async function POST(req: NextRequest) {
     }
 
     let updatedCount = 0;
-    const syncResults = [];
+    const syncResults: Array<Record<string, any>> = [];
 
-    // 3. Process each lead with timeout and detailed report
-    for (const lead of leads) {
+    const processLead = async (lead: any): Promise<Record<string, any>> => {
       try {
         const ixcResponse = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente`, {
           method: 'POST',
@@ -92,109 +91,118 @@ export async function POST(req: NextRequest) {
 
         if (!ixcResponse.ok) {
           console.warn(`IXC request failed for lead ${lead.name}: Status ${ixcResponse.status}`);
-          syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: `Status HTTP ${ixcResponse.status}` });
-          continue;
+          return { leadId: lead.id, name: lead.name, status: 'error', reason: `Status HTTP ${ixcResponse.status}` };
         }
 
         const ixcData = await ixcResponse.json();
 
-        if (ixcData.registros && ixcData.registros.length > 0) {
-          let foundValidContract = false;
-          let matchedClient = null;
-          let activeContractId = null;
-          
-          const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
-          leadDate.setDate(leadDate.getDate() - 30);
-          
-          let activeContractValue = 0;
-          
-          for (const client of ixcData.registros) {
-            const contractRes = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Basic ${base64Token}`,
-                'Content-Type': 'application/json',
-                'ixcsoft': 'listar'
-              },
-              body: JSON.stringify({
-                qtype: 'id_cliente',
-                query: client.id,
-                oper: '=',
-                page: '1',
-                rp: '50'
-              })
-            }, 10000);
-            
-            if (!contractRes.ok) continue;
-            
-            const contractData = await contractRes.json();
-            if (contractData.registros && contractData.registros.length > 0) {
-              for (const contract of contractData.registros) {
-                if (contract.status === 'A') {
-                  const contractDate = new Date(contract.data);
-                  if (contractDate >= leadDate) {
-                    foundValidContract = true;
-                    matchedClient = client;
-                    activeContractId = contract.id;
-                    const val = parseFloat(contract.valor || contract.valor_total || contract.mensalidade || '0');
-                    if (val > 0) {
-                      activeContractValue = val;
-                    }
-                    break;
+        if (!(ixcData.registros && ixcData.registros.length > 0)) {
+          return { leadId: lead.id, name: lead.name, status: 'not_found', reason: 'Cliente não localizado no cadastro IXC' };
+        }
+
+        let foundValidContract = false;
+        let matchedClient = null;
+        let activeContractId = null;
+
+        const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
+        leadDate.setDate(leadDate.getDate() - 30);
+
+        let activeContractValue = 0;
+
+        for (const client of ixcData.registros) {
+          const contractRes = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${base64Token}`,
+              'Content-Type': 'application/json',
+              'ixcsoft': 'listar'
+            },
+            body: JSON.stringify({
+              qtype: 'id_cliente',
+              query: client.id,
+              oper: '=',
+              page: '1',
+              rp: '50'
+            })
+          }, 10000);
+
+          if (!contractRes.ok) continue;
+
+          const contractData = await contractRes.json();
+          if (contractData.registros && contractData.registros.length > 0) {
+            for (const contract of contractData.registros) {
+              if (contract.status === 'A') {
+                const contractDate = new Date(contract.data);
+                if (contractDate >= leadDate) {
+                  foundValidContract = true;
+                  matchedClient = client;
+                  activeContractId = contract.id;
+                  const val = parseFloat(contract.valor || contract.valor_total || contract.mensalidade || '0');
+                  if (val > 0) {
+                    activeContractValue = val;
                   }
+                  break;
                 }
               }
             }
-            if (foundValidContract) break;
           }
-          
-          if (!foundValidContract || !matchedClient) {
-            syncResults.push({ leadId: lead.id, name: lead.name, status: 'no_contract', reason: 'Cliente encontrado sem contrato ativo recente' });
-            continue;
-          }
-          
-          const updateFields: Record<string, any> = { status: 'Ganho' };
-          if (activeContractValue > 0) {
-            updateFields.value = activeContractValue;
-          }
-
-          const { error: updateError } = await supabase
-            .from('leads')
-            .update(updateFields)
-            .eq('id', lead.id);
-
-          if (updateError) {
-            console.error(`Error updating lead ${lead.id} to Ganho:`, updateError);
-            syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: updateError.message });
-            continue;
-          }
-
-          const valueText = activeContractValue > 0 ? ` | Valor: R$ ${activeContractValue.toFixed(2)}` : '';
-          const historyData = {
-            lead_id: lead.id,
-            date: new Date().toLocaleString('pt-BR').substring(0, 16),
-            action: 'Sincronizado com IXC Soft',
-            note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId}${valueText})`
-          };
-
-          await supabase.from('lead_history').insert([historyData]);
-
-          updatedCount++;
-          syncResults.push({
-            leadId: lead.id,
-            name: lead.name,
-            status: 'success',
-            matchedAs: matchedClient.razao,
-            code: matchedClient.id,
-            contract: activeContractId,
-            value: activeContractValue
-          });
-        } else {
-          syncResults.push({ leadId: lead.id, name: lead.name, status: 'not_found', reason: 'Cliente não localizado no cadastro IXC' });
+          if (foundValidContract) break;
         }
+
+        if (!foundValidContract || !matchedClient) {
+          return { leadId: lead.id, name: lead.name, status: 'no_contract', reason: 'Cliente encontrado sem contrato ativo recente' };
+        }
+
+        const updateFields: Record<string, any> = { status: 'Ganho' };
+        if (activeContractValue > 0) {
+          updateFields.value = activeContractValue;
+        }
+
+        const { error: updateError } = await supabase
+          .from('leads')
+          .update(updateFields)
+          .eq('id', lead.id);
+
+        if (updateError) {
+          console.error(`Error updating lead ${lead.id} to Ganho:`, updateError);
+          return { leadId: lead.id, name: lead.name, status: 'error', reason: updateError.message };
+        }
+
+        const valueText = activeContractValue > 0 ? ` | Valor: R$ ${activeContractValue.toFixed(2)}` : '';
+        const historyData = {
+          lead_id: lead.id,
+          date: new Date().toLocaleString('pt-BR').substring(0, 16),
+          action: 'Sincronizado com IXC Soft',
+          note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId}${valueText})`
+        };
+
+        await supabase.from('lead_history').insert([historyData]);
+
+        return {
+          leadId: lead.id,
+          name: lead.name,
+          status: 'success',
+          matchedAs: matchedClient.razao,
+          code: matchedClient.id,
+          contract: activeContractId,
+          value: activeContractValue
+        };
       } catch (err: any) {
         console.error(`Failed to sync lead ${lead.name} with IXC:`, err.message);
-        syncResults.push({ leadId: lead.id, name: lead.name, status: 'error', reason: err.message || String(err) });
+        return { leadId: lead.id, name: lead.name, status: 'error', reason: err.message || String(err) };
+      }
+    };
+
+    // Processa leads em lotes paralelos para reduzir o tempo total sem sobrecarregar o IXC
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+      const batch = leads.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(processLead));
+      for (const result of batchResults) {
+        syncResults.push(result);
+        if (result.status === 'success') {
+          updatedCount++;
+        }
       }
     }
 

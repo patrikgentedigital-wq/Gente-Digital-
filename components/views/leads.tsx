@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2 } from 'lucide-react';
-import { supabase, Lead, LeadHistory } from '@/lib/supabase';
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { supabase, Lead, LeadHistory, isSupabaseConfigured } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from 'boring-avatars';
@@ -11,15 +11,18 @@ import { useToast } from '@/components/providers/toast-context';
 import { LeadsSkeleton } from '@/components/views/leads-skeleton';
 import { initialColaboradores } from '@/lib/mock-data';
 import { ConfirmModal } from '@/components/providers/confirm-modal';
+import { sanitizeCsvField } from '@/lib/utils';
+
+const normalizePhoneDigits = (phone: string) => phone.replace(/\D/g, '');
 
 const leadSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
-  phone: z.string().min(10, 'Insira um telefone válido com DDD (mínimo 10 dígitos)'),
+  phone: z.string().min(10, 'Insira um telefone vÃ¡lido com DDD (mÃ­nimo 10 dÃ­gitos)'),
   value: z.string().optional().refine(val => {
     if (!val) return true;
     const num = Number(val);
     return !isNaN(num) && num >= 0;
-  }, 'O valor deve ser um número positivo'),
+  }, 'O valor deve ser um nÃºmero positivo'),
   ref: z.string().optional(),
   customRef: z.string().optional(),
 }).refine(data => {
@@ -44,10 +47,10 @@ export type UILead = Lead & {
 
 const initialLeads: UILead[] = [
   { 
-    id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'LEANDRO COSTA SILVA', status: 'Em negociação', value: 0,
+    id: 1, name: 'Benedita', phone: '(91) 98600-5106', ref: 'LEANDRO COSTA SILVA', status: 'Em negociaÃ§Ã£o', value: 0,
     responsible: 'Emmyly', waitingDays: 5, created_at: '2026-08-03T14:30:00Z',
     history: [
-      { id: 101, lead_id: 1, date: '12/10/2026 14:30', action: 'Lead criado por indicação', note: 'Indicado por Leandro Costa Silva.' }
+      { id: 101, lead_id: 1, date: '12/10/2026 14:30', action: 'Lead criado por indicaÃ§Ã£o', note: 'Indicado por Leandro Costa Silva.' }
     ]
   },
   { 
@@ -58,7 +61,7 @@ const initialLeads: UILead[] = [
     ]
   },
   { 
-    id: 3, name: 'João Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Ganho', value: 1200,
+    id: 3, name: 'JoÃ£o Silva', phone: '(11) 98888-7777', ref: 'EMP-042', status: 'Ganho', value: 1200,
     responsible: 'NIVEA', created_at: '2026-07-15T11:20:00Z',
     history: [
       { id: 301, lead_id: 3, date: '08/10/2026 11:20', action: 'Lead convertido', note: 'Assinou o plano fibra 500MB.' }
@@ -72,10 +75,10 @@ const initialLeads: UILead[] = [
     ]
   },
   { 
-    id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'Orgânico', status: 'Pendente', value: 500,
+    id: 5, name: 'Carlos Santos', phone: '(11) 91111-2222', ref: 'OrgÃ¢nico', status: 'Pendente', value: 500,
     responsible: 'Admin', waitingDays: 1, created_at: '2026-08-05T08:30:00Z',
     history: [
-      { id: 501, lead_id: 5, date: '17/10/2026 08:30', action: 'Lead criado', note: 'Veio pela página inicial.' }
+      { id: 501, lead_id: 5, date: '17/10/2026 08:30', action: 'Lead criado', note: 'Veio pela pÃ¡gina inicial.' }
     ]
   }
 ];
@@ -86,20 +89,31 @@ export function LeadsView() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
 
-  // Auto-switch para lista em telas pequenas (mobile)
+  // Auto-switch de visÃ£o conforme o tamanho da tela (lista no mobile, Kanban no desktop)
   useEffect(() => {
     const checkMobile = () => {
-      if (window.innerWidth < 768) {
-        setViewMode('list');
-      }
+      setViewMode(window.innerWidth < 768 ? 'list' : 'kanban');
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Estado do modal de confirmação de exclusão
+  // Estado do modal de confirmaÃ§Ã£o de exclusÃ£o
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: number; name: string } | null>(null);
+
+  // Fecha modais/painÃ©is com a tecla Escape (o modal de confirmaÃ§Ã£o trata o prÃ³prio Escape)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isModalOpen) {
+        setIsModalOpen(false);
+        setEditingLead(null);
+      } else if (selectedLead) selectLead(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const selectLead = (lead: UILead | null) => {
     setSelectedLead(lead);
@@ -107,7 +121,7 @@ export function LeadsView() {
     setCopiedMessage(false);
   };
 
-  // Helper to read cookie (o valor é gravado com encodeURIComponent)
+  // Helper to read cookie (o valor Ã© gravado com encodeURIComponent)
   const getReferralCookie = () => {
     if (typeof document === 'undefined') return null;
     const nameEQ = "gente_digital_ref=";
@@ -129,8 +143,33 @@ export function LeadsView() {
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const isSupabaseConfigured = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-  const [leads, setLeads] = useState<UILead[]>(isSupabaseConfigured ? [] : initialLeads);
+  const [editingLead, setEditingLead] = useState<UILead | null>(null);
+
+  const openCreateModal = () => {
+    setEditingLead(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (lead: UILead) => {
+    setEditingLead(lead);
+    const isKnownRef = ['Manual', 'OrgÃ¢nico', 'Outro'].includes(lead.ref);
+    reset({
+      name: lead.name,
+      phone: lead.phone,
+      value: lead.value ? String(lead.value) : '',
+      ref: isKnownRef ? lead.ref : 'Outro',
+      customRef: isKnownRef ? '' : lead.ref,
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingLead(null);
+    reset();
+  };
+
+  const [leads, setLeads] = useState<UILead[]>(isSupabaseConfigured() ? [] : initialLeads);
   const [isLoading, setIsLoading] = useState(true);
   const [colaboradores, setColaboradores] = useState<{ id: string, name: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,7 +181,6 @@ export function LeadsView() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
-  const [totalLeadsCount, setTotalLeadsCount] = useState(isSupabaseConfigured ? 0 : initialLeads.length);
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -154,14 +192,14 @@ export function LeadsView() {
       });
       const data = await response.json();
       if (data.success) {
-        toastSuccess('Sincronização IXC', data.message || 'Sincronização realizada com sucesso.');
+        toastSuccess('SincronizaÃ§Ã£o IXC', data.message || 'SincronizaÃ§Ã£o realizada com sucesso.');
         await fetchLeads();
       } else {
-        toastError('Erro na Sincronização', data.error || 'Não foi possível sincronizar com o IXC.');
+        toastError('Erro na SincronizaÃ§Ã£o', data.error || 'NÃ£o foi possÃ­vel sincronizar com o IXC.');
       }
     } catch (error) {
       console.error('Error syncing with IXC:', error);
-      toastError('Erro de Conexão', 'Não foi possível conectar à API de sincronização do IXC.');
+      toastError('Erro de ConexÃ£o', 'NÃ£o foi possÃ­vel conectar Ã  API de sincronizaÃ§Ã£o do IXC.');
     } finally {
       setIsSyncing(false);
     }
@@ -178,43 +216,33 @@ export function LeadsView() {
     const { id, name: leadName } = confirmDelete;
     setConfirmDelete(null);
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error || 'Falha ao excluir no banco de dados.');
         }
       }
-      await logAuditEvent('Exclusão de Lead', `Lead "${leadName}" (ID: ${id}) foi excluído do sistema.`);
+      await logAuditEvent('ExclusÃ£o de Lead', `Lead "${leadName}" (ID: ${id}) foi excluÃ­do do sistema.`);
       setLeads(prev => prev.filter(l => l.id !== id));
-      setTotalLeadsCount(prev => Math.max(0, prev - 1));
       setSelectedLead(null);
-      toastSuccess('Lead Excluído', `O lead "${leadName}" foi removido com sucesso.`);
+      toastSuccess('Lead ExcluÃ­do', `O lead "${leadName}" foi removido com sucesso.`);
     } catch (err: any) {
       console.error("Erro ao excluir lead:", err);
-      toastError('Erro ao Excluir', err.message || 'Falha ao excluir o lead. Verifique suas permissões.');
+      toastError('Erro ao Excluir', err.message || 'Falha ao excluir o lead. Verifique suas permissÃµes.');
     }
   };
 
   const handleExportCSV = () => {
-    const sanitizeCsvField = (val: any) => {
-      if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      if (/^[=+\-@\t\r]/.test(str)) {
-        return `"'${str}"`;
-      }
-      return `"${str}"`;
-    };
-
     const headers = ['ID', 'Nome do Lead', 'Contato', 'Origem (Ref)', 'Canal', 'Status', 'Valor (R$)', 'Ultima Interacao'];
     const rows = filteredLeads.map(l => [
-      l.id,
+      sanitizeCsvField(l.id),
       sanitizeCsvField(l.name),
       sanitizeCsvField(l.phone),
       sanitizeCsvField(l.ref),
       sanitizeCsvField(l.source || 'manual'),
       sanitizeCsvField(l.status),
-      l.value || 0,
+      sanitizeCsvField(l.value || 0),
       sanitizeCsvField(l.history[0]?.date || 'Novo')
     ]);
 
@@ -237,7 +265,9 @@ export function LeadsView() {
   const selectedRef = watch('ref');
 
   useEffect(() => {
-    if (isModalOpen) {
+    // SÃ³ reinicializa o form ao ABRIR em modo criaÃ§Ã£o; em ediÃ§Ã£o o preenchimento
+    // Ã© feito pelo openEditModal para nÃ£o apagar os valores prÃ©-carregados.
+    if (isModalOpen && !editingLead) {
       const cookieRef = getReferralCookie();
       reset({
         name: '',
@@ -247,7 +277,7 @@ export function LeadsView() {
         customRef: ''
       });
     }
-  }, [isModalOpen, reset]);
+  }, [isModalOpen, editingLead, reset]);
 
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{
@@ -274,7 +304,7 @@ export function LeadsView() {
         note: noteText.trim(),
       };
 
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         const { error } = await supabase.from('lead_history').insert([{
           lead_id: selectedLead.id,
           date: nowStr,
@@ -287,10 +317,10 @@ export function LeadsView() {
       setSelectedLead(prev => prev ? { ...prev, history: [historyEntry, ...(prev.history || [])] } : prev);
       setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, history: [historyEntry, ...(l.history || [])] } : l));
       setNoteText('');
-      toastSuccess('Nota salva', 'Interação registrada no histórico do lead.');
+      toastSuccess('Nota salva', 'InteraÃ§Ã£o registrada no histÃ³rico do lead.');
     } catch (err: any) {
       console.error('Erro ao salvar nota:', err);
-      toastError('Erro ao Salvar Nota', err?.message || 'Não foi possível registrar a nota.');
+      toastError('Erro ao Salvar Nota', err?.message || 'NÃ£o foi possÃ­vel registrar a nota.');
     } finally {
       setIsSavingNote(false);
     }
@@ -330,11 +360,11 @@ export function LeadsView() {
         });
       } else {
         console.error('AI Error:', data.error);
-        toastError('Erro na análise IA', data.error || 'Não foi possível qualificar o lead. Tente novamente.');
+        toastError('Erro na anÃ¡lise IA', data.error || 'NÃ£o foi possÃ­vel qualificar o lead. Tente novamente.');
       }
     } catch (err) {
       console.error('AI Request failed:', err);
-      toastError('Erro de conexão', 'Não foi possível conectar à IA. Verifique sua conexão.');
+      toastError('Erro de conexÃ£o', 'NÃ£o foi possÃ­vel conectar Ã  IA. Verifique sua conexÃ£o.');
     } finally {
       setIsAiLoading(false);
     }
@@ -358,11 +388,11 @@ export function LeadsView() {
         });
       } else {
         console.error('AI Error:', data.error);
-        toastError('Erro na IA', data.error || 'Não foi possível gerar a mensagem. Tente novamente.');
+        toastError('Erro na IA', data.error || 'NÃ£o foi possÃ­vel gerar a mensagem. Tente novamente.');
       }
     } catch (err) {
       console.error('AI Request failed:', err);
-      toastError('Erro de conexão', 'Não foi possível conectar à IA. Verifique sua conexão.');
+      toastError('Erro de conexÃ£o', 'NÃ£o foi possÃ­vel conectar Ã  IA. Verifique sua conexÃ£o.');
     } finally {
       setIsAiLoading(false);
     }
@@ -371,9 +401,9 @@ export function LeadsView() {
   const fetchLeads = useCallback(async () => {
     try {
       setIsLoading(true);
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-        // Carrega TODOS os leads para busca, filtros e exportação operarem no dataset completo.
-        // (No dataset atual, a paginação é feita no cliente.)
+      if (isSupabaseConfigured()) {
+        // Carrega TODOS os leads para busca, filtros e exportaÃ§Ã£o operarem no dataset completo.
+        // (No dataset atual, a paginaÃ§Ã£o Ã© feita no cliente.)
         const { data: leadsData, error: leadsError } = await supabase
           .from('leads')
           .select('*')
@@ -396,20 +426,16 @@ export function LeadsView() {
             history: historyData ? historyData.filter(h => h.lead_id === lead.id) : []
           }));
           setLeads(uiLeads);
-          setTotalLeadsCount(uiLeads.length);
         } else {
           setLeads([]);
-          setTotalLeadsCount(0);
         }
       } else {
         setLeads(initialLeads);
-        setTotalLeadsCount(initialLeads.length);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
       toastError('Erro no Carregamento', 'Falha ao buscar a lista de leads do banco.');
-      const isConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-      setLeads(isConfigured ? [] : initialLeads);
+      setLeads(isSupabaseConfigured() ? [] : initialLeads);
     } finally {
       setIsLoading(false);
     }
@@ -419,7 +445,7 @@ export function LeadsView() {
     try {
       const map = new Map<string, { id: string; name: string }>();
 
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      if (isSupabaseConfigured()) {
         const { data, error } = await supabase.from('colaboradores').select('id, name');
         if (!error && data) {
           data.forEach(c => {
@@ -442,7 +468,7 @@ export function LeadsView() {
     fetchLeads();
     fetchColaboradores();
 
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    if (isSupabaseConfigured()) {
       const colabChannel = supabase
         .channel('leads_colaboradores_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
@@ -456,30 +482,38 @@ export function LeadsView() {
     }
   }, [fetchLeads]);
 
-  const statuses = ['Pendente', 'Contato inicial', 'Em negociação', 'Errado', 'Ganho'];
+  const statuses = ['Pendente', 'Contato inicial', 'Em negociaÃ§Ã£o', 'Errado', 'Ganho'];
 
   const handleAdd = async (data: LeadFormData) => {
     let referral = data.ref || getReferralCookie() || 'Manual';
     if (referral === 'Outro' && data.customRef && data.customRef.trim() !== '') {
       referral = data.customRef.trim();
     }
+
+    // Normaliza o telefone para dÃ­gitos, igual ao fluxo da API pÃºblica de indicaÃ§Ãµes,
+    // para que a deduplicaÃ§Ã£o por phone funcione entre canais.
+    const phoneDigits = normalizePhoneDigits(data.phone);
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      toastError('Telefone invÃ¡lido', 'Informe um telefone com DDD vÃ¡lido (mÃ­nimo 10 dÃ­gitos).');
+      return;
+    }
+
     const newLeadData = {
       name: data.name,
-      phone: data.phone,
+      phone: phoneDigits,
       ref: referral,
       status: 'Pendente',
       value: data.value ? parseFloat(data.value) : 0
     };
 
     try {
-       if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+       if (isSupabaseConfigured()) {
          const { data: inserted, error } = await supabase.from('leads').insert([newLeadData]).select();
          if (error) throw error;
          if (inserted && inserted[0]) {
            const historyData = { lead_id: inserted[0].id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null };
            await supabase.from('lead_history').insert([historyData]);
-           setLeads(prev => [{ ...inserted[0], history: [{...historyData, id: inserted[0].id + 9999}] }, ...prev]);
-           setTotalLeadsCount(prev => prev + 1);
+           setLeads(prev => [{ ...inserted[0], history: [{...historyData, id: -Date.now()}] }, ...prev]);
          }
        } else {
          setLeads(prev => {
@@ -488,10 +522,9 @@ export function LeadsView() {
              ...newLeadData,
              id: newId,
              created_at: new Date().toISOString(),
-             history: [{ id: newId + 5000, lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
+             history: [{ id: -Date.now(), lead_id: newId, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Lead criado manualmente', note: null }]
            }, ...prev];
          });
-         setTotalLeadsCount(prev => prev + 1);
        }
 
        toastSuccess('Lead Cadastrado!', `O lead "${newLeadData.name}" foi adicionado com sucesso.`);
@@ -503,11 +536,67 @@ export function LeadsView() {
        }).catch(err => console.error('Failed to send prospect to IXC:', err));
     } catch (error) {
       console.error("Error creating lead", error);
-      toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
+      toastError('Erro ao Cadastrar', 'NÃ£o foi possÃ­vel cadastrar o lead. Tente novamente.');
     }
 
-    setIsModalOpen(false);
-    reset();
+    closeModal();
+  }
+
+  const handleEditSubmit = async (data: LeadFormData) => {
+    if (!editingLead) return;
+
+    const phoneDigits = normalizePhoneDigits(data.phone);
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      toastError('Telefone invÃ¡lido', 'Informe um telefone com DDD vÃ¡lido (mÃ­nimo 10 dÃ­gitos).');
+      return;
+    }
+
+    const updatedFields = {
+      name: data.name,
+      phone: phoneDigits,
+      value: data.value ? parseFloat(data.value) : 0,
+    };
+
+    const nowStr = new Date().toLocaleString('pt-BR').substring(0, 16);
+    const historyEntry: LeadHistory = {
+      id: -Date.now(),
+      lead_id: editingLead.id,
+      date: nowStr,
+      action: 'Dados atualizados',
+      note: 'Nome, telefone e/ou valor revisados manualmente.',
+    };
+
+    try {
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('leads').update(updatedFields).eq('id', editingLead.id);
+        if (error) throw error;
+
+        const { error: historyError } = await supabase.from('lead_history').insert([{
+          lead_id: editingLead.id,
+          date: nowStr,
+          action: historyEntry.action,
+          note: historyEntry.note,
+        }]);
+        if (historyError) console.error('Erro ao registrar histÃ³rico de atualizaÃ§Ã£o:', historyError);
+      }
+
+      setLeads(prev => prev.map(l => l.id === editingLead.id ? {
+        ...l,
+        ...updatedFields,
+        history: [historyEntry, ...(l.history || [])],
+      } : l));
+      setSelectedLead(prev => prev && prev.id === editingLead.id ? {
+        ...prev,
+        ...updatedFields,
+        history: [historyEntry, ...(prev.history || [])],
+      } : prev);
+
+      toastSuccess('Lead atualizado!', `Os dados de "${data.name}" foram salvos com sucesso.`);
+      closeModal();
+    } catch (err: any) {
+      console.error('Erro ao atualizar lead:', err);
+      toastError('Erro ao Atualizar', err?.message || 'NÃ£o foi possÃ­vel salvar as alteraÃ§Ãµes do lead.');
+    }
   }
 
   const handleDragStart = (e: React.DragEvent, id: number) => {
@@ -521,21 +610,23 @@ export function LeadsView() {
     if (!currentLead || currentLead.status === status) return;
 
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-         await supabase.from('leads').update({ status }).eq('id', id);
+      if (isSupabaseConfigured()) {
+         const { error: updateError } = await supabase.from('leads').update({ status }).eq('id', id);
+         if (updateError) throw updateError;
          const historyData = { lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null };
-         await supabase.from('lead_history').insert([historyData]);
+         const { error: historyError } = await supabase.from('lead_history').insert([historyData]);
+         if (historyError) console.error('Erro ao registrar histÃ³rico de movimentaÃ§Ã£o:', historyError);
       }
       setLeads(prev => prev.map(l => l.id === id ? {
         ...l,
         status,
-        history: [{ id: Date.now(), lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
+        history: [{ id: -Date.now(), lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: `Movido para ${status}`, note: null }, ...l.history]
       } : l));
 
       toastInfo('Status Atualizado', `Lead "${currentLead.name}" movido para "${status}".`);
     } catch(err) {
       console.error("Error updating lead status", err);
-      toastError('Erro na Atualização', 'Não foi possível alterar o status do lead.');
+      toastError('Erro na AtualizaÃ§Ã£o', 'NÃ£o foi possÃ­vel alterar o status do lead.');
     }
   };
 
@@ -547,7 +638,7 @@ export function LeadsView() {
     switch(status) {
       case 'Pendente': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'Contato inicial': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Em negociação': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
+      case 'Em negociaÃ§Ã£o': return 'bg-cyan-100 text-cyan-800 border-cyan-200';
       case 'Errado': return 'bg-red-100 text-red-800 border-red-200';
       case 'Ganho': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -558,7 +649,7 @@ export function LeadsView() {
     switch(status) {
       case 'Pendente': return 'border-gray-400';
       case 'Contato inicial': return 'border-blue-500';
-      case 'Em negociação': return 'border-cyan-500';
+      case 'Em negociaÃ§Ã£o': return 'border-cyan-500';
       case 'Errado': return 'border-red-500';
       case 'Ganho': return 'border-green-500';
       default: return 'border-gray-400';
@@ -570,7 +661,7 @@ export function LeadsView() {
       case 'Ganho': return 'bg-green-100 text-green-700';
       case 'Errado': return 'bg-red-100 text-red-700';
       case 'Contato inicial': return 'bg-blue-100 text-blue-700';
-      case 'Em negociação': return 'bg-cyan-100 text-cyan-700';
+      case 'Em negociaÃ§Ã£o': return 'bg-cyan-100 text-cyan-700';
       default: return 'bg-gray-100 text-gray-600';
     }
   };
@@ -606,7 +697,7 @@ export function LeadsView() {
     let matchesDate = true;
     if (dateFilter !== 'all') {
       if (!l.created_at) {
-        // Sem data cadastrada: mantém o lead visível (não esconde dados)
+        // Sem data cadastrada: mantÃ©m o lead visÃ­vel (nÃ£o esconde dados)
         matchesDate = true;
       } else {
         const d = new Date(l.created_at);
@@ -626,14 +717,14 @@ export function LeadsView() {
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
   }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
 
-  // Paginação no cliente: o scroll/lista mostra apenas a página atual do dataset filtrado
+  // PaginaÃ§Ã£o no cliente: o scroll/lista mostra apenas a pÃ¡gina atual do dataset filtrado
   const pageLeads = useMemo(
     () => filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     [filteredLeads, currentPage, pageSize]
   );
   const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
 
-  // Ao mudar filtros/busca, volta para a primeira página
+  // Ao mudar filtros/busca, volta para a primeira pÃ¡gina
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
@@ -642,8 +733,8 @@ export function LeadsView() {
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
       <div className="shrink-0">
         <div className="text-xs text-brand-muted dark:text-gray-400 font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
-          <span>Marketing de indicações</span>
-          <span className="text-gray-300 text-sm">›</span>
+          <span>Marketing de indicaÃ§Ãµes</span>
+          <span className="text-gray-300 text-sm">â€º</span>
           <span className="text-brand-charcoal dark:text-gray-300 font-extrabold">Acompanhamento de leads</span>
         </div>
       </div>
@@ -722,16 +813,16 @@ export function LeadsView() {
 
                 <div className="space-y-1.5 text-left">
                   <label className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
-                    Período
+                    PerÃ­odo
                   </label>
                   <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
                   >
-                    <option value="all">Todo o Período</option>
-                    <option value="this_month">Este Mês</option>
-                    <option value="last_month">Mês Passado</option>
+                    <option value="all">Todo o PerÃ­odo</option>
+                    <option value="this_month">Este MÃªs</option>
+                    <option value="last_month">MÃªs Passado</option>
                     <option value="this_year">Este Ano</option>
                   </select>
                 </div>
@@ -759,15 +850,15 @@ export function LeadsView() {
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      placeholder="Mín"
+                      placeholder="MÃ­n"
                       value={minValueFilter}
                       onChange={(e) => setMinValueFilter(e.target.value ? Number(e.target.value) : '')}
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
                     />
-                    <span className="text-gray-300 dark:text-gray-600 text-xs">até</span>
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">atÃ©</span>
                     <input
                       type="number"
-                      placeholder="Máx"
+                      placeholder="MÃ¡x"
                       value={maxValueFilter}
                       onChange={(e) => setMaxValueFilter(e.target.value ? Number(e.target.value) : '')}
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
@@ -819,7 +910,7 @@ export function LeadsView() {
                   <th className="px-6 py-4 font-bold tracking-wider">Contato</th>
                   <th className="px-6 py-4 font-bold tracking-wider">Origem (Ref)</th>
                   <th className="px-6 py-4 font-bold tracking-wider">Status</th>
-                  <th className="px-6 py-4 font-bold tracking-wider text-right">Ações</th>
+                  <th className="px-6 py-4 font-bold tracking-wider text-right">AÃ§Ãµes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border dark:divide-gray-800 text-sm">
@@ -831,8 +922,8 @@ export function LeadsView() {
                           <Inbox className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                         </div>
                         <h4 className="text-brand-charcoal dark:text-white font-bold mb-1">Nenhum lead encontrado</h4>
-                        <p className="text-brand-muted dark:text-gray-400 text-sm max-w-[250px]">Você ainda não possui leads cadastrados no seu funil de vendas.</p>
-                        <button onClick={() => setIsModalOpen(true)} className="mt-6 px-6 py-2.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 shadow-sm">
+                        <p className="text-brand-muted dark:text-gray-400 text-sm max-w-[250px]">VocÃª ainda nÃ£o possui leads cadastrados no seu funil de vendas.</p>
+                        <button onClick={openCreateModal} className="mt-6 px-6 py-2.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 shadow-sm">
                           <Plus className="w-4 h-4" />
                           Novo Lead
                         </button>
@@ -860,7 +951,18 @@ export function LeadsView() {
                     </td>
                     <td className="px-6 py-4 text-right text-brand-muted transition-colors">
                       <div className="flex items-center justify-end gap-2">
-                        <button 
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(lead);
+                          }}
+                          aria-label={`Editar lead ${lead.name}`}
+                          className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors"
+                          title="Editar Lead"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteLead(lead.id);
@@ -923,7 +1025,18 @@ export function LeadsView() {
                           className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-700 p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all group relative flex flex-col gap-3"
                         >
                           <div className="absolute right-3 top-3.5 flex items-center gap-1">
-                            <button 
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(lead);
+                              }}
+                              aria-label={`Editar lead ${lead.name}`}
+                              className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded transition-colors"
+                              title="Editar Lead"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteLead(lead.id);
@@ -938,7 +1051,7 @@ export function LeadsView() {
                           </div>
                           
                           <span className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-100 dark:border-amber-900/50 text-[10px] font-bold px-2.5 py-0.5 rounded w-fit uppercase tracking-wider">
-                            Marketing de indicações
+                            Marketing de indicaÃ§Ãµes
                           </span>
 
                           {/* Lead Name */}
@@ -955,9 +1068,9 @@ export function LeadsView() {
                               </div>
                             </div>
 
-                            {/* Responsável / Indicador */}
+                            {/* ResponsÃ¡vel / Indicador */}
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-400 tracking-wider">RESPONSÁVEL / INDICADOR</span>
+                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-400 tracking-wider">RESPONSÃVEL / INDICADOR</span>
                               <div className="flex items-center text-xs font-bold text-brand-charcoal dark:text-white mt-0.5">
                                 <Avatar size={16} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} className="mr-1.5 shrink-0" />
                                 <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
@@ -990,7 +1103,7 @@ export function LeadsView() {
                           {/* Footer Colaborador */}
                           <div className="text-[11px] text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
 <span className="font-semibold text-gray-600 dark:text-gray-400">
-                            Indicador {(lead.ref || 'Não especificado').toUpperCase()}
+                            Indicador {(lead.ref || 'NÃ£o especificado').toUpperCase()}
                           </span>
                           </div>
                         </motion.div>
@@ -998,7 +1111,7 @@ export function LeadsView() {
                     ) : (
                       <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white dark:bg-[#18181b]/50">
                         <Inbox className="w-6 h-6 mb-2 text-gray-300 dark:text-gray-600" />
-                        <span className="text-[11px] font-bold">Não há leads nessa etapa</span>
+                        <span className="text-[11px] font-bold">NÃ£o hÃ¡ leads nessa etapa</span>
                       </div>
                     )}
                   </AnimatePresence>
@@ -1009,7 +1122,8 @@ export function LeadsView() {
         </div>
       )}
 
-      {/* Pagination Bar */}
+      {/* Pagination Bar (aplicÃ¡vel apenas Ã  visÃ£o em lista) */}
+      {viewMode === 'list' && (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-brand-border dark:border-gray-800 text-sm mt-2">
         <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">
           Mostrando <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + pageLeads.length : 0}</span> de <span className="font-bold text-brand-charcoal dark:text-white">{filteredLeads.length}</span> leads
@@ -1025,22 +1139,23 @@ export function LeadsView() {
             Anterior
           </button>
           <span className="px-3.5 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-brand-charcoal dark:text-gray-200 border border-brand-border dark:border-gray-700">
-            Página {currentPage} de {totalPages}
+            PÃ¡gina {currentPage} de {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(prev => prev + 1)}
             disabled={currentPage >= totalPages || isLoading}
             className="flex items-center gap-1 px-3.5 py-1.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 rounded-xl font-medium text-xs hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
           >
-            Próximo
+            PrÃ³ximo
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
+      )}
 
       {/* Floating Action Button for New Lead (bottom right) */}
-      <button 
-        onClick={() => setIsModalOpen(true)} 
+      <button
+        onClick={openCreateModal}
         className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
         title="Novo Lead"
       >
@@ -1063,15 +1178,15 @@ export function LeadsView() {
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800 max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center mb-5 shrink-0">
               <div>
-                <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Lead</h3>
-                <p className="text-xs text-brand-muted dark:text-gray-400 mt-0.5">Cadastre um novo cliente no sistema</p>
+                <h3 className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">{editingLead ? 'Editar Lead' : 'Novo Lead'}</h3>
+                <p className="text-xs text-brand-muted dark:text-gray-400 mt-0.5">{editingLead ? `Atualizando os dados de "${editingLead.name}"` : 'Cadastre um novo cliente no sistema'}</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+              <button onClick={closeModal} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
                 <X className="w-5 h-5 text-brand-muted dark:text-gray-400" />
               </button>
             </div>
-            
-            <form onSubmit={handleSubmit(handleAdd)} className="space-y-4 overflow-y-auto pr-1 pb-2">
+
+            <form onSubmit={handleSubmit(editingLead ? handleEditSubmit : handleAdd)} className="space-y-4 overflow-y-auto pr-1 pb-2">
               {/* Campo 1: Nome do Cliente */}
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
@@ -1081,7 +1196,7 @@ export function LeadsView() {
                   autoFocus 
                   {...register('name')} 
                   type="text" 
-                  placeholder="Digite o nome completo do cliente (Ex: João da Silva)" 
+                  placeholder="Digite o nome completo do cliente (Ex: JoÃ£o da Silva)" 
                   className={`w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border rounded-xl text-sm text-brand-charcoal dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
                     errors.name 
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
@@ -1091,7 +1206,7 @@ export function LeadsView() {
                 {errors.name ? (
                   <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>
                 ) : (
-                  <p className="text-gray-400 text-xs mt-1">Este é o nome do cliente que aparecerá no sistema.</p>
+                  <p className="text-gray-400 text-xs mt-1">Este Ã© o nome do cliente que aparecerÃ¡ no sistema.</p>
                 )}
               </div>
 
@@ -1132,20 +1247,20 @@ export function LeadsView() {
                 {errors.value && <p className="text-red-500 text-xs mt-1 font-medium">{errors.value.message}</p>}
               </div>
 
-              {/* Campo 4: Técnico / Indicador (Origem) */}
+              {/* Campo 4: TÃ©cnico / Indicador (Origem) */}
               <div>
                 <label className="block text-sm font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
-                  Técnico / Indicador (Origem da Venda)
+                  TÃ©cnico / Indicador (Origem da Venda)
                 </label>
                 <select
                   {...register('ref')}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-brand-yellow focus:ring-brand-yellow/30 transition-all text-brand-charcoal dark:text-white cursor-pointer"
                 >
                   <option value="Manual">Nenhum (Venda Manual)</option>
-                  <option value="Orgânico">Orgânico (Pesquisa do Cliente)</option>
-                  <option value="Outro">✏️ Outro (Digitar Nome da Indicação Manualmente)</option>
+                  <option value="OrgÃ¢nico">OrgÃ¢nico (Pesquisa do Cliente)</option>
+                  <option value="Outro">âœï¸ Outro (Digitar Nome da IndicaÃ§Ã£o Manualmente)</option>
                   {colaboradores.length > 0 && (
-                    <optgroup label="--- Técnicos e Colaboradores Cadastrados ---">
+                    <optgroup label="--- TÃ©cnicos e Colaboradores Cadastrados ---">
                       {colaboradores.map(c => (
                         <option key={c.id} value={c.name}>{c.name} ({c.id})</option>
                       ))}
@@ -1153,7 +1268,7 @@ export function LeadsView() {
                   )}
                 </select>
 
-                {/* Campo condicional para digitação manual de quem indicou */}
+                {/* Campo condicional para digitaÃ§Ã£o manual de quem indicou */}
                 {selectedRef === 'Outro' && (
                   <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <label className="block text-xs font-semibold text-brand-charcoal dark:text-gray-200 mb-1">
@@ -1172,16 +1287,16 @@ export function LeadsView() {
                     {errors.customRef ? (
                       <p className="text-red-500 text-xs mt-1 font-medium">{errors.customRef.message}</p>
                     ) : (
-                      <p className="text-gray-400 text-xs mt-1">Este nome ficará registrado como o indicador do lead.</p>
+                      <p className="text-gray-400 text-xs mt-1">Este nome ficarÃ¡ registrado como o indicador do lead.</p>
                     )}
                   </div>
                 )}
 
-                <p className="text-gray-400 text-xs mt-1">Selecione o técnico, indicação manual ou origem da venda.</p>
+                <p className="text-gray-400 text-xs mt-1">Selecione o tÃ©cnico, indicaÃ§Ã£o manual ou origem da venda.</p>
               </div>
 
               <button type="submit" className="w-full py-3.5 bg-brand-yellow hover:bg-brand-yellow/90 text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer">
-                Adicionar Lead
+                {editingLead ? 'Salvar Alterações' : 'Adicionar Lead'}
               </button>
             </form>
           </div>
@@ -1221,8 +1336,16 @@ export function LeadsView() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => handleDeleteLead(selectedLead.id)} 
+                <button
+                  onClick={() => openEditModal(selectedLead)}
+                  aria-label={`Editar lead ${selectedLead.name}`}
+                  className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full transition-colors shrink-0 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 shadow-sm"
+                  title="Editar Lead"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteLead(selectedLead.id)}
                   aria-label={`Excluir lead ${selectedLead.name}`}
                   className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full transition-colors shrink-0 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 shadow-sm"
                   title="Excluir Lead"
@@ -1299,7 +1422,7 @@ export function LeadsView() {
                     {aiResult.type === 'qualify' ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Qualificação:</span>
+                          <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">QualificaÃ§Ã£o:</span>
                           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                             aiResult.qualification === 'Quente' ? 'bg-red-100 text-red-800 border-red-200' :
                             aiResult.qualification === 'Morno' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
@@ -1311,7 +1434,7 @@ export function LeadsView() {
                           <p className="text-xs text-brand-muted mt-1 leading-relaxed">{aiResult.reason}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-brand-charcoal dark:text-gray-200">Próximos Passos:</p>
+                          <p className="text-xs font-bold text-brand-charcoal dark:text-gray-200">PrÃ³ximos Passos:</p>
                           <p className="text-xs text-brand-muted mt-1 leading-relaxed">{aiResult.nextSteps}</p>
                         </div>
                       </div>
@@ -1347,11 +1470,11 @@ export function LeadsView() {
 
               {/* Add Note Area */}
               <div className="mt-8 pt-6 border-t border-brand-border dark:border-gray-800">
-                <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-3">Registrar Interação</h4>
+                <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-3">Registrar InteraÃ§Ã£o</h4>
                 <textarea 
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
-                  placeholder="Descreva a nova interação com o lead..." 
+                  placeholder="Descreva a nova interaÃ§Ã£o com o lead..." 
                   className="w-full bg-gray-50 dark:bg-[#27272a]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow resize-none h-28 transition-all dark:text-white dark:placeholder-gray-500"
                 ></textarea>
                 <button
@@ -1367,12 +1490,12 @@ export function LeadsView() {
         </>
       )}
 
-      {/* Modal de confirmação de exclusão de lead */}
+      {/* Modal de confirmaÃ§Ã£o de exclusÃ£o de lead */}
       {confirmDelete && (
         <ConfirmModal
           isOpen={confirmDelete.isOpen}
           title="Excluir Lead"
-          message={`Tem certeza que deseja excluir o lead "${confirmDelete.name}"? Essa ação não pode ser desfeita.`}
+          message={`Tem certeza que deseja excluir o lead "${confirmDelete.name}"? Essa aÃ§Ã£o nÃ£o pode ser desfeita.`}
           confirmLabel="Excluir"
           cancelLabel="Cancelar"
           variant="danger"

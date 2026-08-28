@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     // 1. Find matching lead in Supabase (not already marked as Ganho)
     const { data: pendingLeads, error: leadsError } = await supabase
       .from('leads')
-      .select('*')
+      .select('id, name, phone, status, value, ref')
       .not('status', 'eq', 'Ganho');
 
     if (leadsError) {
@@ -86,26 +86,33 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const cleanStr = (s: string) => s ? s.toLowerCase().replace(/\D/g, '') : '';
-    const cleanPhoneTarget = cleanStr(clientPhone);
+    const cleanPhone = (s: string) => (s ? s.replace(/\D/g, '') : '');
+    const cleanPhoneTarget = cleanPhone(clientPhone);
 
-    // Try finding lead by phone or name
+    // Matching apenas EXATO para evitar marcar o lead errado como "Ganho":
+    // telefone normalizado igual OU nome normalizado igual.
+    const normalizeName = (s: string) => (s ? s.toLowerCase().trim() : '');
+
     let matchedLead = pendingLeads.find(l => {
-      if (cleanPhoneTarget && cleanPhoneTarget.length >= 8 && cleanStr(l.phone).includes(cleanPhoneTarget)) {
+      if (cleanPhoneTarget && cleanPhoneTarget.length >= 8 && cleanPhone(l.phone) === cleanPhoneTarget) {
         return true;
       }
-      if (clientName && l.name && l.name.toLowerCase().trim() === clientName.toLowerCase().trim()) {
+      if (clientName && normalizeName(l.name) === normalizeName(clientName)) {
         return true;
       }
       return false;
     });
 
     if (!matchedLead && clientName) {
-      // Fuzzy name match if exact match wasn't found
-      matchedLead = pendingLeads.find(l => 
-        l.name.toLowerCase().includes(clientName.toLowerCase()) || 
-        clientName.toLowerCase().includes(l.name.toLowerCase())
-      );
+      // Fallback: nome normalizado sem acentos/pontuação, ainda exigindo igualdade exata
+      const strip = (s: string) => normalizeName(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+      const target = strip(clientName);
+      if (target) {
+        const nameMatches = pendingLeads.filter(l => strip(l.name) === target);
+        if (nameMatches.length === 1) {
+          matchedLead = nameMatches[0];
+        }
+      }
     }
 
     if (!matchedLead) {

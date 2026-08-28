@@ -27,12 +27,12 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Focus no botão de cancelar ao abrir (seguro por padrão)
+  // Focus no botão de cancelar ao abrir (default seguro para ações destrutivas)
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => confirmBtnRef.current?.focus(), 50);
+      const timer = setTimeout(() => cancelBtnRef.current?.focus(), 50);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -121,13 +121,13 @@ export function ConfirmModal({
             {/* Actions */}
             <div className="flex gap-3">
               <button
+                ref={cancelBtnRef}
                 onClick={onCancel}
                 className="flex-1 py-2.5 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-slate-300 font-semibold text-sm rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
               >
                 {cancelLabel}
               </button>
               <button
-                ref={confirmBtnRef}
                 onClick={onConfirm}
                 className={`flex-1 py-2.5 font-bold text-sm rounded-xl shadow-sm transition-all ${styles.btnClass}`}
               >

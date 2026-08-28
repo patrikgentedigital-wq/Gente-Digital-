@@ -65,8 +65,15 @@ export async function POST(req: NextRequest) {
         'Authorization': `Basic ${base64Token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000)
     });
+
+    if (!ixcResponse.ok) {
+      const errorText = await ixcResponse.text().catch(() => '');
+      console.error('IXC Prospect HTTP Error:', ixcResponse.status, errorText.slice(0, 200));
+      return NextResponse.json({ success: false, error: `Servidor IXC respondeu com código ${ixcResponse.status}.` }, { status: 502 });
+    }
 
     const ixcData = await ixcResponse.json();
 

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Gente Digital',
     short_name: 'Gente Digital',
     description: 'Gestão de Links de Indicação para colaboradores.',
-    start_url: '/?tab=colaboradores',
+    start_url: '/',
     display: 'standalone',
     background_color: '#111827',
     theme_color: '#FFC700',

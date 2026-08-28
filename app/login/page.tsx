@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,12 +36,31 @@ export default function LoginPage() {
       });
 
       if (error) throw error;
-      
+
       router.push('/');
       router.refresh();
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Credenciais inválidas. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      setError(err.message || 'Não foi possível enviar o e-mail de redefinição.');
     } finally {
       setLoading(false);
     }
@@ -95,23 +116,36 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Error Notification */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: 'auto' }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-start gap-3 text-rose-700 dark:text-rose-400 text-xs font-medium overflow-hidden"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p>{error}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Reset e-mail sent confirmation */}
+        {mode === 'forgot' && resetSent ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl flex items-start gap-3 text-emerald-700 dark:text-emerald-400 text-xs font-medium"
+          >
+            <Mail className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>
+              Se <strong>{email}</strong> estiver cadastrado, você receberá um link para redefinir sua senha. Verifique sua caixa de entrada (e a pasta de spam).
+            </p>
+          </motion.div>
+        ) : (
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-start gap-3 text-rose-700 dark:text-rose-400 text-xs font-medium overflow-hidden"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p>{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={mode === 'login' ? handleLogin : handleForgotPassword} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
               E-mail corporativo
@@ -129,30 +163,41 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Senha de acesso
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-400 dark:focus:border-zinc-600 transition-all font-medium"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                title={showPassword ? 'Ocultar Senha' : 'Mostrar Senha'}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+          {mode === 'login' && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Senha de acesso
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setMode('forgot'); setError(null); setResetSent(false); }}
+                  className="text-[11px] font-semibold text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-slate-400 dark:focus:border-zinc-600 transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  title={showPassword ? 'Ocultar Senha' : 'Mostrar Senha'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <motion.button
             whileHover={{ scale: 1.01 }}
@@ -164,20 +209,42 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Autenticando...</span>
+                <span>{mode === 'login' ? 'Autenticando...' : 'Enviando...'}</span>
               </>
             ) : (
               <>
-                <span>Entrar no Sistema</span>
+                <span>{mode === 'login' ? 'Entrar no Sistema' : 'Enviar link de redefinição'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </motion.button>
         </form>
 
+        {mode === 'forgot' && (
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(null); setResetSent(false); }}
+              className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+            >
+              Voltar para o login
+            </button>
+          </div>
+        )}
+
         <p className="text-[11px] text-center text-slate-400 dark:text-slate-500 mt-8 font-medium">
           Gente Digital &copy; {new Date().getFullYear()} • Plataforma Segura
         </p>
+
+        <div className="text-center mt-4">
+          <a
+            href="/indicar"
+            className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors inline-flex items-center gap-1"
+          >
+            <ArrowRight className="w-3 h-3 rotate-180" />
+            Conheça o programa Indique e Ganhe
+          </a>
+        </div>
       </motion.div>
     </div>
   );

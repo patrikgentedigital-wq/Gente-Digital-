@@ -25,6 +25,7 @@ export async function executeDbQuery<T>(
   const startTime = performance.now();
   let result: { data: T | null; error: any } = { data: null, error: null };
   let executionError: unknown = null;
+  let durationMs = 0;
 
   try {
     result = await queryFn();
@@ -35,8 +36,7 @@ export async function executeDbQuery<T>(
     executionError = err;
     result.error = err;
   } finally {
-    const endTime = performance.now();
-    const durationMs = Number((endTime - startTime).toFixed(2));
+    durationMs = Number((performance.now() - startTime).toFixed(2));
     const isSlowQuery = durationMs > 200;
 
     // Registrar no coletor de métricas do serviço (Regra 7)
@@ -75,6 +75,6 @@ export async function executeDbQuery<T>(
   return {
     data: result.data,
     error: result.error,
-    durationMs: Number((performance.now() - startTime).toFixed(2)),
+    durationMs,
   };
 }

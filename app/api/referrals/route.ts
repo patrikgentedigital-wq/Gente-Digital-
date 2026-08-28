@@ -74,7 +74,21 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
 
-    if (leadError) throw leadError;
+    if (leadError) {
+      // Violação de unique (ex.: índice idx_leads_phone): outra requisição inseriu o mesmo
+      // telefone primeiro. Recupera o lead existente e responde como duplicado.
+      if ((leadError as any).code === '23505') {
+        const { data: existing } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('phone', phone)
+          .limit(1);
+        if (existing?.[0]) {
+          return NextResponse.json({ success: true, duplicate: true, leadId: existing[0].id }, { status: 200 });
+        }
+      }
+      throw leadError;
+    }
 
     const { error: historyError } = await supabase.from('lead_history').insert([{
       lead_id: lead.id,

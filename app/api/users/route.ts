@@ -58,6 +58,29 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // Impede remover o último administrador do sistema
+    if (role === 'vendedor') {
+      const { data: currentRole } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (currentRole?.role === 'admin') {
+        const { count } = await supabaseAdmin
+          .from('user_roles')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('role', 'admin');
+
+        if ((count ?? 0) <= 1) {
+          return NextResponse.json(
+            { success: false, error: 'Não é possível rebaixar o último administrador do sistema.' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('user_roles')
       .upsert({ user_id: userId, role }, { onConflict: 'user_id' });

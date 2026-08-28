@@ -7,6 +7,7 @@ import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useToast } from '@/components/providers/toast-context';
+import { sanitizeCsvField } from '@/lib/utils';
 import Avatar from 'boring-avatars';
 import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
 
@@ -324,15 +325,15 @@ export function ComissoesView() {
   const handleExportCSV = () => {
     const headers = ['ID Lead', 'Nome do Lead / Prêmio', 'Indicador (Colaborador/Cliente)', 'Tipo', 'Valor Venda (R$)', 'Recompensa (R$)', 'Status', 'Data Conversao', 'Data Pagamento'];
     const rows = commissions.map(c => [
-      c.lead_id,
-      `"${c.lead_name.replace(/"/g, '""')}"`,
-      `"${c.colaborador_name.replace(/"/g, '""')}"`,
-      c.type === 'pix_colaborador' ? 'PIX Colaborador' : c.type === 'bonus_top' ? 'Bônus Top Colaborador' : 'Desconto Mensalidade Cliente',
-      c.sale_value,
-      c.commission_amount,
-      c.status,
-      c.date,
-      `"${c.paid_at || '-'}"`
+      sanitizeCsvField(c.lead_id),
+      sanitizeCsvField(c.lead_name),
+      sanitizeCsvField(c.colaborador_name),
+      sanitizeCsvField(c.type === 'pix_colaborador' ? 'PIX Colaborador' : c.type === 'bonus_top' ? 'Bônus Top Colaborador' : 'Desconto Mensalidade Cliente'),
+      sanitizeCsvField(c.sale_value),
+      sanitizeCsvField(c.commission_amount),
+      sanitizeCsvField(c.status),
+      sanitizeCsvField(c.date),
+      sanitizeCsvField(c.paid_at || '-')
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -428,6 +429,16 @@ export function ComissoesView() {
           </div>
         </div>
       </div>
+
+      {/* Aviso de permissão para vendedores */}
+      {userRole === 'vendedor' && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60">
+          <UserCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium leading-relaxed">
+            Você está vendo todas as comissões do período, mas só pode dar baixa (PIX ou desconto) nas comissões vinculadas ao seu cadastro. As demais são exclusividade da administração.
+          </p>
+        </div>
+      )}
 
       {/* Prazo de pagamento */}
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60">

@@ -14,6 +14,17 @@ interface CacheEntry<T> {
 
 class TrackedCacheClient {
   private store = new Map<string, CacheEntry<any>>();
+  private sweepThreshold = 100;
+
+  // Remove entradas expiradas quando o store cresce demais
+  private sweepExpired() {
+    const now = Date.now();
+    for (const [key, entry] of this.store) {
+      if (entry.expiresAt !== null && entry.expiresAt <= now) {
+        this.store.delete(key);
+      }
+    }
+  }
 
   /**
    * Obtém um valor do cache rastreando o evento de HIT ou MISS
@@ -58,6 +69,9 @@ class TrackedCacheClient {
     const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
 
     this.store.set(key, { value, expiresAt });
+    if (this.store.size > this.sweepThreshold) {
+      this.sweepExpired();
+    }
     const durationMs = Number((performance.now() - startTime).toFixed(2));
 
     logger.info(`[CACHE SET] Chave '${key}' salva (TTL: ${ttlSeconds || 'indefinido'}s, ${durationMs}ms)`, {

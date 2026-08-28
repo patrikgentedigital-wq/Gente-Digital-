@@ -1,5 +1,15 @@
 import { Printer, X, TrendingUp, Award, Download } from 'lucide-react';
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c] as string));
+}
+
 interface ExecutiveReportModalProps {
   onClose: () => void;
   metrics: {
@@ -250,9 +260,9 @@ export function ExecutiveReportModal({ onClose, metrics }: ExecutiveReportModalP
               ${metrics.topColaboradores.map((colab, i) => `
                 <tr>
                   <td><strong>#${i + 1}</strong></td>
-                  <td><strong>${colab.name}</strong></td>
-                  <td class="text-green"><strong>${colab.conversions} vendas</strong></td>
-                  <td style="text-align: right;"><strong>${colab.points} pts</strong></td>
+                  <td><strong>${escapeHtml(colab.name)}</strong></td>
+                  <td class="text-green"><strong>${escapeHtml(colab.conversions)} vendas</strong></td>
+                  <td style="text-align: right;"><strong>${escapeHtml(colab.points)} pts</strong></td>
                 </tr>
               `).join('')}
             </tbody>

@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/components/providers/toast-context';
+import { ConfirmModal } from '@/components/providers/confirm-modal';
 import QRCode from 'qrcode';
 import { PROGRAM_RULES } from '@/lib/rules';
 
@@ -20,6 +21,9 @@ const colaboradorSchema = z.object({
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
+
+const normalizeRef = (str: string) =>
+  str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
 
 export function ColaboradoresView() {
@@ -35,12 +39,54 @@ export function ColaboradoresView() {
   const [baseLink, setBaseLink] = useState<string>(PROGRAM_RULES.linkBasePadrao);
   const [isEditingBase, setIsEditingBase] = useState(false);
   const [tempBaseLink, setTempBaseLink] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
+  const [editingColab, setEditingColab] = useState<Colaborador | null>(null);
+  const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
+  const [clicksLoaded, setClicksLoaded] = useState(false);
+
+  // Busca os cliques por ref (rota admin; para vendedores o fetch retorna 401 e é ignorado)
+  const fetchClicks = async () => {
+    try {
+      const res = await fetch('/api/track-click');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.clicks)) {
+        const map: Record<string, number> = {};
+        data.clicks.forEach((c: { ref: string; count: number }) => {
+          map[normalizeRef(c.ref)] = (map[normalizeRef(c.ref)] || 0) + c.count;
+        });
+        setClickCounts(map);
+        setClicksLoaded(true);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar cliques de links:', err);
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingColab(null);
+    reset();
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (colab: Colaborador) => {
+    setEditingColab(colab);
+    reset({ name: colab.name, email: colab.email, photo_url: colab.photo_url || '' });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingColab(null);
+    reset();
+  };
 
   // Fechar modais com a tecla Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsModalOpen(false);
+        setEditingColab(null);
         setSelectedColabForQr(null);
       }
     };
@@ -214,6 +260,7 @@ export function ColaboradoresView() {
   useEffect(() => {
     fetchColaboradores();
     loadBaseLink();
+    fetchClicks();
 
     if (isSupabaseConfigured()) {
       const colabChannel = supabase
@@ -278,6 +325,44 @@ export function ColaboradoresView() {
   };
 
   const handleAdd = async (data: ColaboradorFormData) => {
+    if (editingColab) {
+      const previousColabs = [...colaboradores];
+      const updated: Colaborador = {
+        ...editingColab,
+        name: data.name,
+        email: data.email,
+        photo_url: data.photo_url || undefined,
+      };
+      setColaboradores(prev => prev.map(c => c.id === editingColab.id ? updated : c));
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { error } = await supabase.from('colaboradores').update({
+            name: data.name,
+            email: data.email,
+            photo_url: data.photo_url || null,
+          }).eq('id', editingColab.id);
+
+          if (error) {
+            console.error("Supabase update error:", error);
+            toastError("Erro ao atualizar", error.message || "As alterações não puderam ser salvas.");
+            setColaboradores(previousColabs);
+          } else {
+            toastSuccess("Colaborador atualizado!", "As alterações foram sincronizadas com todos os dispositivos.");
+          }
+        } catch (err: any) {
+          console.error("Supabase update exception:", err);
+          toastError("Erro de conexão", "Não foi possível conectar ao servidor para atualizar o colaborador.");
+          setColaboradores(previousColabs);
+        }
+      } else {
+        toastInfo("Modo Demonstração", "O Supabase não está configurado. As alterações são locais.");
+      }
+
+      closeModal();
+      return;
+    }
+
     const initials = data.name.substring(0, 2).toUpperCase();
     const id = await getNextColabId();
     
@@ -318,12 +403,19 @@ export function ColaboradoresView() {
     } else {
       toastInfo("Modo Demonstração", "O Supabase não está configurado. As alterações são locais.");
     }
-    
-    setIsModalOpen(false);
-    reset();
+
+    closeModal();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
+    const target = colaboradores.find(c => c.id === id);
+    setConfirmDelete({ isOpen: true, id, name: target?.name || id });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
     const previousColabs = [...colaboradores];
     setColaboradores(prev => prev.filter(c => c.id !== id));
 
@@ -359,7 +451,7 @@ export function ColaboradoresView() {
           <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Links de Indicação</h2>
           <p className="text-brand-muted dark:text-gray-400 mt-1">Configure e monitore os links de compartilhamento dos seus colaboradores.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
+        <button onClick={openCreateModal} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
           <UserPlus className="w-5 h-5" />
           Novo Colaborador
         </button>
@@ -492,18 +584,31 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className="font-bold text-brand-charcoal dark:text-white text-base">{(colab.count ?? 0).toString().padStart(2, '0')}</span>
+                    {clicksLoaded && (
+                      <span className="block text-[10px] text-brand-muted dark:text-gray-400 font-medium mt-0.5">
+                        {clickCounts[normalizeRef(colab.id)] ?? clickCounts[normalizeRef(colab.name)] ?? 0} cliques no link
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
-                      <button 
+                      <button
                         onClick={() => router.push('/?tab=dashboard')}
                         aria-label={`Ver analytics de ${colab.name}`}
-                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors" 
+                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
                         title="Ver Analytics"
                       >
                         <BarChart2 className="w-4 h-4" />
                       </button>
-                      <button 
+                      <button
+                        onClick={() => openEditModal(colab)}
+                        aria-label={`Editar colaborador ${colab.name}`}
+                        className="p-2 text-brand-muted hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => {
                           setSelectedColabForQr(colab);
                           setCopiedLink(false);
@@ -535,7 +640,7 @@ export function ColaboradoresView() {
                       </div>
                       <h4 className="text-brand-charcoal font-bold mb-1">Nenhum colaborador</h4>
                       <p className="text-brand-muted text-sm max-w-[250px]">Adicione colaboradores para que eles possam gerar links e trazer novos leads.</p>
-                      <button onClick={() => setIsModalOpen(true)} className="mt-6 px-6 py-2.5 bg-white border border-brand-border text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                      <button onClick={openCreateModal} className="mt-6 px-6 py-2.5 bg-white border border-brand-border text-brand-charcoal font-bold text-sm rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm">
                         <UserPlus className="w-4 h-4" />
                         Novo Colaborador
                       </button>
@@ -553,8 +658,8 @@ export function ColaboradoresView() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="new-colaborator-title">
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
-              <h3 id="new-colaborator-title" className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">Novo Colaborador</h3>
-              <button type="button" aria-label="Fechar cadastro de colaborador" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
+              <h3 id="new-colaborator-title" className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">{editingColab ? 'Editar Colaborador' : 'Novo Colaborador'}</h3>
+              <button type="button" aria-label="Fechar cadastro de colaborador" onClick={closeModal} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
             </div>
             <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
@@ -607,7 +712,7 @@ export function ColaboradoresView() {
                 {errors.photo_url && <p className="text-red-500 text-xs mt-1 font-medium">{errors.photo_url.message}</p>}
               </div>
               <button type="submit" className="w-full py-3.5 bg-brand-yellow text-brand-charcoal font-bold rounded-xl mt-6 hover:shadow-level-2 transition-all">
-                Adicionar Colaborador
+                {editingColab ? 'Salvar Alterações' : 'Adicionar Colaborador'}
               </button>
             </form>
           </div>
@@ -703,6 +808,21 @@ export function ColaboradoresView() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de confirmação de exclusão de colaborador */}
+      {confirmDelete && (
+        <ConfirmModal
+          isOpen={confirmDelete.isOpen}
+          title="Excluir Colaborador"
+          message={`Tem certeza que deseja excluir o colaborador "${confirmDelete.name}"? O link de indicação deixará de funcionar. Os leads já registrados permanecerão no sistema.`}
+          confirmLabel="Excluir"
+          cancelLabel="Cancelar"
+          variant="danger"
+          icon="trash"
+          onConfirm={executeDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   );

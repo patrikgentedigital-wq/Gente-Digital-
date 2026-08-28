@@ -48,7 +48,7 @@ export function DashboardShell() {
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const tabParam = searchParams.get('tab');
-  const activeTab: TabId = isTabId(tabParam) ? tabParam : 'colaboradores';
+  const activeTab: TabId = isTabId(tabParam) ? tabParam : 'dashboard';
   const refParam = searchParams.get('ref');
 
   useEffect(() => {

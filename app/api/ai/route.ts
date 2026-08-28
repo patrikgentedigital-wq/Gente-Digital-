@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { verifyAuthAny } from '@/lib/auth-server';
 
 // Inicializa Rate Limiter (evita crash se Redis não estiver configurado)
 const redis = (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) 
@@ -64,8 +65,6 @@ function generateDynamicSummary(metrics: any): string {
     `• Foque no acompanhamento dos leads nas etapas "Contato Inicial" e "Em Negociação" no funil Kanban para maximizar a conversão nesta semana.`;
 }
 
-import { verifyAuthAny } from '@/lib/auth-server';
-
 export async function POST(req: NextRequest) {
   try {
     const isAuthenticated = await verifyAuthAny(req);
@@ -83,7 +82,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Validação Zod
-    const rawBody = await req.json();
+    const rawBody = await req.json().catch(() => null);
+    if (rawBody === null) {
+      return NextResponse.json({ error: 'Payload inválido: corpo da requisição não é um JSON válido.' }, { status: 400 });
+    }
     const parsed = AiPayloadSchema.safeParse(rawBody);
     
     if (!parsed.success) {

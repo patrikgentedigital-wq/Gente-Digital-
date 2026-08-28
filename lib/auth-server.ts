@@ -37,6 +37,7 @@ export async function getAuthenticatedUser(req: NextRequest) {
 
 /**
  * Retorna o role do usuário consultando múltiplas fontes (ADMIN_EMAILS, user_roles, colaboradores, auth metadata).
+ * O fallback seguro é 'vendedor': nenhum usuário recebe admin implicitamente.
  */
 export async function getUserRole(
   userId: string,
@@ -48,33 +49,23 @@ export async function getUserRole(
 
   const emailLower = (userEmail || '').trim().toLowerCase();
 
-  // 2. E-mails administrativos da Gente Digital reconhecidos automaticamente
-  if (
-    !emailLower ||
-    emailLower.includes('gentedigital') ||
-    emailLower.includes('admin') ||
-    emailLower.endsWith('@gentedigital.com.br') ||
-    emailLower === 'gentedigital2424@gmail.com'
-  ) {
-    return 'admin';
-  }
-
-  // 3. Checar ADMIN_EMAILS no .env
+  // 2. Checar ADMIN_EMAILS no .env (fonte oficial de bootstrap de admins)
+  //    e o e-mail exato do dono (comparação exata, nunca substring).
   const adminEmails = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (emailLower && adminEmails.includes(emailLower)) {
+  if (emailLower && (adminEmails.includes(emailLower) || emailLower === 'gentedigital2424@gmail.com')) {
     return 'admin';
   }
 
-  // 4. Checar metadados do Supabase Auth
+  // 3. Checar metadados do Supabase Auth
   if (userMetadata?.role === 'admin') {
     return 'admin';
   }
 
-  // 5. Checar tabela user_roles
+  // 4. Checar tabela user_roles
   try {
     const { data, error } = await supabaseAdmin
       .from('user_roles')
@@ -89,13 +80,17 @@ export async function getUserRole(
     console.warn('Erro ao consultar user_roles:', err);
   }
 
-  // 6. Checar tabela colaboradores
-  if (emailLower || userId) {
+  // 5. Checar tabela colaboradores (valores entre aspas para não quebrar a sintaxe do or())
+  if (userId || emailLower) {
     try {
+      const orParts: string[] = [];
+      if (userId) orParts.push(`user_id.eq.${userId}`);
+      if (emailLower) orParts.push(`email.ilike."${emailLower.replace(/"/g, '""')}"`);
+
       const { data: colab } = await supabaseAdmin
         .from('colaboradores')
         .select('role')
-        .or(`user_id.eq.${userId}${emailLower ? `,email.ilike.${emailLower}` : ''}`)
+        .or(orParts.join(','))
         .limit(1)
         .maybeSingle();
 
@@ -107,23 +102,7 @@ export async function getUserRole(
     }
   }
 
-  // 7. Se não houver nenhum admin ativo na tabela user_roles, o usuário autenticado vira admin
-  try {
-    const { data: adminRows, error } = await supabaseAdmin
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'admin')
-      .limit(1);
-
-    if (!error && (!adminRows || adminRows.length === 0)) {
-      await supabaseAdmin
-        .from('user_roles')
-        .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id' });
-      return 'admin';
-    }
-  } catch {}
-
-  return 'admin';
+  return 'vendedor';
 }
 
 /**

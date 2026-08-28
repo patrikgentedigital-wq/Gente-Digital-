@@ -32,11 +32,14 @@ export async function GET(request: NextRequest) {
     dbLatencyMs = dbCheck.durationMs;
     if (dbCheck.error) {
       dbStatus = 'DEGRADED';
-      dbErrorDetails = dbCheck.error.message || String(dbCheck.error);
+      // Não expor detalhes internos do banco em endpoint público
+      dbErrorDetails = 'Detalhes do erro registrados no log do servidor.';
+      logger.error('[HEALTH CHECK] Banco de dados degradado', dbCheck.error, undefined, requestId);
     }
   } catch (err: any) {
     dbStatus = 'DOWN';
-    dbErrorDetails = err?.message || String(err);
+    dbErrorDetails = 'Detalhes do erro registrados no log do servidor.';
+    logger.error('[HEALTH CHECK] Banco de dados indisponível', err, undefined, requestId);
   }
 
   // 2. Diagnóstico do Cache

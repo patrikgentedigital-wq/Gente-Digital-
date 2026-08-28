@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth, verifyAuthAny, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
+import { verifyAuth, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
 import { z } from 'zod';
 
 const PayCommissionSchema = z.object({
@@ -12,6 +12,24 @@ const PayCommissionSchema = z.object({
   type: z.enum(['pix_colaborador', 'desconto_cliente', 'bonus_top']),
 });
 
+async function getRole(user: { id: string; email?: string | null; user_metadata?: any }): Promise<'admin' | 'vendedor'> {
+  if (user.id === 'dev-local') return 'admin';
+  return getUserRole(user.id, user.email, (user as any).user_metadata);
+}
+
+async function getAllowedColabNames(user: { id: string; email?: string | null }): Promise<string[]> {
+  const userEmail = user.email || '';
+  const orParts: string[] = [`user_id.eq.${user.id}`];
+  if (userEmail) orParts.push(`email.ilike."${userEmail.replace(/"/g, '""')}"`);
+
+  const { data: colabData } = await supabase
+    .from('colaboradores')
+    .select('name, id')
+    .or(orParts.join(','));
+
+  return (colabData || []).flatMap(c => [c.name, c.id]).filter(Boolean);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthenticatedUser(req);
@@ -19,8 +37,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    const isDevLocal = user.id === 'dev-local';
-    const role = isDevLocal ? 'admin' : await getUserRole(user.id, user.email, (user as any).user_metadata);
+    const role = await getRole(user);
 
     // Se Supabase não estiver configurado (dev local / demo)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -35,13 +52,7 @@ export async function GET(req: NextRequest) {
 
     if (role !== 'admin') {
       // Vendedor só visualiza os próprios pagamentos de comissão
-      const userEmail = user.email || '';
-      const { data: colabData } = await supabase
-        .from('colaboradores')
-        .select('name, id')
-        .or(`user_id.eq.${user.id}${userEmail ? `,email.ilike.${userEmail}` : ''}`);
-
-      const allowedNames = (colabData || []).flatMap(c => [c.name, c.id]).filter(Boolean);
+      const allowedNames = await getAllowedColabNames(user);
 
       if (allowedNames.length === 0) {
         return NextResponse.json({ success: true, payments: [] });
@@ -67,11 +78,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuthAny(req);
-    if (!isAuthenticated) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
       return NextResponse.json({ success: false, error: 'Não autorizado. Faça login para dar baixa em comissões.' }, { status: 401 });
     }
 
+    const role = await getRole(user);
     const rawBody = await req.json().catch(() => ({}));
     const parsed = PayCommissionSchema.safeParse(rawBody);
 
@@ -80,6 +92,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { key, colaboradorName, leadName, amount, type } = parsed.data;
+
+    // Não-admins só podem dar baixa em comissões vinculadas aos próprios nomes/IDs
+    if (role !== 'admin') {
+      const allowedNames = await getAllowedColabNames(user);
+      if (!allowedNames.includes(colaboradorName)) {
+        console.warn(`Acesso negado: ${user.email} tentou registrar pagamento para "${colaboradorName}".`);
+        return NextResponse.json({ success: false, error: 'Você não tem permissão para registrar pagamento desta comissão.' }, { status: 403 });
+      }
+    }
 
     // Se Supabase não estiver configurado (dev local / demo)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -111,7 +132,7 @@ export async function POST(req: NextRequest) {
       .select();
 
     // 2. Fallback de compatibilidade caso a coluna no banco ainda se chame 'commission_key'
-    if (error && (error.message.includes('commission_ref') || error.message.includes('column'))) {
+    if (error && (error.message.includes('commission_ref') || error.message.includes('commission_key'))) {
       console.warn('Tentando fallback com commission_key:', error.message);
       const fallbackResult = await supabase
         .from('commission_payments')
