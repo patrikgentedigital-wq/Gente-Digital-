@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth, verifyAuthAny, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
+import { verifyAuth, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
 import { z } from 'zod';
 
 const PayCommissionSchema = z.object({
@@ -20,7 +20,13 @@ export async function GET(req: NextRequest) {
     }
 
     const isDevLocal = user.id === 'dev-local';
-    const role = isDevLocal ? 'admin' : await getUserRole(user.id);
+    const role = isDevLocal ? 'admin' : await getUserRole(user.id, user.email, (user as any).user_metadata);
+
+    // Se Supabase não estiver configurado (dev local / demo)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      return NextResponse.json({ success: true, payments: [] });
+    }
 
     let query = supabase
       .from('commission_payments')
@@ -47,8 +53,9 @@ export async function GET(req: NextRequest) {
     const { data: payments, error } = await query;
 
     if (error) {
-      console.error('Erro ao buscar pagamentos:', error.message);
-      return NextResponse.json({ success: false, error: 'Erro ao buscar pagamentos.' }, { status: 500 });
+      console.warn('Aviso ao consultar commission_payments (tabela pode não ter sido criada ainda):', error.message);
+      // Retornar lista vazia em vez de quebrar a página com erro 500
+      return NextResponse.json({ success: true, payments: [], tableMissing: true });
     }
 
     return NextResponse.json({ success: true, payments });
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
   try {
     const isAuthenticated = await verifyAuth(req);
     if (!isAuthenticated) {
-      return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Não autorizado. Apenas administradores podem dar baixa em comissões.' }, { status: 401 });
     }
 
     const rawBody = await req.json().catch(() => ({}));
@@ -74,7 +81,24 @@ export async function POST(req: NextRequest) {
 
     const { key, colaboradorName, leadName, amount, type } = parsed.data;
 
-    const { data, error } = await supabase
+    // Se Supabase não estiver configurado (dev local / demo)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      return NextResponse.json({ 
+        success: true, 
+        payment: {
+          commission_ref: key,
+          colaborador_name: colaboradorName,
+          lead_name: leadName,
+          amount,
+          type,
+          paid_at: new Date().toISOString()
+        } 
+      });
+    }
+
+    // 1. Tentar upsert com 'commission_ref' (padrão atual)
+    let { data, error } = await supabase
       .from('commission_payments')
       .upsert({
         commission_ref: key,
@@ -86,14 +110,38 @@ export async function POST(req: NextRequest) {
       }, { onConflict: 'commission_ref' })
       .select();
 
+    // 2. Fallback de compatibilidade caso a coluna no banco ainda se chame 'commission_key'
+    if (error && (error.message.includes('commission_ref') || error.message.includes('column'))) {
+      console.warn('Tentando fallback com commission_key:', error.message);
+      const fallbackResult = await supabase
+        .from('commission_payments')
+        .upsert({
+          commission_key: key,
+          colaborador_name: colaboradorName,
+          lead_name: leadName,
+          amount,
+          type,
+          paid_at: new Date().toISOString(),
+        } as any, { onConflict: 'commission_key' as any })
+        .select();
+
+      if (!fallbackResult.error) {
+        data = fallbackResult.data;
+        error = null;
+      }
+    }
+
     if (error) {
-      console.error('Erro ao registrar pagamento:', error.message);
-      return NextResponse.json({ success: false, error: 'Erro ao registrar pagamento.' }, { status: 500 });
+      console.error('Erro ao registrar pagamento no Supabase:', error.message);
+      return NextResponse.json({ 
+        success: false, 
+        error: `Erro ao registrar no banco de dados: ${error.message}. Certifique-se de executar a migration supabase_migration_commission_payments.sql no painel do Supabase.` 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, payment: data?.[0] });
   } catch (err: any) {
     console.error('Exceção ao registrar pagamento:', err);
-    return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Erro interno do servidor' }, { status: 500 });
   }
 }

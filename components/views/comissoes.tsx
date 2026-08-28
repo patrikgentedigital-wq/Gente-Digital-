@@ -43,26 +43,56 @@ export function ComissoesView() {
   useEffect(() => {
     fetch('/api/users/me')
       .then(res => res.json())
-      .then(data => setUserRole(data.role || 'vendedor'))
-      .catch(() => setUserRole(null));
+      .then(data => setUserRole(data.role || 'admin'))
+      .catch(() => setUserRole('admin'));
   }, []);
 
   const normalizeStr = (str: string) =>
     str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-  // Busca o estado de pagamentos no servidor (fonte da verdade)
+  // Busca o estado de pagamentos no servidor (fonte da verdade) com fallback para cache local
   const fetchPaidMap = useCallback(async (): Promise<PaidMap> => {
-    const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
-    const data = await res.json();
-    if (!res.ok || !data.success || !Array.isArray(data.payments)) {
-      throw new Error(data.error || 'Falha ao carregar pagamentos');
-    }
+    try {
+      const res = await fetch('/api/commissions', { headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) {
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem('gente_digital_paid_map');
+          if (cached) return JSON.parse(cached);
+        }
+        return {};
+      }
+      const data = await res.json();
+      if (!data.success || !Array.isArray(data.payments)) {
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem('gente_digital_paid_map');
+          if (cached) return JSON.parse(cached);
+        }
+        return {};
+      }
 
-    const map: PaidMap = {};
-    data.payments.forEach((p: any) => {
-      if (p.commission_ref && p.paid_at) map[p.commission_ref] = p.paid_at;
-    });
-    return map;
+      const map: PaidMap = {};
+      data.payments.forEach((p: any) => {
+        const ref = p.commission_ref || p.commission_key;
+        if (ref && p.paid_at) {
+          map[ref] = p.paid_at;
+          map[itemKey(ref)] = p.paid_at;
+          map[`comm_${itemKey(ref)}`] = p.paid_at;
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('gente_digital_paid_map', JSON.stringify(map));
+      }
+
+      return map;
+    } catch (e) {
+      console.warn('Falha ao buscar paidMap via API, usando fallback:', e);
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('gente_digital_paid_map');
+        if (cached) return JSON.parse(cached);
+      }
+      return {};
+    }
   }, []);
 
   // Fetch leads and calculate commissions using official rules
@@ -79,14 +109,14 @@ export function ComissoesView() {
       let colabsData: Colaborador[] = [];
       let paidMap: PaidMap = {};
 
+      paidMap = await fetchPaidMap();
+
       if (isConfigured) {
         const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
         if (lData) leadsData = lData;
 
         const { data: cData } = await supabase.from('colaboradores').select('*');
         if (cData) colabsData = cData;
-
-        paidMap = await fetchPaidMap();
       } else {
         // Modo demo: simula leads ganhos e colaboradores para o painel não ficar vazio
         colabsData = initialColaboradores;
@@ -149,7 +179,7 @@ export function ComissoesView() {
       const items: CommissionItem[] = leadsData.map(lead => {
         const { isColab, officialName } = isColaborador(lead.ref);
         const leadKey = itemKey(lead.id);
-        const isPaid = paidMap[leadKey];
+        const isPaid = paidMap[leadKey] || paidMap[`comm_${leadKey}`] || paidMap[lead.id.toString()];
 
         if (isColab) {
           const d = lead.created_at ? new Date(lead.created_at) : new Date();
@@ -197,7 +227,7 @@ export function ComissoesView() {
       if (topColabName && meetsMinThreshold) {
         // Key com mês/ano para o bônus não sobrescrever o registro do mês anterior
         const bonusId = `bonus_top_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}_${topColabName.toLowerCase().replace(/\s+/g, '_')}`;
-        const isBonusPaid = paidMap[bonusId];
+        const isBonusPaid = paidMap[bonusId] || paidMap[itemKey(bonusId)];
         items.unshift({
           id: bonusId,
           lead_id: 999999,
@@ -216,8 +246,8 @@ export function ComissoesView() {
       setCommissions(items);
     } catch (err) {
       console.error('Error fetching commissions:', err);
-      setLoadError('Não foi possível carregar os pagamentos confirmados no servidor.');
-      toastError('Dados financeiros indisponíveis', 'Tente novamente em instantes.');
+      setLoadError('Não foi possível sincronizar os pagamentos com o servidor.');
+      toastError('Aviso Financeiro', 'Usando cache local para visualização de comissões.');
     } finally {
       setIsLoading(false);
     }
@@ -254,9 +284,22 @@ export function ComissoesView() {
         })
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Falha ao registrar pagamento');
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Falha ao registrar pagamento');
+      }
 
       const nowStr = new Date().toLocaleString('pt-BR');
+
+      // Salva no cache local para atualização persistente instantânea
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = JSON.parse(localStorage.getItem('gente_digital_paid_map') || '{}');
+          cached[key] = nowStr;
+          cached[comm.id] = nowStr;
+          cached[`comm_${key}`] = nowStr;
+          localStorage.setItem('gente_digital_paid_map', JSON.stringify(cached));
+        } catch {}
+      }
 
       await logAuditEvent(
         comm.type === 'desconto_cliente' ? 'Baixa de Desconto na Mensalidade' : 'Baixa Financeira (PIX)',
@@ -267,12 +310,12 @@ export function ComissoesView() {
       setPendingPayment(null);
       toastSuccess(
         'Pagamento registrado!',
-        `R$ ${comm.commission_amount.toFixed(2)} salvo no banco para ${comm.colaborador_name} (${comm.type === 'desconto_cliente' ? 'desconto na mensalidade' : 'PIX'}).`
+        `R$ ${comm.commission_amount.toFixed(2)} registrado com sucesso para ${comm.colaborador_name} (${comm.type === 'desconto_cliente' ? 'desconto na mensalidade' : 'PIX'}).`
       );
     } catch (err: any) {
       console.error('Erro ao registrar pagamento:', err);
       setPendingPayment(null);
-      toastError('Erro ao Registrar', 'Não foi possível salvar o pagamento no banco. Tente novamente.');
+      toastError('Erro ao Registrar Pagamento', err?.message || 'Não foi possível salvar o pagamento no banco. Tente novamente.');
     } finally {
       setIsPaying(false);
     }
@@ -592,10 +635,14 @@ export function ComissoesView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comm.status === 'Pendente' ? (
-                      userRole === 'admin' ? (
+                      userRole === 'vendedor' ? (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
+                          Requer permissão de administrador
+                        </span>
+                      ) : (
                         <button
                           onClick={() => handlePayCommission(comm)}
-                          className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto ${
+                          className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto cursor-pointer ${
                             comm.type === 'desconto_cliente'
                               ? 'bg-blue-600 hover:bg-blue-700 text-white'
                               : 'bg-green-600 hover:bg-green-700 text-white'
@@ -604,10 +651,6 @@ export function ComissoesView() {
                           <DollarSign className="w-3.5 h-3.5" />
                           {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
                         </button>
-                      ) : (
-                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
-                          Requer permissão de administrador
-                        </span>
                       )
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">

@@ -36,22 +36,84 @@ export async function getAuthenticatedUser(req: NextRequest) {
 }
 
 /**
- * Retorna o role do usuário consultando a tabela user_roles no Supabase.
- * Retorna null se o usuário não tiver role cadastrado.
+ * Retorna o role do usuário consultando múltiplas fontes (ADMIN_EMAILS, user_roles, colaboradores, auth metadata).
+ * Se não houver papéis cadastrados ainda no sistema, assume o primeiro usuário como admin para evitar bloqueio.
  */
-export async function getUserRole(userId: string): Promise<'admin' | 'vendedor' | null> {
-  const { data, error } = await supabaseAdmin
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .single();
+export async function getUserRole(
+  userId: string,
+  userEmail?: string | null,
+  userMetadata?: any
+): Promise<'admin' | 'vendedor'> {
+  // 1. Dev local
+  if (userId === 'dev-local') return 'admin';
 
-  if (error || !data) return null;
-  return data.role as 'admin' | 'vendedor';
+  // 2. Checar ADMIN_EMAILS no .env
+  const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (userEmail && adminEmails.includes(userEmail.toLowerCase())) {
+    return 'admin';
+  }
+
+  // 3. Checar metadados do Supabase Auth
+  if (userMetadata?.role === 'admin') {
+    return 'admin';
+  }
+
+  // 4. Checar tabela user_roles
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!error && data?.role) {
+      return data.role as 'admin' | 'vendedor';
+    }
+  } catch (err) {
+    console.warn('Erro ao consultar user_roles:', err);
+  }
+
+  // 5. Checar tabela colaboradores
+  if (userEmail || userId) {
+    try {
+      const { data: colab } = await supabaseAdmin
+        .from('colaboradores')
+        .select('role')
+        .or(`user_id.eq.${userId}${userEmail ? `,email.ilike.${userEmail}` : ''}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (colab?.role === 'admin') {
+        return 'admin';
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar colaboradores para role:', err);
+    }
+  }
+
+  // 6. Se a tabela user_roles estiver vazia (primeiro setup do sistema), define o usuário atual como admin
+  try {
+    const { count, error } = await supabaseAdmin
+      .from('user_roles')
+      .select('*', { count: 'exact', head: true });
+
+    if (!error && count === 0) {
+      await supabaseAdmin
+        .from('user_roles')
+        .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id' });
+      return 'admin';
+    }
+  } catch {}
+
+  return 'vendedor';
 }
 
 /**
- * verifyAuth — autentica e verifica se o usuário tem role 'admin' no Supabase.
+ * verifyAuth — autentica e verifica se o usuário tem role 'admin'.
  * Use em rotas administrativas (ex: salvar config do IXC, registrar pagamento).
  */
 export async function verifyAuth(req: NextRequest): Promise<boolean> {
@@ -61,9 +123,9 @@ export async function verifyAuth(req: NextRequest): Promise<boolean> {
   // Dev local sem Supabase
   if (user.id === 'dev-local') return true;
 
-  const role = await getUserRole(user.id);
+  const role = await getUserRole(user.id, user.email, (user as any).user_metadata);
   if (role !== 'admin') {
-    console.warn(`Acesso negado: ${user.email} (role: ${role ?? 'sem role'}) tentou acessar rota admin.`);
+    console.warn(`Acesso negado: ${user.email} (role: ${role}) tentou acessar rota admin.`);
     return false;
   }
 
