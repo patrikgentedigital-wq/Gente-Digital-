@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const { data: leads, error: leadsError } = await supabase
       .from('leads')
       .select('*')
-      .not('status', 'in', '("Ganho","Cancelado")');
+      .not('status', 'in', '(Ganho,Cancelado)');
 
     if (leadsError) {
       return NextResponse.json({ success: false, error: leadsError.message }, { status: 500 });

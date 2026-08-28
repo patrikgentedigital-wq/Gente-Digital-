@@ -19,14 +19,22 @@ export async function middleware(request: NextRequest) {
   // Rotas públicas não precisam consultar a sessão antes de renderizar.
   // Isso mantém a landing de indicação rápida e permite que o fluxo funcione
   // mesmo quando o Supabase ainda não foi configurado no ambiente local.
+  // Rotas públicas que não exigem autenticação prévia
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
   const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
-  const isWebhookRoute = request.nextUrl.pathname.startsWith('/api/webhooks')
+  const isPublicApi = 
+    request.nextUrl.pathname.startsWith('/api/referrals') ||
+    request.nextUrl.pathname.startsWith('/api/track-click') ||
+    (request.nextUrl.pathname === '/api/settings/base-link' && request.method === 'GET')
+  const isWebhookRoute = 
+    request.nextUrl.pathname.startsWith('/api/webhooks') ||
+    request.nextUrl.pathname.startsWith('/api/integrations/ixc/webhook')
   const isHealthRoute = request.nextUrl.pathname.startsWith('/api/health')
   const isMetricsRoute = request.nextUrl.pathname.startsWith('/api/metrics')
-  const isTrackClickRoute = request.nextUrl.pathname.startsWith('/api/track-click')
 
-  if (isPublicLanding || isWebhookRoute || isHealthRoute || isMetricsRoute || isTrackClickRoute) {
+  const isPublicRoute = isPublicLanding || isPublicApi || isWebhookRoute || isHealthRoute || isMetricsRoute
+
+  if (isPublicRoute) {
     return supabaseResponse;
   }
 
@@ -70,7 +78,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protect all remaining application and API routes.
-  if (!user && !isAuthRoute && !isPublicLanding && !isWebhookRoute && !isHealthRoute && !isMetricsRoute && !isTrackClickRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
       unauthRes.headers.set('x-request-id', requestId);

@@ -20,10 +20,6 @@ const ColaboradoresView = dynamic(
   () => import('@/components/views/colaboradores').then((module) => module.ColaboradoresView),
   { loading: ViewLoading }
 );
-const GamificacaoView = dynamic(
-  () => import('@/components/views/gamificacao').then((module) => module.GamificacaoView),
-  { loading: ViewLoading }
-);
 const ComissoesView = dynamic(
   () => import('@/components/views/comissoes').then((module) => module.ComissoesView),
   { loading: ViewLoading }
@@ -35,9 +31,8 @@ const IntegracoesView = dynamic(
 
 const tabNames = {
   dashboard: 'Dashboard',
-  leads: 'Leads',
+  leads: 'Leads & Funil',
   colaboradores: 'Colaboradores',
-  gamificacao: 'Loja de Prêmios & Gamificação',
   comissoes: 'Gestão de Comissões & PIX',
   integracoes: 'Integrações (IXC & MS)',
 } as const;
@@ -131,8 +126,6 @@ function ActiveView({ tab }: { tab: TabId }) {
       return <DashboardView />;
     case 'leads':
       return <LeadsView />;
-    case 'gamificacao':
-      return <GamificacaoView />;
     case 'comissoes':
       return <ComissoesView />;
     case 'integracoes':
