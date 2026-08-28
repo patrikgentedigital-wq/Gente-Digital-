@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuth, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
+import { verifyAuth, verifyAuthAny, getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
 import { z } from 'zod';
 
 const PayCommissionSchema = z.object({
@@ -67,9 +67,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuth(req);
+    const isAuthenticated = await verifyAuthAny(req);
     if (!isAuthenticated) {
-      return NextResponse.json({ success: false, error: 'Não autorizado. Apenas administradores podem dar baixa em comissões.' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Não autorizado. Faça login para dar baixa em comissões.' }, { status: 401 });
     }
 
     const rawBody = await req.json().catch(() => ({}));

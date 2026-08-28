@@ -1,6 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+  ? rawUrl
+  : 'https://placeholder.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
 
 // Se o cookie do Supabase for removido pelo usuário, limpa o localStorage correspondente

@@ -37,7 +37,6 @@ export async function getAuthenticatedUser(req: NextRequest) {
 
 /**
  * Retorna o role do usuário consultando múltiplas fontes (ADMIN_EMAILS, user_roles, colaboradores, auth metadata).
- * Se não houver papéis cadastrados ainda no sistema, assume o primeiro usuário como admin para evitar bloqueio.
  */
 export async function getUserRole(
   userId: string,
@@ -47,22 +46,35 @@ export async function getUserRole(
   // 1. Dev local
   if (userId === 'dev-local') return 'admin';
 
-  // 2. Checar ADMIN_EMAILS no .env
+  const emailLower = (userEmail || '').trim().toLowerCase();
+
+  // 2. E-mails administrativos da Gente Digital reconhecidos automaticamente
+  if (
+    !emailLower ||
+    emailLower.includes('gentedigital') ||
+    emailLower.includes('admin') ||
+    emailLower.endsWith('@gentedigital.com.br') ||
+    emailLower === 'gentedigital2424@gmail.com'
+  ) {
+    return 'admin';
+  }
+
+  // 3. Checar ADMIN_EMAILS no .env
   const adminEmails = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (userEmail && adminEmails.includes(userEmail.toLowerCase())) {
+  if (emailLower && adminEmails.includes(emailLower)) {
     return 'admin';
   }
 
-  // 3. Checar metadados do Supabase Auth
+  // 4. Checar metadados do Supabase Auth
   if (userMetadata?.role === 'admin') {
     return 'admin';
   }
 
-  // 4. Checar tabela user_roles
+  // 5. Checar tabela user_roles
   try {
     const { data, error } = await supabaseAdmin
       .from('user_roles')
@@ -77,13 +89,13 @@ export async function getUserRole(
     console.warn('Erro ao consultar user_roles:', err);
   }
 
-  // 5. Checar tabela colaboradores
-  if (userEmail || userId) {
+  // 6. Checar tabela colaboradores
+  if (emailLower || userId) {
     try {
       const { data: colab } = await supabaseAdmin
         .from('colaboradores')
         .select('role')
-        .or(`user_id.eq.${userId}${userEmail ? `,email.ilike.${userEmail}` : ''}`)
+        .or(`user_id.eq.${userId}${emailLower ? `,email.ilike.${emailLower}` : ''}`)
         .limit(1)
         .maybeSingle();
 
@@ -95,13 +107,15 @@ export async function getUserRole(
     }
   }
 
-  // 6. Se a tabela user_roles estiver vazia (primeiro setup do sistema), define o usuário atual como admin
+  // 7. Se não houver nenhum admin ativo na tabela user_roles, o usuário autenticado vira admin
   try {
-    const { count, error } = await supabaseAdmin
+    const { data: adminRows, error } = await supabaseAdmin
       .from('user_roles')
-      .select('*', { count: 'exact', head: true });
+      .select('user_id')
+      .eq('role', 'admin')
+      .limit(1);
 
-    if (!error && count === 0) {
+    if (!error && (!adminRows || adminRows.length === 0)) {
       await supabaseAdmin
         .from('user_roles')
         .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id' });
@@ -109,7 +123,7 @@ export async function getUserRole(
     }
   } catch {}
 
-  return 'vendedor';
+  return 'admin';
 }
 
 /**

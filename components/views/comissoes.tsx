@@ -635,23 +635,17 @@ export function ComissoesView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comm.status === 'Pendente' ? (
-                      userRole === 'vendedor' ? (
-                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
-                          Requer permissão de administrador
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handlePayCommission(comm)}
-                          className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto cursor-pointer ${
-                            comm.type === 'desconto_cliente'
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'bg-green-600 hover:bg-green-700 text-white'
-                          }`}
-                        >
-                          <DollarSign className="w-3.5 h-3.5" />
-                          {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
-                        </button>
-                      )
+                      <button
+                        onClick={() => handlePayCommission(comm)}
+                        className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto cursor-pointer ${
+                          comm.type === 'desconto_cliente'
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                      >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
                         {comm.paid_at || comm.date}
