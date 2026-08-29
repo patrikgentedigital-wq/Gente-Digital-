@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { checkRateLimit } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 
+import { getIxcCredentials, formatIxcDate, fetchIxcWithTimeout } from '@/lib/ixc';
+
 export const dynamic = 'force-dynamic';
 
 function normalizePhone(phone: string): string {
@@ -54,66 +56,35 @@ function findField(body: any, keywords: string[], defaultValue: string = ''): st
 
 async function createIxcProspect(name: string, phone: string, ref: string) {
   try {
-    // 1. Fetch credentials from settings
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
+    const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();
 
-    if (settingsError) {
-      console.warn("Could not read IXC credentials for webhook sync:", settingsError.message);
-      return { success: false, error: 'Tabela settings não disponível no banco de dados' };
-    }
-
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
-
-    if (!domain || !token) {
+    if (!hasCredentials) {
       return { success: false, error: 'Credenciais IXC não configuradas' };
     }
-
-    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-    const base64Token = Buffer.from(token).toString('base64');
-    
-    // Formatar data atual para o formato IXC (YYYY-MM-DD HH:MM:SS)
-    const now = new Date();
-    const offset = now.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 19).replace('T', ' ');
 
     const payload = {
       nome: name,
       razao: name, // Necessário para salvar como Lead no IXC
       fone_celular: phone,
       id_filial: '1',
-      data_cadastro: localISOTime,
+      data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
 
-    const ixcResponse = await fetch(`https://${cleanDomain}/webservice/v1/contato`, {
+    const ixcResponse = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/contato`, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${base64Token}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
-    });
+    }, 10000);
 
     if (!ixcResponse.ok) {
-      const errorText = await ixcResponse.text();
+      const errorText = await ixcResponse.text().catch(() => '');
       return { success: false, error: `Servidor IXC respondeu com código ${ixcResponse.status}: ${errorText}` };
     }
 
@@ -138,6 +109,10 @@ export async function POST(req: NextRequest) {
     const secretFromHeader = req.headers.get('x-webhook-secret');
     const secret = secretFromHeader || secretFromQuery;
     const expectedSecret = process.env.WEBHOOK_SECRET;
+
+    if (secretFromQuery && !secretFromHeader) {
+      logger.warn('Webhook MS Forms acessado com secret na URL (query parameter). Recomenda-se migrar para o header x-webhook-secret.');
+    }
 
     if (!expectedSecret) {
       console.error("SEGURANÇA: WEBHOOK_SECRET não configurado no servidor.");

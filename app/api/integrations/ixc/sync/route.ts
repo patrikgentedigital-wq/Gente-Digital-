@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuthAny } from '@/lib/auth-server';
-
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 10000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+import { getIxcCredentials, fetchIxcWithTimeout } from '@/lib/ixc';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,35 +10,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    // 1. Fetch credentials from settings
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
+    // 1. Fetch credentials via unified helper
+    const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();
 
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
-
-    if (!domain || !token) {
+    if (!hasCredentials) {
       return NextResponse.json({ 
         success: false, 
         error: 'Domínio ou Token inválido.' 
       }, { status: 400 });
     }
-
-    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-    const base64Token = Buffer.from(token).toString('base64');
 
     // 2. Fetch leads that are not installed/concluido
     const { data: leads, error: leadsError } = await supabase
@@ -73,10 +44,10 @@ export async function POST(req: NextRequest) {
 
     const processLead = async (lead: any): Promise<Record<string, any>> => {
       try {
-        const ixcResponse = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente`, {
+        const ixcResponse = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/cliente`, {
           method: 'POST',
           headers: {
-            'Authorization': `Basic ${base64Token}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json',
             'ixcsoft': 'listar'
           },
@@ -110,10 +81,10 @@ export async function POST(req: NextRequest) {
         let activeContractValue = 0;
 
         for (const client of ixcData.registros) {
-          const contractRes = await fetchWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
+          const contractRes = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
             method: 'POST',
             headers: {
-              'Authorization': `Basic ${base64Token}`,
+              'Authorization': authHeader,
               'Content-Type': 'application/json',
               'ixcsoft': 'listar'
             },

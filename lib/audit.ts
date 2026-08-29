@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { supabaseAdmin } from './supabase-admin';
 
 export interface AuditLog {
   id?: number | string;
@@ -10,13 +11,13 @@ export interface AuditLog {
 
 export async function logAuditEvent(action: string, details: string, user_email = 'Admin') {
   try {
-    const isConfigured = typeof window !== 'undefined' && 
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const isConfigured = !!rawUrl && !rawUrl.includes('placeholder');
 
     if (isConfigured) {
       try {
-        const { error } = await supabase.from('audit_logs').insert([{
+        const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+        const { error } = await client.from('audit_logs').insert([{
           action,
           details,
           user_email,

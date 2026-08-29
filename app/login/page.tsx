@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, Mail, Loader2, AlertCircle, Eye, EyeOff, Sun, Moon, ArrowRight } from 'lucide-react';
@@ -10,11 +10,11 @@ import { useTheme } from 'next-themes';
 export default function LoginPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const mounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

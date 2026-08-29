@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { checkRateLimit } from '@/lib/ratelimit';
 
-const RefPattern = /^[A-Za-z0-9 _\-.\u00C0-\u024F]+$/;
+const RefPattern = /^[\p{L}\p{N}\s_\-.'()]+$/u;
 
 const ReferralSchema = z.object({
   name: z.string().trim().min(3).max(100),
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const cookieRef = req.cookies.get('gente_digital_ref')?.value || '';
     const ref = (parsed.data.ref || cookieRef || 'Orgânico').trim().slice(0, 50);
-    if (!RefPattern.test(ref)) {
+    if (ref && !RefPattern.test(ref)) {
       return NextResponse.json({ success: false, error: 'Indicação inválida.' }, { status: 400 });
     }
 
@@ -90,9 +90,12 @@ export async function POST(req: NextRequest) {
       throw leadError;
     }
 
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     const { error: historyError } = await supabase.from('lead_history').insert([{
       lead_id: lead.id,
-      date: new Date().toLocaleString('pt-BR').substring(0, 16),
+      date: formattedDate,
       action: 'Lead criado pela landing de indicação',
       note: `Contato recebido pelo programa Indique e Ganhe. Origem: ${ref}`,
     }]);

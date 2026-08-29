@@ -126,13 +126,14 @@ function ActiveView({ tab }: { tab: TabId }) {
       return <DashboardView />;
     case 'leads':
       return <LeadsView />;
+    case 'colaboradores':
+      return <ColaboradoresView />;
     case 'comissoes':
       return <ComissoesView />;
     case 'integracoes':
       return <IntegracoesView />;
-    case 'colaboradores':
     default:
-      return <ColaboradoresView />;
+      return <DashboardView />;
   }
 }
 

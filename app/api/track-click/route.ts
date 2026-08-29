@@ -24,11 +24,13 @@ async function getMonthClickCounts(): Promise<{ currentMonthClicks: number; prev
 
   const countForRange = async (gte: string, lt?: string): Promise<number> => {
     try {
-      const query = supabase
+      let query = supabase
         .from('link_clicks')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', gte);
-      if (lt) query.lt('created_at', lt);
+      if (lt) {
+        query = query.lt('created_at', lt);
+      }
       const { count, error } = await query;
       if (error) {
         console.warn('Erro ao contar cliques por período:', error.message);

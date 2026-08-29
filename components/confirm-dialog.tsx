@@ -24,7 +24,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -32,7 +32,7 @@ export function ConfirmDialog({
       if (e.key === 'Escape') onCancel();
     };
     window.addEventListener('keydown', onKey);
-    confirmRef.current?.focus();
+    cancelRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onCancel]);
 
@@ -68,17 +68,17 @@ export function ConfirmDialog({
         <div className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed mb-6">{message}</div>
         <div className="flex items-center gap-3">
           <button
+            ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="flex-1 py-3 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-gray-300 font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+            className="flex-1 py-3 border border-brand-border dark:border-gray-700 text-brand-charcoal dark:text-gray-300 font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             {cancelLabel}
           </button>
           <button
-            ref={confirmRef}
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-3 font-bold text-sm rounded-xl shadow-sm transition-all ${toneClasses}`}
+            className={`flex-1 py-3 font-bold text-sm rounded-xl shadow-sm transition-all cursor-pointer ${toneClasses}`}
           >
             {confirmLabel}
           </button>

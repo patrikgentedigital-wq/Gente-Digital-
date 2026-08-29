@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { metricsRegistry } from '@/lib/metrics';
 import { cacheClient } from '@/lib/cache-client';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { executeDbQuery } from '@/lib/db-client';
 
 /**
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const dbCheck = await executeDbQuery(
       'health_check_ping',
       async () => {
-        const { data, error } = await supabase.from('audit_logs').select('id').limit(1);
+        const { data, error } = await supabaseAdmin.from('audit_logs').select('id').limit(1);
         return { data, error };
       },
       requestId

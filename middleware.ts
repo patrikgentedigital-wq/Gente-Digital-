@@ -4,10 +4,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   // 1. Request ID Único (DevOps Rule 1)
   const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
-  request.headers.set('x-request-id', requestId);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-request-id', requestId);
 
   let supabaseResponse = NextResponse.next({
-    request,
+    request: {
+      headers: requestHeaders,
+    },
   })
 
   // Garantir que a resposta HTTP sempre retorne o header x-request-id

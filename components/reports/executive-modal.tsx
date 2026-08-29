@@ -1,4 +1,6 @@
-import { Printer, X, TrendingUp, Award, Download } from 'lucide-react';
+'use client';
+
+import { Printer, X, TrendingUp, Award } from 'lucide-react';
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { timingSafeEqual } from 'crypto';
+import { getIxcCredentials, fetchIxcWithTimeout } from '@/lib/ixc';
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,24 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check IXC credentials to fetch contract value if missing in payload
-    const { data: settingsData } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
-
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
+    const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();
 
     // 1. Find matching lead in Supabase (not already marked as Ganho)
     const { data: pendingLeads, error: leadsError } = await supabase
@@ -123,15 +107,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. If contractValue is not in payload, query IXC API for contract value if domain and token are available
-    if ((!contractValue || contractValue <= 0) && domain && token && clientId) {
+    if ((!contractValue || contractValue <= 0) && hasCredentials && clientId) {
       try {
-        const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-        const base64Token = Buffer.from(token).toString('base64');
-        
-        const contractRes = await fetch(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
+        const contractRes = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
           method: 'POST',
           headers: {
-            'Authorization': `Basic ${base64Token}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json',
             'ixcsoft': 'listar'
           },
@@ -142,7 +123,7 @@ export async function POST(req: NextRequest) {
             page: '1',
             rp: '10'
           })
-        });
+        }, 10000);
 
         if (contractRes.ok) {
           const contractData = await contractRes.json();

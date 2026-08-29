@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuth } from '@/lib/auth-server';
+import { getIxcCredentials, maskIxcToken } from '@/lib/ixc';
 
 export const dynamic = 'force-dynamic';
-
-function maskToken(token: string): string {
-  if (!token) return '';
-  if (token.length <= 6) return '****';
-  return '*'.repeat(token.length - 4) + token.slice(-4);
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,38 +12,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const envDomain = process.env.IXC_DOMAIN || '';
-    const envToken = process.env.IXC_TOKEN || '';
-
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
-
-    if (error) {
-      console.warn("Error reading settings table:", error.message);
-      return NextResponse.json({ 
-        success: true, 
-        domain: envDomain, 
-        token: maskToken(envToken),
-        hasToken: !!envToken,
-        tableMissing: true 
-      });
-    }
-
-    const config: Record<string, string> = {};
-    data?.forEach((row: any) => {
-      config[row.key] = row.value;
-    });
-
-    const activeDomain = config['ixc_domain'] || envDomain;
-    const activeToken = config['ixc_token'] || envToken;
+    const { domain, token } = await getIxcCredentials();
 
     return NextResponse.json({
       success: true,
-      domain: activeDomain,
-      token: maskToken(activeToken),
-      hasToken: !!activeToken,
+      domain,
+      token: maskIxcToken(token),
+      hasToken: !!token,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

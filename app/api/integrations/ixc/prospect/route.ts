@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuthAny } from '@/lib/auth-server';
+import { getIxcCredentials, formatIxcDate, fetchIxcWithTimeout } from '@/lib/ixc';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,59 +15,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Nome e telefone são obrigatórios' }, { status: 400 });
     }
 
-    // Fetch credentials from settings
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('settings')
-      .select('*')
-      .in('key', ['ixc_domain', 'ixc_token']);
+    // Fetch credentials via unified helper
+    const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();
 
-    const config: Record<string, string> = {
-      ixc_domain: process.env.IXC_DOMAIN || '',
-      ixc_token: process.env.IXC_TOKEN || ''
-    };
-
-    if (settingsData && settingsData.length > 0) {
-      settingsData.forEach((row: any) => {
-        config[row.key] = row.value;
-      });
-    }
-
-    const domain = config['ixc_domain'];
-    const token = config['ixc_token'];
-
-    if (!domain || !token) {
+    if (!hasCredentials) {
       return NextResponse.json({ success: false, error: 'IXC não configurado' }, { status: 400 });
     }
-
-    const cleanDomain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
-    const base64Token = Buffer.from(token).toString('base64');
-    
-    // Format current date for IXC (YYYY-MM-DD HH:MM:SS)
-    const now = new Date();
-    const offset = now.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 19).replace('T', ' ');
 
     const payload = {
       nome: name,
       razao: name,
       fone_celular: phone,
       id_filial: '1',
-      data_cadastro: localISOTime,
+      data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
 
-    const ixcResponse = await fetch(`https://${cleanDomain}/webservice/v1/contato`, {
+    const ixcResponse = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/contato`, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${base64Token}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000)
-    });
+      body: JSON.stringify(payload)
+    }, 10000);
 
     if (!ixcResponse.ok) {
       const errorText = await ixcResponse.text().catch(() => '');
