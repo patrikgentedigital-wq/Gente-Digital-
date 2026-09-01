@@ -667,6 +667,8 @@ export function LeadsView() {
   };
 
   const [dateFilter, setDateFilter] = useState('all');
+  const [specificMonth, setSpecificMonth] = useState(new Date().getMonth());
+  const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
 
   const uniqueRefs = useMemo(
     () => Array.from(new Set(leads.map(l => l.ref).filter(Boolean))),
@@ -710,12 +712,14 @@ export function LeadsView() {
           matchesDate = d.getMonth() === lastMonth && d.getFullYear() === lastYear;
         } else if (dateFilter === 'this_year') {
           matchesDate = d.getFullYear() === currentDate.getFullYear();
+        } else if (dateFilter === 'specific_month') {
+          matchesDate = d.getMonth() === specificMonth && d.getFullYear() === specificYear;
         }
       }
     }
 
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
-  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
+  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear]);
 
   // Paginação no cliente: o scroll/lista mostra apenas a página atual do dataset filtrado
   const pageLeads = useMemo(
@@ -727,7 +731,7 @@ export function LeadsView() {
   // Ao mudar filtros/busca, volta para a primeira página
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
+  }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear]);
 
   return (
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
@@ -803,6 +807,8 @@ export function LeadsView() {
                         setMinValueFilter('');
                         setMaxValueFilter('');
                         setDateFilter('all');
+                        setSpecificMonth(new Date().getMonth());
+                        setSpecificYear(new Date().getFullYear());
                       }}
                       className="text-xs text-red-500 hover:text-red-600 font-bold"
                     >
@@ -824,7 +830,39 @@ export function LeadsView() {
                     <option value="this_month">Este Mês</option>
                     <option value="last_month">Mês Passado</option>
                     <option value="this_year">Este Ano</option>
+                    <option value="specific_month">Mês Específico</option>
                   </select>
+                  {dateFilter === 'specific_month' && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <select
+                        value={specificMonth}
+                        onChange={(e) => setSpecificMonth(Number(e.target.value))}
+                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                      >
+                        <option value={0}>Janeiro</option>
+                        <option value={1}>Fevereiro</option>
+                        <option value={2}>Março</option>
+                        <option value={3}>Abril</option>
+                        <option value={4}>Maio</option>
+                        <option value={5}>Junho</option>
+                        <option value={6}>Julho</option>
+                        <option value={7}>Agosto</option>
+                        <option value={8}>Setembro</option>
+                        <option value={9}>Outubro</option>
+                        <option value={10}>Novembro</option>
+                        <option value={11}>Dezembro</option>
+                      </select>
+                      <select
+                        value={specificYear}
+                        onChange={(e) => setSpecificYear(Number(e.target.value))}
+                        className="w-24 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-brand-charcoal dark:text-white"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 text-left">

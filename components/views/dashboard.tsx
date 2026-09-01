@@ -33,6 +33,8 @@ export function DashboardView() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [dateFilter, setDateFilter] = useState('all');
+  const [specificMonth, setSpecificMonth] = useState(new Date().getMonth());
+  const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
@@ -144,6 +146,9 @@ export function DashboardView() {
     }
     if (dateFilter === 'this_year') {
       return d.getFullYear() === now.getFullYear();
+    }
+    if (dateFilter === 'specific_month') {
+      return d.getMonth() === specificMonth && d.getFullYear() === specificYear;
     }
     return true;
   });
@@ -492,7 +497,39 @@ export function DashboardView() {
             <option value="this_month">Este Mês</option>
             <option value="last_month">Mês Passado</option>
             <option value="this_year">Este Ano</option>
+            <option value="specific_month">Mês Específico</option>
           </select>
+          {dateFilter === 'specific_month' && (
+            <div className="flex items-center gap-2">
+              <select
+                value={specificMonth}
+                onChange={(e) => setSpecificMonth(Number(e.target.value))}
+                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+              >
+                <option value={0}>Jan</option>
+                <option value={1}>Fev</option>
+                <option value={2}>Mar</option>
+                <option value={3}>Abr</option>
+                <option value={4}>Mai</option>
+                <option value={5}>Jun</option>
+                <option value={6}>Jul</option>
+                <option value={7}>Ago</option>
+                <option value={8}>Set</option>
+                <option value={9}>Out</option>
+                <option value={10}>Nov</option>
+                <option value={11}>Dez</option>
+              </select>
+              <select
+                value={specificYear}
+                onChange={(e) => setSpecificYear(Number(e.target.value))}
+                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+              >
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
       
