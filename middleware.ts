@@ -23,7 +23,9 @@ export async function middleware(request: NextRequest) {
   // Isso mantém a landing de indicação rápida e permite que o fluxo funcione
   // mesmo quando o Supabase ainda não foi configurado no ambiente local.
   // Rotas públicas que não exigem autenticação prévia
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  const isLoginRoute = request.nextUrl.pathname.startsWith('/login')
+  const isPasswordResetRoute = request.nextUrl.pathname.startsWith('/redefinir-senha')
+  const isAuthRoute = isLoginRoute || isPasswordResetRoute
   const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
   const isPublicApi = 
     request.nextUrl.pathname.startsWith('/api/referrals') ||
@@ -80,7 +82,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect all remaining application and API routes.
+  // Proteger rotas da aplicação e APIs restantes.
+  // Permite acesso a /login e /redefinir-senha para usuários não autenticados.
   if (!user && !isAuthRoute && !isPublicRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -94,8 +97,9 @@ export async function middleware(request: NextRequest) {
     return redirectRes;
   }
 
-  // If user is logged in and tries to access /login, redirect to /
-  if (user && isAuthRoute) {
+  // Se o usuário estiver autenticado e tentar acessar /login, redireciona para o painel /
+  // Mas permite acessar /redefinir-senha caso queira atualizar suas credenciais
+  if (user && isLoginRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     const redirectRes = NextResponse.redirect(url);

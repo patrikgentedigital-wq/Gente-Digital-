@@ -205,8 +205,12 @@ Retorne estritamente um JSON limpo com as chaves "qualification" ("Quente", "Mor
 
       try {
         const textResult = await callAI(prompt);
-        const cleanJson = textResult.replace(/^```json/, '').replace(/```$/, '').trim();
-        const jsonResult = JSON.parse(cleanJson);
+        // Extrai bloco JSON de forma robusta, suportando ```json ... ``` com quebras de linha ou texto adjacente
+        const jsonMatch = textResult.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Nenhum bloco JSON válido retornado pelo modelo de IA');
+        }
+        const jsonResult = JSON.parse(jsonMatch[0]);
         return NextResponse.json({
           status: 'success',
           ...jsonResult

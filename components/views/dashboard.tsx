@@ -154,112 +154,8 @@ export function DashboardView() {
   });
 
   const totalLeads = filteredLeads.length;
-  const conversões = filteredLeads.filter(l => l.status === 'Ganho').length;
-  const conversionRate = totalLeads > 0 ? ((conversões / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
-
-  const handleExportReport = () => {
-    const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
-    
-    const allData = colaboradores.map(colab => {
-      const normColabName = normalizeStr(colab.name);
-      const normColabId = normalizeStr(colab.id);
-      const referredLeads = leads.filter(l => {
-        const normRef = normalizeStr(l.ref);
-        return normRef === normColabId || normRef === normColabName;
-      });
-      const convs = referredLeads.filter(l => l.status === 'Ganho').length;
-      const points = referredLeads.length * PROGRAM_RULES.pontos.porIndicacao + convs * PROGRAM_RULES.pontos.porConversao;
-      
-      return [
-        sanitizeCsvField(colab.name),
-        sanitizeCsvField(colab.id),
-        sanitizeCsvField(referredLeads.length),
-        sanitizeCsvField(convs),
-        sanitizeCsvField(points)
-      ];
-    });
-
-    const csvContent = "\uFEFF" + [headers.join(','), ...allData.map(e => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `relatorio_gerencial_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleGenerateAiSummary = async () => {
-    try {
-      setIsAiLoading(true);
-      setShowAiModal(true);
-      
-      const metrics = {
-        totalLeads,
-        conversões,
-        conversionRate,
-        cliques: clicks,
-        leadsTrend: trends.leadsTrend,
-        convsTrend: trends.convsTrend
-      };
-
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'dashboard-summary', metrics })
-      });
-
-      const data = await res.json();
-      if (data.status === 'success') {
-        setAiSummary(data.summary);
-      } else {
-        setAiSummary('Desculpe, ocorreu um erro ao gerar a análise. Tente novamente.');
-      }
-    } catch (err) {
-      console.error(err);
-      setAiSummary('Erro de conexão ao gerar análise.');
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
-  const getDynamicChartData = () => {
-    const baseData: any[] = [];
-    const d = new Date();
-    
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
-      baseData.push({
-        name: months[monthDate.getMonth()],
-        month: monthDate.getMonth(),
-        year: monthDate.getFullYear(),
-        pendente: 0,
-        contatoInicial: 0,
-        emNegociacao: 0,
-        ganho: 0,
-        errado: 0
-      });
-    }
-
-    filteredLeads.forEach(lead => {
-      const date = lead.created_at ? new Date(lead.created_at) : new Date();
-      const chartMonth = baseData.find(d => d.month === date.getMonth() && d.year === date.getFullYear());
-      if (chartMonth) {
-        const status = lead.status;
-        if (status === 'Pendente') chartMonth.pendente++;
-        else if (status === 'Contato inicial') chartMonth.contatoInicial++;
-        else if (status === 'Em negociação') chartMonth.emNegociacao++;
-        else if (status === 'Ganho') chartMonth.ganho++;
-        else if (status === 'Errado') chartMonth.errado++;
-      }
-    });
-
-    return baseData;
-  };
-
-  const chartData = getDynamicChartData();
+  const conversoesCount = filteredLeads.filter(l => l.status === 'Ganho').length;
+  const conversionRate = totalLeads > 0 ? ((conversoesCount / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
 
   // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
   const clicks = colaboradores.reduce((acc, c) => {
@@ -269,95 +165,10 @@ export function DashboardView() {
     return acc + refClicks;
   }, 0);
 
-  const getTopColaboradores = () => {
-    return colaboradores
-      .map(colab => {
-        const normColabName = normalizeStr(colab.name);
-        const normColabId = normalizeStr(colab.id);
-
-        const referredLeads = filteredLeads.filter(l => {
-          const normRef = normalizeStr(l.ref);
-          if (!normRef) return false;
-          return normRef === normColabId || normRef === normColabName || (normColabName.length >= 4 && (normRef.includes(normColabName) || normColabName.includes(normRef)));
-        });
-        
-        const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
-        const totalReferred = referredLeads.length;
-        const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + colabConversions * PROGRAM_RULES.pontos.porConversao;
-
-        return {
-          ...colab,
-          points: points,
-          conversions: colabConversions,
-          totalReferred: totalReferred
-        };
-      })
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 3)
-      .map((colab, index) => {
-        const ranks = [
-          { rank: 1, color: 'text-amber-500', bg: 'bg-amber-100' },
-          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
-          { rank: 3, color: 'text-amber-700', bg: 'bg-amber-50' }
-        ];
-        return {
-          ...colab,
-          ...ranks[index]
-        };
-      });
-  };
-
-  const getTopClientes = () => {
-    const clientRefs = filteredLeads.map(l => l.ref).filter(ref => {
-       const normRef = normalizeStr(ref);
-       if (!normRef || normRef === "organico" || normRef === "") return false;
-       
-       const isColab = colaboradores.some(c => {
-         const nName = normalizeStr(c.name);
-         const nId = normalizeStr(c.id);
-         if (!nName && !nId) return false;
-         return normRef === nId || normRef === nName || nName.includes(normRef) || normRef.includes(nName);
-       });
-       return !isColab;
-    });
-
-    const uniqueRefs = Array.from(new Set(clientRefs.map(r => normalizeStr(r))));
-    
-    return uniqueRefs.map(uRef => {
-      const originalName = clientRefs.find(r => normalizeStr(r) === uRef) || uRef;
-      const referredLeads = filteredLeads.filter(l => normalizeStr(l.ref) === uRef);
-      const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
-      const totalReferred = referredLeads.length;
-      const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + conversions * PROGRAM_RULES.pontos.porConversao;
-      
-      return {
-        id: uRef,
-        name: originalName,
-        points: points,
-        conversions: conversions,
-        totalReferred: totalReferred
-      };
-    })
-    .filter(client => client.points > 0)
-    .sort((a, b) => b.points - a.points)
-    .slice(0, 3)
-    .map((client, index) => {
-        const ranks = [
-          { rank: 1, color: 'text-blue-500', bg: 'bg-blue-100' },
-          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
-          { rank: 3, color: 'text-blue-700', bg: 'bg-blue-50' }
-        ];
-        return {
-          ...client,
-          ...ranks[index]
-        };
-    });
-  };
-
   const getTrends = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const dNow = new Date();
+    const currentMonth = dNow.getMonth();
+    const currentYear = dNow.getFullYear();
 
     let prevMonth = currentMonth - 1;
     let prevYear = currentYear;
@@ -440,9 +251,199 @@ export function DashboardView() {
     };
   };
 
+  const trends = getTrends();
+
+  const handleExportReport = () => {
+    const headers = ['Colaborador', 'ID', 'Total de Leads (Indicações)', 'Conversões (Ganho)', 'Pontuação Total'];
+    
+    const allData = colaboradores.map(colab => {
+      const normColabName = normalizeStr(colab.name);
+      const normColabId = normalizeStr(colab.id);
+      const referredLeads = leads.filter(l => {
+        const normRef = normalizeStr(l.ref);
+        return normRef === normColabId || normRef === normColabName;
+      });
+      const convs = referredLeads.filter(l => l.status === 'Ganho').length;
+      const points = referredLeads.length * PROGRAM_RULES.pontos.porIndicacao + convs * PROGRAM_RULES.pontos.porConversao;
+      
+      return [
+        sanitizeCsvField(colab.name),
+        sanitizeCsvField(colab.id),
+        sanitizeCsvField(referredLeads.length),
+        sanitizeCsvField(convs),
+        sanitizeCsvField(points)
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...allData.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_gerencial_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateAiSummary = async () => {
+    try {
+      setIsAiLoading(true);
+      setShowAiModal(true);
+      
+      const metrics = {
+        totalLeads,
+        conversões: conversoesCount,
+        conversionRate,
+        cliques: clicks,
+        leadsTrend: trends.leadsTrend,
+        convsTrend: trends.convsTrend
+      };
+
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dashboard-summary', metrics })
+      });
+
+      const data = await res.json();
+      if (data.status === 'success') {
+        setAiSummary(data.summary);
+      } else {
+        setAiSummary('Desculpe, ocorreu um erro ao gerar a análise. Tente novamente.');
+      }
+    } catch (err) {
+      console.error(err);
+      setAiSummary('Erro de conexão ao gerar análise.');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const getDynamicChartData = () => {
+    const baseData: any[] = [];
+    const d = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      baseData.push({
+        name: months[monthDate.getMonth()],
+        month: monthDate.getMonth(),
+        year: monthDate.getFullYear(),
+        pendente: 0,
+        contatoInicial: 0,
+        emNegociacao: 0,
+        ganho: 0,
+        errado: 0
+      });
+    }
+
+    filteredLeads.forEach(lead => {
+      const date = lead.created_at ? new Date(lead.created_at) : new Date();
+      const chartMonth = baseData.find(d => d.month === date.getMonth() && d.year === date.getFullYear());
+      if (chartMonth) {
+        const status = lead.status;
+        if (status === 'Pendente') chartMonth.pendente++;
+        else if (status === 'Contato inicial') chartMonth.contatoInicial++;
+        else if (status === 'Em negociação') chartMonth.emNegociacao++;
+        else if (status === 'Ganho') chartMonth.ganho++;
+        else if (status === 'Errado') chartMonth.errado++;
+      }
+    });
+
+    return baseData;
+  };
+
+  const chartData = getDynamicChartData();
+
+  const getTopColaboradores = () => {
+    return colaboradores
+      .map(colab => {
+        const normColabName = normalizeStr(colab.name);
+        const normColabId = normalizeStr(colab.id);
+
+        const referredLeads = filteredLeads.filter(l => {
+          const normRef = normalizeStr(l.ref);
+          if (!normRef) return false;
+          // Correspondência exata por ID ou Nome para evitar falso match de substrings
+          return normRef === normColabId || normRef === normColabName;
+        });
+        
+        const colabConversions = referredLeads.filter(l => l.status === 'Ganho').length;
+        const totalReferred = referredLeads.length;
+        const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + colabConversions * PROGRAM_RULES.pontos.porConversao;
+
+        return {
+          ...colab,
+          points: points,
+          conversions: colabConversions,
+          totalReferred: totalReferred
+        };
+      })
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3)
+      .map((colab, index) => {
+        const ranks = [
+          { rank: 1, color: 'text-amber-500', bg: 'bg-amber-100' },
+          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
+          { rank: 3, color: 'text-amber-700', bg: 'bg-amber-50' }
+        ];
+        return {
+          ...colab,
+          ...ranks[index]
+        };
+      });
+  };
+
+  const getTopClientes = () => {
+    const clientRefs = filteredLeads.map(l => l.ref).filter(ref => {
+       const normRef = normalizeStr(ref);
+       if (!normRef || normRef === "organico" || normRef === "") return false;
+       
+       const isColab = colaboradores.some(c => {
+         const nName = normalizeStr(c.name);
+         const nId = normalizeStr(c.id);
+         return normRef === nId || normRef === nName;
+       });
+       return !isColab;
+    });
+
+    const uniqueRefs = Array.from(new Set(clientRefs.map(r => normalizeStr(r))));
+    
+    return uniqueRefs.map(uRef => {
+      const originalName = clientRefs.find(r => normalizeStr(r) === uRef) || uRef;
+      const referredLeads = filteredLeads.filter(l => normalizeStr(l.ref) === uRef);
+      const conversions = referredLeads.filter(l => l.status === 'Ganho').length;
+      const totalReferred = referredLeads.length;
+      const points = totalReferred * PROGRAM_RULES.pontos.porIndicacao + conversions * PROGRAM_RULES.pontos.porConversao;
+      
+      return {
+        id: uRef,
+        name: originalName,
+        points: points,
+        conversions: conversions,
+        totalReferred: totalReferred
+      };
+    })
+    .filter(client => client.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 3)
+    .map((client, index) => {
+        const ranks = [
+          { rank: 1, color: 'text-blue-500', bg: 'bg-blue-100' },
+          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
+          { rank: 3, color: 'text-blue-700', bg: 'bg-blue-50' }
+        ];
+        return {
+          ...client,
+          ...ranks[index]
+        };
+    });
+  };
+
   const topColaboradores = getTopColaboradores();
   const topClientes = getTopClientes();
-  const trends = getTrends();
 
   if (isLoading) {
     return (
@@ -464,7 +465,7 @@ export function DashboardView() {
           <button
             onClick={() => setShowExecutiveModal(true)}
             aria-label="Gerar Relatório PDF"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm cursor-pointer"
           >
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Relatório PDF</span>
@@ -473,7 +474,7 @@ export function DashboardView() {
           <button
             onClick={handleGenerateAiSummary}
             aria-label="Gerar Resumo com IA"
-            className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm"
+            className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden sm:inline">Resumo IA</span>
@@ -482,7 +483,7 @@ export function DashboardView() {
           <button
             onClick={handleExportReport}
             aria-label="Exportar relatório CSV"
-            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm"
+            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
@@ -491,7 +492,7 @@ export function DashboardView() {
           <select 
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+            className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
           >
             <option value="all">Todo o Período</option>
             <option value="this_month">Este Mês</option>
@@ -504,7 +505,7 @@ export function DashboardView() {
               <select
                 value={specificMonth}
                 onChange={(e) => setSpecificMonth(Number(e.target.value))}
-                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
               >
                 <option value={0}>Jan</option>
                 <option value={1}>Fev</option>
@@ -522,7 +523,7 @@ export function DashboardView() {
               <select
                 value={specificYear}
                 onChange={(e) => setSpecificYear(Number(e.target.value))}
-                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm"
+                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
               >
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
                   <option key={year} value={year}>{year}</option>
@@ -535,7 +536,7 @@ export function DashboardView() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
-        <StatCard icon={Target} title="Conversões" value={conversões.toString()} trend={trends.convsTrend} trendUp={trends.convsTrendUp} />
+        <StatCard icon={Target} title="Conversões" value={conversoesCount.toString()} trend={trends.convsTrend} trendUp={trends.convsTrendUp} />
         <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
         <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
@@ -658,7 +659,7 @@ export function DashboardView() {
                 </div>
                 <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Análise Inteligente</h3>
               </div>
-              <button onClick={() => setShowAiModal(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <button onClick={() => setShowAiModal(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -684,7 +685,7 @@ export function DashboardView() {
           onClose={() => setShowExecutiveModal(false)}
           metrics={{
             totalLeads,
-            conversões,
+            conversões: conversoesCount,
             conversionRate,
             clicks,
             topColaboradores,
@@ -724,4 +725,3 @@ function StatCard({ icon: Icon, title, value, trend, trendUp }: any) {
     </motion.div>
   );
 }
-

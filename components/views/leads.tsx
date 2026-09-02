@@ -534,9 +534,13 @@ export function LeadsView() {
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({ name: newLeadData.name, phone: newLeadData.phone, ref: newLeadData.ref })
        }).catch(err => console.error('Failed to send prospect to IXC:', err));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating lead", error);
-      toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
+      if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('idx_leads_phone')) {
+        toastError('Telefone Duplicado', 'Este número de telefone já está cadastrado para outro lead no sistema.');
+      } else {
+        toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
+      }
     }
 
     closeModal();
@@ -595,7 +599,11 @@ export function LeadsView() {
       closeModal();
     } catch (err: any) {
       console.error('Erro ao atualizar lead:', err);
-      toastError('Erro ao Atualizar', err?.message || 'Não foi possível salvar as alterações do lead.');
+      if (err?.code === '23505' || err?.message?.includes('unique') || err?.message?.includes('idx_leads_phone')) {
+        toastError('Telefone Duplicado', 'Este número de telefone já está cadastrado para outro lead no sistema.');
+      } else {
+        toastError('Erro ao Atualizar', err?.message || 'Não foi possível salvar as alterações do lead.');
+      }
     }
   }
 

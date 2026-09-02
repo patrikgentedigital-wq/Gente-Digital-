@@ -267,22 +267,33 @@ export function IntegracoesView() {
         </div>
         <div className="space-y-4 bg-gray-50 dark:bg-zinc-900/60 p-6 rounded-xl border border-brand-border dark:border-gray-700">
           <div>
-            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white mb-1.5">URL do Webhook (Gerada pelo Gente Digital)</label>
-            <div className="flex gap-2">
-              <input readOnly value={webhookUrl} className="w-full bg-white dark:bg-[#27272a] px-4 py-3 border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-muted dark:text-gray-400 outline-none font-mono" />
+            <label className="block text-sm font-semibold text-brand-charcoal dark:text-white mb-1.5">
+              URL do Webhook (Cole no Microsoft Power Automate)
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input 
+                readOnly 
+                value={`${webhookUrl}?secret=SEU_WEBHOOK_SECRET`} 
+                className="w-full bg-white dark:bg-[#27272a] px-4 py-3 border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-gray-200 outline-none font-mono" 
+              />
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(webhookUrl);
+                  navigator.clipboard.writeText(`${webhookUrl}?secret=SEU_WEBHOOK_SECRET`);
                   setFormsSaved(true);
-                  toastSuccess('Copiado!', 'URL do Webhook copiada para a área de transferência.');
+                  toastSuccess('Copiado!', 'URL do Webhook copiada com o parâmetro de autenticação.');
                   setTimeout(() => setFormsSaved(false), 2000);
                 }}
-                className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-white dark:bg-gray-900 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+                className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-brand-yellow hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl transition-colors shrink-0 shadow-sm"
               >
-                {formsSaved ? 'Copiado!' : 'Copiar'}
+                {formsSaved ? 'Copiado!' : 'Copiar URL Autenticada'}
               </button>
             </div>
-            <p className="text-sm text-brand-muted dark:text-gray-400 mt-3">Cole esta URL no <span className="font-semibold text-brand-charcoal dark:text-white">Microsoft Power Automate</span> para direcionar as respostas do Forms para sua base de leads.</p>
+            <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-300 flex flex-col gap-1">
+              <span className="font-bold">🔒 Requisito de Segurança (Token Obrigatório):</span>
+              <span>
+                Substitua <code className="bg-amber-100 dark:bg-amber-950/60 px-1 py-0.5 rounded font-mono font-bold">SEU_WEBHOOK_SECRET</code> pelo mesmo valor configurado na variável <code className="bg-amber-100 dark:bg-amber-950/60 px-1 py-0.5 rounded font-mono font-bold">WEBHOOK_SECRET</code> no seu servidor, ou adicione o cabeçalho HTTP <code className="bg-amber-100 dark:bg-amber-950/60 px-1 py-0.5 rounded font-mono font-bold">x-webhook-secret</code> na ação HTTP do Power Automate.
+              </span>
+            </div>
             
             <div className="mt-6 pt-5 border-t border-brand-border dark:border-gray-700">
               <h4 className="text-sm font-bold text-brand-charcoal dark:text-white mb-3">🏷️ Mapeamento Inteligente de Campos</h4>

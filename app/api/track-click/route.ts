@@ -111,9 +111,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, clicks: cachedClicks, cached: true, ...monthCounts });
     }
 
+    // Limita a contagem a uma janela temporal recente (últimos 90 dias) e teto seguro
+    // para prevenir consumo excessivo de memória em bases de cliques volumosas
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
     const { data, error } = await supabase
       .from('link_clicks')
-      .select('ref');
+      .select('ref')
+      .gte('created_at', ninetyDaysAgo)
+      .limit(20000);
 
     if (error) {
       console.error('Erro ao buscar cliques:', error.message);

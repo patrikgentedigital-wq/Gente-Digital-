@@ -71,6 +71,12 @@ export async function POST(req: NextRequest) {
           return { leadId: lead.id, name: lead.name, status: 'not_found', reason: 'Cliente não localizado no cadastro IXC' };
         }
 
+        const cleanDigits = (s?: string) => (s ? s.replace(/\D/g, '') : '');
+        const normStr = (s?: string) => (s ? s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '');
+
+        const leadPhone = cleanDigits(lead.phone);
+        const leadNameNorm = normStr(lead.name);
+
         let foundValidContract = false;
         let matchedClient = null;
         let activeContractId = null;
@@ -81,6 +87,23 @@ export async function POST(req: NextRequest) {
         let activeContractValue = 0;
 
         for (const client of ixcData.registros) {
+          // Validação anti-falso-positivo: verifica se o telefone coincide OU o nome é exatamente igual
+          const clientPhones = [
+            cleanDigits(client.telefone_celular),
+            cleanDigits(client.telefone),
+            cleanDigits(client.fone),
+            cleanDigits(client.whatsapp)
+          ].filter(p => p.length >= 8);
+
+          const clientNameNorm = normStr(client.razao || client.nome || client.fantasia);
+          const phoneMatches = leadPhone.length >= 8 && clientPhones.some(cp => cp.endsWith(leadPhone.slice(-8)) || leadPhone.endsWith(cp.slice(-8)));
+          const nameMatches = leadNameNorm && clientNameNorm && (leadNameNorm === clientNameNorm);
+
+          // Se não houver correspondência de telefone nem nome completo exato, ignora o registro para não contaminar dados
+          if (!phoneMatches && !nameMatches) {
+            continue;
+          }
+
           const contractRes = await fetchIxcWithTimeout(`https://${cleanDomain}/webservice/v1/cliente_contrato`, {
             method: 'POST',
             headers: {
@@ -121,7 +144,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!foundValidContract || !matchedClient) {
-          return { leadId: lead.id, name: lead.name, status: 'no_contract', reason: 'Cliente encontrado sem contrato ativo recente' };
+          return { leadId: lead.id, name: lead.name, status: 'no_contract', reason: 'Cliente encontrado no IXC mas sem confirmação de telefone ou contrato ativo recente' };
         }
 
         const updateFields: Record<string, any> = { status: 'Ganho' };

@@ -76,8 +76,15 @@ export function ReferralLanding() {
     }).catch(err => console.error('Falha ao rastrear clique:', err));
   }, [ref]);
 
-  // Garante que o link de compartilhamento sempre carregue o ref para manter rastreabilidade
+  // Garante que o link de compartilhamento sempre direcione para a landing page mantendo o ref
   const getShareLink = () => {
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      if (ref) {
+        return `${origin}/indicar?ref=${encodeURIComponent(ref)}`;
+      }
+      return `${origin}/indicar`;
+    }
     if (ref) {
       return `${baseLink}${baseLink.includes('?') ? '&' : '?'}ref=${encodeURIComponent(ref)}`;
     }
