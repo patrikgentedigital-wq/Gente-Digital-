@@ -82,6 +82,33 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Proteção CSRF: validação de Origin em rotas de API com mutação de estado (POST, PATCH, DELETE, PUT)
+  const isMutation = ['POST', 'PATCH', 'DELETE', 'PUT'].includes(request.method);
+  if (isMutation && request.nextUrl.pathname.startsWith('/api')) {
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+    if (origin && host) {
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost !== host) {
+          const forbiddenRes = NextResponse.json(
+            { error: 'Acesso negado: Origem não autorizada (CSRF Protection).' },
+            { status: 403 }
+          );
+          forbiddenRes.headers.set('x-request-id', requestId);
+          return forbiddenRes;
+        }
+      } catch {
+        const forbiddenRes = NextResponse.json(
+          { error: 'Acesso negado: Origem inválida.' },
+          { status: 403 }
+        );
+        forbiddenRes.headers.set('x-request-id', requestId);
+        return forbiddenRes;
+      }
+    }
+  }
+
   // Proteger rotas da aplicação e APIs restantes.
   // Permite acesso a /login e /redefinir-senha para usuários não autenticados.
   if (!user && !isAuthRoute && !isPublicRoute) {

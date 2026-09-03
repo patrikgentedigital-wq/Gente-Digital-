@@ -10,12 +10,12 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const isProd = process.env.NODE_ENV === 'production';
 
 if (isProd && !serviceRoleKey && !supabaseUrl.includes('placeholder')) {
-  console.error('ALERTA DE SEGURANÇA: SUPABASE_SERVICE_ROLE_KEY não configurada no ambiente de produção. Operações administrativas podem ser bloqueadas por RLS.');
+  console.error('ALERTA DE SEGURANÇA CRÍTICO: SUPABASE_SERVICE_ROLE_KEY não configurada no ambiente de produção. Não utilize anon_key como fallback em operações administrativas.');
 }
 
 const supabaseServiceKey = 
   serviceRoleKey || 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+  (!isProd ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '') || 
   'placeholder_key';
 
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {

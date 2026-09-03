@@ -4,6 +4,7 @@ import { metricsRegistry } from '@/lib/metrics';
 import { cacheClient } from '@/lib/cache-client';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { executeDbQuery } from '@/lib/db-client';
+import { verifyAuth } from '@/lib/auth-server';
 
 /**
  * Health Check Detalhado (DevOps Regra 4)
@@ -67,7 +68,9 @@ export async function GET(request: NextRequest) {
   const isHealthy = dbStatus !== 'DOWN' && cacheStatus !== 'DOWN';
   const statusCode = isHealthy ? 200 : 503;
 
-  const healthPayload = {
+  const isAdmin = await verifyAuth(request);
+
+  const healthPayload: Record<string, any> = {
     status: isHealthy ? 'healthy' : 'unhealthy',
     timestamp: new Date().toISOString(),
     service: 'gente-digital-api',
@@ -84,14 +87,18 @@ export async function GET(request: NextRequest) {
         latencyMs: cacheLatencyMs,
         hitRatioPercent: snapshot.cache.hit_ratio_percent,
       },
-      system: {
-        status: 'UP',
-        uptimeSeconds: snapshot.uptime_seconds,
-        memoryUsage: snapshot.memory,
-        cpuUsage: snapshot.cpu,
-      },
     },
   };
+
+  // Telemetria detalhada de hardware/processo restrita a administradores autenticados (B5)
+  if (isAdmin) {
+    healthPayload.system = {
+      status: 'UP',
+      uptimeSeconds: snapshot.uptime_seconds,
+      memoryUsage: snapshot.memory,
+      cpuUsage: snapshot.cpu,
+    };
+  }
 
   if (!isHealthy) {
     logger.error('[HEALTH CHECK FAIL] Serviço degradado ou indisponível', new Error('Health check failure'), healthPayload, requestId);

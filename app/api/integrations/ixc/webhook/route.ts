@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { timingSafeEqual } from 'crypto';
 import { getIxcCredentials, fetchIxcWithTimeout } from '@/lib/ixc';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const rawBody = await req.json().catch(() => ({}));
-    console.log('IXC Webhook recebido');
+    logger.info('IXC Webhook recebido');
 
     // Support both direct IXC trigger payloads and standard webhook formats
     const payload = rawBody.data || rawBody.registro || rawBody;

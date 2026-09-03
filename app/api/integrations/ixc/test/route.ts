@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyAuth } from '@/lib/auth-server';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Base64 encode the token
     const base64Token = Buffer.from(token).toString('base64');
 
-    console.log(`Testing IXC integration. URL: ${url}`);
+    logger.info('Testando conexão com IXC', { domain: cleanDomain });
 
     // Request to IXC Webservice API with a 10s timeout
     const controller = new AbortController();

@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    console.log('Received MS Forms webhook com chaves:', Object.keys(body || {}));
+    logger.info('Recebido webhook MS Forms', { keysCount: Object.keys(body || {}).length });
 
     // Captura parâmetros da query URL (?ref=... ou ?colaborador=...)
     const url = new URL(req.url);
@@ -338,7 +338,7 @@ export async function POST(req: NextRequest) {
         external_ref: externalRef || null,
         created_at: new Date().toISOString()
       };
-      console.log('Mocked MS Forms webhook registration (Supabase offline):', insertedLead);
+      logger.info('Mocked MS Forms webhook registration (Supabase offline)', { leadId: insertedLead.id });
     }
 
     return NextResponse.json(
