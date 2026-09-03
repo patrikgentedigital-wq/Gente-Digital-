@@ -25,21 +25,29 @@ CREATE INDEX IF NOT EXISTS idx_commission_payments_ref
 COMMENT ON TABLE commission_payments IS 
   'Registro persistente de comissões pagas. Substitui localStorage do admin.';
 
--- RLS (Row Level Security) - ajuste conforme sua política
+-- RLS (Row Level Security)
 ALTER TABLE commission_payments ENABLE ROW LEVEL SECURITY;
 
--- Política: usuários autenticados podem ler e inserir
-CREATE POLICY "Authenticated users can read commission_payments"
+-- Políticas de Segurança RLS
+-- Leitura: usuários autenticados podem consultar comissões
+-- Escrita (INSERT/UPDATE/DELETE): restrita a administradores (ou via API server-side com service_role)
+DROP POLICY IF EXISTS "Authenticated users can read commission_payments" ON commission_payments;
+DROP POLICY IF EXISTS "Authenticated users can insert commission_payments" ON commission_payments;
+DROP POLICY IF EXISTS "Authenticated users can update commission_payments" ON commission_payments;
+DROP POLICY IF EXISTS "Admins podem tudo em commission_payments" ON commission_payments;
+DROP POLICY IF EXISTS "Autenticados podem ler commission_payments" ON commission_payments;
+
+CREATE POLICY "Admins podem tudo em commission_payments"
+  ON commission_payments FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.user_roles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+
+CREATE POLICY "Autenticados podem ler commission_payments"
   ON commission_payments FOR SELECT
   TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can insert commission_payments"
-  ON commission_payments FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
-CREATE POLICY "Authenticated users can update commission_payments"
-  ON commission_payments FOR UPDATE
-  TO authenticated
-  USING (true);
+  USING (auth.uid() IS NOT NULL);

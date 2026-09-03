@@ -5,9 +5,15 @@ import { getIxcCredentials, fetchIxcWithTimeout } from '@/lib/ixc';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (Token Secreto Obrigatório)
-    const secret = req.nextUrl.searchParams.get('secret');
+    // 1. Validação de Segurança (Token Secreto Obrigatório via Header ou Query)
+    const secretFromHeader = req.headers.get('x-webhook-secret');
+    const secretFromQuery = req.nextUrl.searchParams.get('secret');
+    const secret = secretFromHeader || secretFromQuery;
     const expectedSecret = process.env.IXC_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+    
+    if (secretFromQuery && !secretFromHeader) {
+      console.warn('Webhook IXC acessado com secret na URL (query parameter). Recomenda-se migrar para o header x-webhook-secret.');
+    }
     
     if (!expectedSecret) {
       console.error("SEGURANÇA: IXC_WEBHOOK_SECRET / WEBHOOK_SECRET não configurado no servidor.");

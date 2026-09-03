@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { verifyAuthAny } from '@/lib/auth-server';
 import { getIxcCredentials, formatIxcDate, fetchIxcWithTimeout } from '@/lib/ixc';
+
+const ProspectSchema = z.object({
+  name: z.string().trim().min(2).max(150),
+  phone: z.string().trim().min(8).max(30),
+  ref: z.string().trim().max(100).optional(),
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,11 +16,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { name, phone, ref } = await req.json();
+    const rawBody = await req.json().catch(() => ({}));
+    const parsed = ProspectSchema.safeParse(rawBody);
 
-    if (!name || !phone) {
-      return NextResponse.json({ success: false, error: 'Nome e telefone são obrigatórios' }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Nome e telefone válidos são obrigatórios', details: parsed.error.format() },
+        { status: 400 }
+      );
     }
+
+    const { name, phone, ref } = parsed.data;
 
     // Fetch credentials via unified helper
     const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();

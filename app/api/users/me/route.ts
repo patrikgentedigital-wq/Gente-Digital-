@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Serviço de autenticação não configurado.' }, { status: 503 });
+      }
       return NextResponse.json({ role: 'admin' }); // dev local
     }
 

@@ -50,7 +50,7 @@ export async function getUserRole(
   const emailLower = (userEmail || '').trim().toLowerCase();
 
   // 2. Checar ADMIN_EMAILS no .env (fonte oficial de bootstrap de admins)
-  const configuredAdminEmails = (process.env.ADMIN_EMAILS || 'gentedigital2424@gmail.com')
+  const configuredAdminEmails = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);

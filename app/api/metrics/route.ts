@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { metricsRegistry } from '@/lib/metrics';
 import { logger } from '@/lib/logger';
 import { verifyAuth } from '@/lib/auth-server';
@@ -15,7 +16,16 @@ export async function GET(request: NextRequest) {
 
   const metricsSecret = process.env.METRICS_SECRET;
   const bearer = request.headers.get('authorization');
-  const hasValidBearer = !!metricsSecret && bearer === `Bearer ${metricsSecret}`;
+  const expectedBearer = metricsSecret ? `Bearer ${metricsSecret}` : '';
+
+  let hasValidBearer = false;
+  if (expectedBearer && bearer && bearer.length === expectedBearer.length) {
+    try {
+      hasValidBearer = timingSafeEqual(Buffer.from(bearer), Buffer.from(expectedBearer));
+    } catch {
+      hasValidBearer = false;
+    }
+  }
 
   if (!hasValidBearer && !(await verifyAuth(request))) {
     logger.warn('[METRICS DENIED] Tentativa de scrape não autorizado', undefined, requestId);
