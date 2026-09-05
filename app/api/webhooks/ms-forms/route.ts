@@ -269,7 +269,8 @@ export async function POST(req: NextRequest) {
         ref: validData.ref,
         status: 'Pendente',
         value: validData.value,
-        source: 'ms_forms'
+        source: 'ms_forms',
+        created_at: new Date().toISOString()
       };
       if (externalRef) {
         insertPayload.external_ref = externalRef;

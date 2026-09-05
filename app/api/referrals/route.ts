@@ -70,7 +70,15 @@ export async function POST(req: NextRequest) {
 
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .insert([{ name: parsed.data.name, phone, ref, status: 'Pendente', value: 0 }])
+      .insert([{
+        name: parsed.data.name,
+        phone,
+        ref,
+        status: 'Pendente',
+        value: 0,
+        source: 'landing',
+        created_at: new Date().toISOString()
+      }])
       .select('id')
       .single();
 

@@ -503,7 +503,9 @@ export function LeadsView() {
       phone: phoneDigits,
       ref: referral,
       status: 'Pendente',
-      value: data.value ? parseFloat(data.value) : 0
+      value: data.value ? parseFloat(data.value) : 0,
+      source: 'manual',
+      created_at: new Date().toISOString()
     };
 
     try {

@@ -5,7 +5,7 @@ import { X, Download, Calendar, DollarSign, Award, CheckCircle2, Clock, AlertCir
 import Avatar from 'boring-avatars';
 import { Colaborador, Lead } from '@/lib/supabase';
 import { PROGRAM_RULES } from '@/lib/rules';
-import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateFilterState, matchesDateFilter, getPeriodLabel, AvailableMonthOption, extractAvailableMonths } from '@/lib/date-filters';
 import { DateRangeFilter } from '@/components/date-range-filter';
 import { sanitizeCsvField } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ interface ColaboradorExtratoModalProps {
   colaborador: Colaborador;
   allLeads: Lead[];
   initialFilter?: DateFilterState;
+  availableMonths?: AvailableMonthOption[];
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export function ColaboradorExtratoModal({
   colaborador,
   allLeads,
   initialFilter = { period: 'this_month' },
+  availableMonths,
   onClose,
 }: ColaboradorExtratoModalProps) {
   const [dateFilter, setDateFilter] = useState<DateFilterState>(initialFilter);
@@ -37,6 +39,11 @@ export function ColaboradorExtratoModal({
       return refNorm === colabIdNorm || refNorm === colabNameNorm;
     });
   }, [allLeads, colabIdNorm, colabNameNorm]);
+
+  const effectiveAvailableMonths = useMemo(() => {
+    if (availableMonths && availableMonths.length > 0) return availableMonths;
+    return extractAvailableMonths(colabLeads.map(l => l.created_at));
+  }, [availableMonths, colabLeads]);
 
   // Filtra pelo período de apuração de data
   const filteredLeads = useMemo(() => {
@@ -166,7 +173,7 @@ export function ColaboradorExtratoModal({
             <Calendar className="w-4 h-4 text-amber-500" />
             <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Período de Apuração da Comissão:</span>
           </div>
-          <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+          <DateRangeFilter value={dateFilter} onChange={setDateFilter} availableMonths={effectiveAvailableMonths} />
         </div>
 
         {/* Cards de Métricas do Período */}

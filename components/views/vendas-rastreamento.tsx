@@ -28,7 +28,7 @@ import {
 import Avatar from 'boring-avatars';
 import { supabase, Lead, LeadHistory, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
-import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateFilterState, matchesDateFilter, getPeriodLabel, extractAvailableMonths } from '@/lib/date-filters';
 import { DateRangeFilter } from '@/components/date-range-filter';
 import { sanitizeCsvField } from '@/lib/utils';
 import { useToast } from '@/components/providers/toast-context';
@@ -127,6 +127,10 @@ export function VendasRastreamentoView() {
     });
     return list;
   }, [colaboradores, leads]);
+
+  const availableMonths = useMemo(() => {
+    return extractAvailableMonths(leads.map(l => l.created_at));
+  }, [leads]);
 
   // Filtra leads de acordo com período, canal, colaborador e busca textual
   const filteredLeads = useMemo(() => {
@@ -439,7 +443,7 @@ export function VendasRastreamentoView() {
       {/* Barra de Filtros Globais */}
       <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-brand-border dark:border-gray-800 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+          <DateRangeFilter value={dateFilter} onChange={setDateFilter} availableMonths={availableMonths} />
 
           {/* Filtro por Canal de Origem */}
           <select

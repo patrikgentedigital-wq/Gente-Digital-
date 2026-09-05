@@ -1,7 +1,7 @@
 'use client';
 
 import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, Colaborador, Lead, isSupabaseConfigured } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
@@ -13,7 +13,7 @@ import { useToast } from '@/components/providers/toast-context';
 import { ConfirmModal } from '@/components/providers/confirm-modal';
 import QRCode from 'qrcode';
 import { PROGRAM_RULES } from '@/lib/rules';
-import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateFilterState, matchesDateFilter, getPeriodLabel, extractAvailableMonths } from '@/lib/date-filters';
 import { DateRangeFilter } from '@/components/date-range-filter';
 import { ColaboradorExtratoModal } from './colaborador-extrato-modal';
 
@@ -231,11 +231,21 @@ export function ColaboradoresView() {
       let leadsData: Lead[] = [];
       if (isSupabaseConfigured()) {
         try {
-          const { data: lData } = await supabase
+          // Busca resiliente: carrega os leads ordenados por created_at
+          const { data: lData, error: lError } = await supabase
             .from('leads')
-            .select('id, name, phone, ref, status, value, source, loss_reason, created_at')
+            .select('*')
             .order('created_at', { ascending: false });
-          if (lData) leadsData = lData as Lead[];
+
+          if (!lError && lData) {
+            leadsData = lData as Lead[];
+          } else {
+            if (lError) console.warn("Aviso ao buscar leads (tentando fallback de colunas canônicas):", lError.message);
+            const { data: fallbackData } = await supabase
+              .from('leads')
+              .select('id, name, phone, ref, status, value, source, created_at');
+            if (fallbackData) leadsData = fallbackData as Lead[];
+          }
         } catch (e) {
           console.error("Erro ao buscar leads em colaboradores:", e);
         }
@@ -435,6 +445,10 @@ export function ColaboradoresView() {
     }
   };
 
+  const availableMonths = useMemo(() => {
+    return extractAvailableMonths(allLeads.map(l => l.created_at));
+  }, [allLeads]);
+
   const colabsWithPeriodMetrics = colaboradores.map(colab => {
     const normColabName = normalizeRef(colab.name);
     const normColabId = normalizeRef(colab.id);
@@ -547,7 +561,7 @@ export function ColaboradoresView() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+            <DateRangeFilter value={dateFilter} onChange={setDateFilter} availableMonths={availableMonths} />
 
             <div className="relative w-full sm:w-60 text-brand-muted focus-within:text-brand-charcoal transition-colors">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
@@ -880,6 +894,7 @@ export function ColaboradoresView() {
           colaborador={selectedColabForExtrato}
           allLeads={allLeads}
           initialFilter={dateFilter}
+          availableMonths={availableMonths}
           onClose={() => setSelectedColabForExtrato(null)}
         />
       )}

@@ -10,7 +10,7 @@ import { useToast } from '@/components/providers/toast-context';
 import { sanitizeCsvField } from '@/lib/utils';
 import Avatar from 'boring-avatars';
 import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
-import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateFilterState, matchesDateFilter, getPeriodLabel, extractAvailableMonths } from '@/lib/date-filters';
 import { DateRangeFilter } from '@/components/date-range-filter';
 
 export interface CommissionItem {
@@ -364,6 +364,10 @@ export function ComissoesView() {
     return Array.from(set).sort();
   }, [commissions]);
 
+  const availableMonths = useMemo(() => {
+    return extractAvailableMonths(commissions.map(c => c.raw_date));
+  }, [commissions]);
+
   const filteredCommissions = commissions.filter(c => {
     const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.colaborador_name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -567,7 +571,7 @@ export function ComissoesView() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+              <DateRangeFilter value={dateFilter} onChange={setDateFilter} availableMonths={availableMonths} />
 
               {colaboradorOptions.length > 0 && (
                 <select
