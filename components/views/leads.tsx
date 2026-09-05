@@ -12,6 +12,7 @@ import { LeadsSkeleton } from '@/components/views/leads-skeleton';
 import { initialColaboradores } from '@/lib/mock-data';
 import { ConfirmModal } from '@/components/providers/confirm-modal';
 import { sanitizeCsvField } from '@/lib/utils';
+import { DateFilterState, matchesDateFilter } from '@/lib/date-filters';
 
 const normalizePhoneDigits = (phone: string) => phone.replace(/\D/g, '');
 
@@ -758,35 +759,14 @@ export function LeadsView() {
     
     let matchesDate = true;
     if (dateFilter !== 'all') {
-      if (!l.created_at) {
-        matchesDate = true;
-      } else {
-        const d = new Date(l.created_at);
-        const currentDate = new Date();
-        if (dateFilter === 'this_month') {
-          matchesDate = d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
-        } else if (dateFilter === 'last_month') {
-          const lastMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
-          const lastYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
-          matchesDate = d.getMonth() === lastMonth && d.getFullYear() === lastYear;
-        } else if (dateFilter === 'last_30_days') {
-          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = d >= thirtyDaysAgo && d <= currentDate;
-        } else if (dateFilter === 'this_year') {
-          matchesDate = d.getFullYear() === currentDate.getFullYear();
-        } else if (dateFilter === 'specific_month') {
-          matchesDate = d.getMonth() === specificMonth && d.getFullYear() === specificYear;
-        } else if (dateFilter === 'custom') {
-          if (customStartDate) {
-            const start = new Date(`${customStartDate}T00:00:00`);
-            if (!isNaN(start.getTime()) && d < start) matchesDate = false;
-          }
-          if (customEndDate) {
-            const end = new Date(`${customEndDate}T23:59:59.999`);
-            if (!isNaN(end.getTime()) && d > end) matchesDate = false;
-          }
-        }
-      }
+      const filterState: DateFilterState = {
+        period: dateFilter as any,
+        month: specificMonth,
+        year: specificYear,
+        startDate: customStartDate || undefined,
+        endDate: customEndDate || undefined,
+      };
+      matchesDate = matchesDateFilter(l.created_at, filterState);
     }
 
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;

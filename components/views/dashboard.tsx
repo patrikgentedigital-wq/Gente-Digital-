@@ -11,6 +11,7 @@ import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabas
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
 import { PROGRAM_RULES } from '@/lib/rules';
 import { sanitizeCsvField } from '@/lib/utils';
+import { DateFilterState, matchesDateFilter, parseFlexibleDate } from '@/lib/date-filters';
 
 // Lazy load recharts para reduzir bundle inicial
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
@@ -131,27 +132,12 @@ export function DashboardView() {
   }, []);
 
   const now = new Date();
-  const filteredLeads = leads.filter(l => {
-    if (dateFilter === 'all') return true;
-    if (!l.created_at) return false;
-    const d = new Date(l.created_at);
-    
-    if (dateFilter === 'this_month') {
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }
-    if (dateFilter === 'last_month') {
-      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-      const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      return d.getMonth() === lastMonth && d.getFullYear() === lastYear;
-    }
-    if (dateFilter === 'this_year') {
-      return d.getFullYear() === now.getFullYear();
-    }
-    if (dateFilter === 'specific_month') {
-      return d.getMonth() === specificMonth && d.getFullYear() === specificYear;
-    }
-    return true;
-  });
+  const filterState: DateFilterState = {
+    period: dateFilter as any,
+    month: specificMonth,
+    year: specificYear,
+  };
+  const filteredLeads = leads.filter(l => matchesDateFilter(l.created_at, filterState));
 
   const totalLeads = filteredLeads.length;
   const conversoesCount = filteredLeads.filter(l => l.status === 'Ganho').length;
@@ -178,14 +164,14 @@ export function DashboardView() {
     }
 
     const currentMonthLeads = leads.filter(l => {
-      if (!l.created_at) return false;
-      const d = new Date(l.created_at);
+      const d = parseFlexibleDate(l.created_at);
+      if (!d) return false;
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
     const prevMonthLeads = leads.filter(l => {
-      if (!l.created_at) return false;
-      const d = new Date(l.created_at);
+      const d = parseFlexibleDate(l.created_at);
+      if (!d) return false;
       return d.getMonth() === prevMonth && d.getFullYear() === prevYear;
     });
 
@@ -340,7 +326,7 @@ export function DashboardView() {
     }
 
     filteredLeads.forEach(lead => {
-      const date = lead.created_at ? new Date(lead.created_at) : new Date();
+      const date = parseFlexibleDate(lead.created_at) || new Date();
       const chartMonth = baseData.find(d => d.month === date.getMonth() && d.year === date.getFullYear());
       if (chartMonth) {
         const status = lead.status;
