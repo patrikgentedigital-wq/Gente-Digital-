@@ -38,6 +38,8 @@ export interface Lead {
   value?: number;
   source?: string;
   external_ref?: string;
+  loss_reason?: string;
+  tracking_metadata?: Record<string, any>;
   created_at?: string;
 }
 

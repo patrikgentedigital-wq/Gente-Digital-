@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2, Edit2 } from 'lucide-react';
+import { Search, Plus, X, LayoutGrid, List, MessageSquare, Clock, Calendar, Phone, ChevronRight, ChevronLeft, GripVertical, Inbox, Sparkles, ShieldAlert, Loader2, Copy, RefreshCw, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 import { supabase, Lead, LeadHistory, isSupabaseConfigured } from '@/lib/supabase';
 import { logAuditEvent } from '@/lib/audit';
 import { motion, AnimatePresence } from 'motion/react';
@@ -617,6 +617,11 @@ export function LeadsView() {
     const currentLead = leads.find(l => l.id === id);
     if (!currentLead || currentLead.status === status) return;
 
+    if (status === 'Errado') {
+      setLossReasonModalLead({ id, name: currentLead.name });
+      return;
+    }
+
     try {
       if (isSupabaseConfigured()) {
          const { error: updateError } = await supabase.from('leads').update({ status }).eq('id', id);
@@ -635,6 +640,46 @@ export function LeadsView() {
     } catch(err) {
       console.error("Error updating lead status", err);
       toastError('Erro na Atualização', 'Não foi possível alterar o status do lead.');
+    }
+  };
+
+  const handleConfirmLossReason = async (reasonToUse?: string) => {
+    if (!lossReasonModalLead) return;
+    const { id, name: leadName } = lossReasonModalLead;
+    const finalReason = reasonToUse || (selectedLossReason === 'Outro' ? (customLossReason.trim() || 'Outro motivo') : selectedLossReason);
+
+    try {
+      if (isSupabaseConfigured()) {
+        const { error: updateError } = await supabase.from('leads').update({
+          status: 'Errado',
+          loss_reason: finalReason
+        }).eq('id', id);
+        if (updateError) throw updateError;
+
+        const historyData = {
+          lead_id: id,
+          date: new Date().toLocaleString('pt-BR').substring(0, 16),
+          action: 'Marcado como Errado / Descartado',
+          note: `Motivo: ${finalReason}`
+        };
+        await supabase.from('lead_history').insert([historyData]);
+      }
+
+      setLeads(prev => prev.map(l => l.id === id ? {
+        ...l,
+        status: 'Errado',
+        loss_reason: finalReason,
+        history: [{ id: -Date.now(), lead_id: id, date: new Date().toLocaleString('pt-BR').substring(0, 16), action: 'Marcado como Errado', note: `Motivo: ${finalReason}` }, ...l.history]
+      } : l));
+
+      toastInfo('Lead Descartado', `Lead "${leadName}" marcado como Errado (${finalReason}).`);
+    } catch (err: any) {
+      console.error('Erro ao marcar lead como errado:', err);
+      toastError('Erro na Atualização', err?.message || 'Falha ao registrar motivo.');
+    } finally {
+      setLossReasonModalLead(null);
+      setCustomLossReason('');
+      setSelectedLossReason('Sem viabilidade técnica');
     }
   };
 
@@ -677,6 +722,11 @@ export function LeadsView() {
   const [dateFilter, setDateFilter] = useState('all');
   const [specificMonth, setSpecificMonth] = useState(new Date().getMonth());
   const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [lossReasonModalLead, setLossReasonModalLead] = useState<{ id: number; name: string } | null>(null);
+  const [selectedLossReason, setSelectedLossReason] = useState<string>('Sem viabilidade técnica');
+  const [customLossReason, setCustomLossReason] = useState<string>('');
 
   const uniqueRefs = useMemo(
     () => Array.from(new Set(leads.map(l => l.ref).filter(Boolean))),
@@ -707,7 +757,6 @@ export function LeadsView() {
     let matchesDate = true;
     if (dateFilter !== 'all') {
       if (!l.created_at) {
-        // Sem data cadastrada: mantém o lead visível (não esconde dados)
         matchesDate = true;
       } else {
         const d = new Date(l.created_at);
@@ -718,16 +767,28 @@ export function LeadsView() {
           const lastMonth = currentDate.getMonth() === 0 ? 11 : currentDate.getMonth() - 1;
           const lastYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
           matchesDate = d.getMonth() === lastMonth && d.getFullYear() === lastYear;
+        } else if (dateFilter === 'last_30_days') {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          matchesDate = d >= thirtyDaysAgo && d <= currentDate;
         } else if (dateFilter === 'this_year') {
           matchesDate = d.getFullYear() === currentDate.getFullYear();
         } else if (dateFilter === 'specific_month') {
           matchesDate = d.getMonth() === specificMonth && d.getFullYear() === specificYear;
+        } else if (dateFilter === 'custom') {
+          if (customStartDate) {
+            const start = new Date(`${customStartDate}T00:00:00`);
+            if (!isNaN(start.getTime()) && d < start) matchesDate = false;
+          }
+          if (customEndDate) {
+            const end = new Date(`${customEndDate}T23:59:59.999`);
+            if (!isNaN(end.getTime()) && d > end) matchesDate = false;
+          }
         }
       }
     }
 
     return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
-  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear]);
+  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear, customStartDate, customEndDate]);
 
   // Paginação no cliente: o scroll/lista mostra apenas a página atual do dataset filtrado
   const pageLeads = useMemo(
@@ -837,9 +898,33 @@ export function LeadsView() {
                     <option value="all">Todo o Período</option>
                     <option value="this_month">Este Mês</option>
                     <option value="last_month">Mês Passado</option>
+                    <option value="last_30_days">Últimos 30 Dias</option>
                     <option value="this_year">Este Ano</option>
                     <option value="specific_month">Mês Específico</option>
+                    <option value="custom">Intervalo Personalizado</option>
                   </select>
+                  {dateFilter === 'custom' && (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-10">De:</span>
+                        <input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-10">Até:</span>
+                        <input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                   {dateFilter === 'specific_month' && (
                     <div className="flex items-center gap-2 mt-2">
                       <select
@@ -1549,6 +1634,99 @@ export function LeadsView() {
           onConfirm={executeDeleteLead}
           onCancel={() => setConfirmDelete(null)}
         />
+      )}
+
+      {/* Modal de Motivo de Descarte / Erro */}
+      {lossReasonModalLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-red-100 dark:bg-red-950/40 rounded-xl text-red-600 dark:text-red-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Registrar Motivo de Descarte
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Lead: <span className="font-semibold text-gray-700 dark:text-gray-300">{lossReasonModalLead.name}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setLossReasonModalLead(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">
+                Selecione o motivo pelo qual este lead foi marcado como Errado / Descartado:
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  'Sem viabilidade técnica',
+                  'Cliente desistiu / Sem interesse',
+                  'Telefone inexistente / Não atende',
+                  'Já é cliente da base',
+                  'Lead duplicado',
+                  'Preço / Condições comerciais',
+                  'Outro'
+                ].map((reason) => (
+                  <label
+                    key={reason}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-xs cursor-pointer transition-colors ${
+                      selectedLossReason === reason
+                        ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-700 dark:text-red-300 font-semibold'
+                        : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="loss_reason"
+                      value={reason}
+                      checked={selectedLossReason === reason}
+                      onChange={() => setSelectedLossReason(reason)}
+                      className="text-red-600 focus:ring-red-500"
+                    />
+                    <span>{reason === 'Outro' ? 'Outro motivo (especificar)' : reason}</span>
+                  </label>
+                ))}
+              </div>
+
+              {selectedLossReason === 'Outro' && (
+                <div className="pt-1">
+                  <input
+                    type="text"
+                    value={customLossReason}
+                    onChange={(e) => setCustomLossReason(e.target.value)}
+                    placeholder="Descreva o motivo detalhado..."
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setLossReasonModalLead(null)}
+                className="flex-1 py-2.5 px-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmLossReason()}
+                className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm hover:shadow"
+              >
+                Confirmar Descarte
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

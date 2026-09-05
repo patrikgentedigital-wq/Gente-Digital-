@@ -1,10 +1,10 @@
 'use client';
 
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle } from 'lucide-react';
+import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
-import { initialColaboradores } from '@/lib/mock-data';
+import { supabase, Colaborador, Lead, isSupabaseConfigured } from '@/lib/supabase';
+import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import Avatar from 'boring-avatars';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +13,9 @@ import { useToast } from '@/components/providers/toast-context';
 import { ConfirmModal } from '@/components/providers/confirm-modal';
 import QRCode from 'qrcode';
 import { PROGRAM_RULES } from '@/lib/rules';
+import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateRangeFilter } from '@/components/date-range-filter';
+import { ColaboradorExtratoModal } from './colaborador-extrato-modal';
 
 const colaboradorSchema = z.object({
   name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
@@ -30,6 +33,9 @@ export function ColaboradoresView() {
   const router = useRouter();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>(isSupabaseConfigured() ? [] : initialColaboradores);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [dateFilter, setDateFilter] = useState<DateFilterState>({ period: 'all' });
+  const [selectedColabForExtrato, setSelectedColabForExtrato] = useState<Colaborador | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -218,38 +224,27 @@ export function ColaboradoresView() {
         }
       }
 
-      // Se carregou do Supabase com sucesso, usa APENAS os dados do banco.
-      // Os dados mockados só são usados como fallback quando Supabase não está disponível.
       if (!loadedFromSupabase) {
         baseColabs = [...initialColaboradores];
       }
 
-      let leadsData: any[] = [];
+      let leadsData: Lead[] = [];
       if (isSupabaseConfigured()) {
         try {
-          const { data: lData } = await supabase.from('leads').select('ref');
-          if (lData) leadsData = lData;
-        } catch (e) {}
+          const { data: lData } = await supabase
+            .from('leads')
+            .select('id, name, phone, ref, status, value, source, loss_reason, created_at')
+            .order('created_at', { ascending: false });
+          if (lData) leadsData = lData as Lead[];
+        } catch (e) {
+          console.error("Erro ao buscar leads em colaboradores:", e);
+        }
+      } else {
+        leadsData = (initialLeads as any[]) as Lead[];
       }
 
-      const normalizeStr = (str: string) => 
-        str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
-
-      const colabsWithCount = baseColabs.map(colab => {
-        const normColabName = normalizeStr(colab.name);
-        const normColabId = normalizeStr(colab.id);
-        
-        // Contagem de indicações efetivas (todas as origens associadas ao colaborador).
-        // Sem fallback para colab.count, que congelava em 0/valores defasados.
-        const colabCount = leadsData.filter(lead => {
-          const normRef = normalizeStr(lead.ref);
-          return normRef === normColabId || normRef === normColabName;
-        }).length;
-        
-        return { ...colab, count: colabCount };
-      });
-      
-      setColaboradores(colabsWithCount);
+      setAllLeads(leadsData);
+      setColaboradores(baseColabs);
     } catch (error) {
       console.error("Error fetching colaboradores:", error);
     } finally {
@@ -266,6 +261,9 @@ export function ColaboradoresView() {
       const colabChannel = supabase
         .channel('colaboradores_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'colaboradores' }, () => {
+          fetchColaboradores();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
           fetchColaboradores();
         })
         .subscribe();
@@ -437,7 +435,30 @@ export function ColaboradoresView() {
     }
   };
 
-  const filteredColabs = colaboradores.filter(c =>
+  const colabsWithPeriodMetrics = colaboradores.map(colab => {
+    const normColabName = normalizeRef(colab.name);
+    const normColabId = normalizeRef(colab.id);
+
+    const colabAllLeads = allLeads.filter(lead => {
+      const normRef = normalizeRef(lead.ref);
+      return normRef === normColabId || normRef === normColabName;
+    });
+
+    const periodLeads = colabAllLeads.filter(lead =>
+      matchesDateFilter(lead.created_at, dateFilter)
+    );
+
+    const vendasGanhasPeriodo = periodLeads.filter(l => l.status === 'Ganho').length;
+
+    return {
+      ...colab,
+      count: periodLeads.length,
+      totalAllTime: colabAllLeads.length,
+      vendasGanhas: vendasGanhasPeriodo,
+    };
+  });
+
+  const filteredColabs = colabsWithPeriodMetrics.filter(c =>
     (c.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (c.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (c.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
@@ -448,8 +469,8 @@ export function ColaboradoresView() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Links de Indicação</h2>
-          <p className="text-brand-muted dark:text-gray-400 mt-1">Configure e monitore os links de compartilhamento dos seus colaboradores.</p>
+          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Links & Técnicos</h2>
+          <p className="text-brand-muted dark:text-gray-400 mt-1">Configure os links e monitore as indicações por período para pagamento de comissões.</p>
         </div>
         <button onClick={openCreateModal} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
           <UserPlus className="w-5 h-5" />
@@ -507,27 +528,37 @@ export function ColaboradoresView() {
         <div className="bg-gray-50 dark:bg-gray-800/40 rounded-2xl border-l-4 border-brand-yellow p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-3 text-brand-charcoal dark:text-white">
             <HelpCircle className="w-5 h-5" />
-            <h4 className="font-bold">Como funciona?</h4>
+            <h4 className="font-bold">Apuração de Comissão</h4>
           </div>
           <p className="text-sm text-brand-muted dark:text-gray-400 leading-relaxed">
-            Cada colaborador possui um <span className="font-bold text-brand-charcoal dark:text-white">ID Único</span>. Quando alguém acessa o link com esse ID, o sistema armazena um cookie por 30 dias para garantir o rastreamento da conversão.
+            Use o <span className="font-bold text-brand-charcoal dark:text-white">filtro por data</span> para consultar quantas indicações cada técnico realizou no mês ou período selecionado para efetuar o fechamento financeiro.
           </p>
         </div>
       </div>
 
       {/* Table Section */}
       <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 overflow-hidden transition-colors">
-        <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-          <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Colaboradores Ativos</h3>
-          <div className="relative w-full sm:w-64 text-brand-muted focus-within:text-brand-charcoal transition-colors">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Filtrar colaborador..."
-              className="w-full pl-9 pr-4 py-2 bg-white border border-brand-border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
-            />
+        <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+          <div>
+            <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Colaboradores & Técnicos</h3>
+            <p className="text-xs text-brand-muted dark:text-gray-400 mt-0.5">
+              Exibindo contagem de indicações para: <span className="font-semibold text-amber-600 dark:text-amber-400">{getPeriodLabel(dateFilter)}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+
+            <div className="relative w-full sm:w-60 text-brand-muted focus-within:text-brand-charcoal transition-colors">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Filtrar por nome ou ID..."
+                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-800 border border-brand-border dark:border-zinc-700 rounded-xl text-xs text-brand-charcoal dark:text-white focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
+              />
+            </div>
           </div>
         </div>
 
@@ -584,6 +615,16 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className="font-bold text-brand-charcoal dark:text-white text-base">{(colab.count ?? 0).toString().padStart(2, '0')}</span>
+                    {dateFilter.period !== 'all' && (
+                      <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                        {colab.totalAllTime ?? 0} no histórico total
+                      </span>
+                    )}
+                    {colab.vendasGanhas !== undefined && colab.vendasGanhas > 0 && (
+                      <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                        {colab.vendasGanhas} venda(s) instalada(s)
+                      </span>
+                    )}
                     {clicksLoaded && (
                       <span className="block text-[10px] text-brand-muted dark:text-gray-400 font-medium mt-0.5">
                         {clickCounts[normalizeRef(colab.id)] ?? clickCounts[normalizeRef(colab.name)] ?? 0} cliques no link
@@ -592,6 +633,14 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
+                      <button
+                        onClick={() => setSelectedColabForExtrato(colab)}
+                        aria-label={`Ver extrato de indicações de ${colab.name}`}
+                        className="p-2 text-brand-muted hover:text-amber-600 dark:hover:text-amber-400 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                        title="Ver Extrato de Indicações (Comissão)"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => router.push('/?tab=dashboard')}
                         aria-label={`Ver analytics de ${colab.name}`}
@@ -822,6 +871,16 @@ export function ColaboradoresView() {
           icon="trash"
           onConfirm={executeDelete}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {/* Modal de Extrato Detalhado do Técnico (Apuração de Comissões) */}
+      {selectedColabForExtrato && (
+        <ColaboradorExtratoModal
+          colaborador={selectedColabForExtrato}
+          allLeads={allLeads}
+          initialFilter={dateFilter}
+          onClose={() => setSelectedColabForExtrato(null)}
         />
       )}
     </div>

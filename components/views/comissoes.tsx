@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2, Calendar } from 'lucide-react';
 import { supabase, Lead, Colaborador } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
@@ -10,6 +10,8 @@ import { useToast } from '@/components/providers/toast-context';
 import { sanitizeCsvField } from '@/lib/utils';
 import Avatar from 'boring-avatars';
 import { PROGRAM_RULES, RULES_COPY } from '@/lib/rules';
+import { DateFilterState, matchesDateFilter, getPeriodLabel } from '@/lib/date-filters';
+import { DateRangeFilter } from '@/components/date-range-filter';
 
 export interface CommissionItem {
   id: string | number;
@@ -20,6 +22,7 @@ export interface CommissionItem {
   commission_amount: number;
   status: 'Pendente' | 'Paga';
   date: string;
+  raw_date?: string;
   paid_at?: string;
   isBonus?: boolean;
   type: 'pix_colaborador' | 'desconto_cliente' | 'bonus_top';
@@ -34,6 +37,8 @@ export function ComissoesView() {
   const [commissions, setCommissions] = useState<CommissionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'Pendente' | 'Paga'>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilterState>({ period: 'this_month' });
+  const [selectedColabFilter, setSelectedColabFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [topColaborador, setTopColaborador] = useState<{ name: string; count: number } | null>(null);
   const [pendingPayment, setPendingPayment] = useState<CommissionItem | null>(null);
@@ -199,6 +204,7 @@ export function ComissoesView() {
             commission_amount: ratePerLead,
             status: isPaid ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
+            raw_date: lead.created_at || undefined,
             paid_at: isPaid || undefined,
             type: 'pix_colaborador' as const
           };
@@ -218,6 +224,7 @@ export function ComissoesView() {
             commission_amount: PROGRAM_RULES.clienteIndicador.descontoMensalidade,
             status: isPaid ? 'Paga' as const : 'Pendente' as const,
             date: lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '15/07/2026',
+            raw_date: lead.created_at || undefined,
             paid_at: isPaid || undefined,
             type: 'desconto_cliente' as const
           };
@@ -238,6 +245,7 @@ export function ComissoesView() {
           commission_amount: PROGRAM_RULES.bonusTop.valor,
           status: isBonusPaid ? 'Paga' : 'Pendente',
           date: new Date().toLocaleDateString('pt-BR'),
+          raw_date: now.toISOString(),
           paid_at: isBonusPaid || undefined,
           isBonus: true,
           type: 'bonus_top'
@@ -324,7 +332,7 @@ export function ComissoesView() {
 
   const handleExportCSV = () => {
     const headers = ['ID Lead', 'Nome do Lead / Prêmio', 'Indicador (Colaborador/Cliente)', 'Tipo', 'Valor Venda (R$)', 'Recompensa (R$)', 'Status', 'Data Conversao', 'Data Pagamento'];
-    const rows = commissions.map(c => [
+    const rows = filteredCommissions.map(c => [
       sanitizeCsvField(c.lead_id),
       sanitizeCsvField(c.lead_name),
       sanitizeCsvField(c.colaborador_name),
@@ -348,16 +356,27 @@ export function ComissoesView() {
     URL.revokeObjectURL(url);
   };
 
+  const colaboradorOptions = useMemo(() => {
+    const set = new Set<string>();
+    commissions.forEach(c => {
+      if (c.colaborador_name && !c.isBonus) set.add(c.colaborador_name);
+    });
+    return Array.from(set).sort();
+  }, [commissions]);
+
   const filteredCommissions = commissions.filter(c => {
     const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.colaborador_name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesColab = selectedColabFilter === 'all' || c.colaborador_name === selectedColabFilter;
+    const matchesDate = matchesDateFilter(c.raw_date, dateFilter);
+
+    return matchesSearch && matchesStatus && matchesColab && matchesDate;
   });
 
-  const totalPendente = commissions.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + c.commission_amount, 0);
-  const totalPago = commissions.filter(c => c.status === 'Paga').reduce((acc, c) => acc + c.commission_amount, 0);
-  const totalConversoes = commissions.filter(c => !c.isBonus).length;
+  const totalPendente = filteredCommissions.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + c.commission_amount, 0);
+  const totalPago = filteredCommissions.filter(c => c.status === 'Paga').reduce((acc, c) => acc + c.commission_amount, 0);
+  const totalConversoes = filteredCommissions.filter(c => !c.isBonus).length;
 
   return (
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
@@ -512,49 +531,77 @@ export function ComissoesView() {
 
       {/* Filter and Table Container */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-brand-border dark:border-gray-800 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                filterStatus === 'all'
-                  ? 'bg-brand-charcoal dark:bg-zinc-700 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
-              }`}
-            >
-              Todas ({commissions.length})
-            </button>
-            <button
-              onClick={() => setFilterStatus('Pendente')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                filterStatus === 'Pendente'
-                  ? 'bg-amber-500 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
-              }`}
-            >
-              Pendentes ({commissions.filter(c => c.status === 'Pendente').length})
-            </button>
-            <button
-              onClick={() => setFilterStatus('Paga')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-                filterStatus === 'Paga'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
-              }`}
-            >
-              Pagas/Baixadas ({commissions.filter(c => c.status === 'Paga').length})
-            </button>
+        <div className="p-6 border-b border-brand-border dark:border-gray-800 flex flex-col gap-4">
+          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterStatus('all')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
+                  filterStatus === 'all'
+                    ? 'bg-brand-charcoal dark:bg-zinc-700 text-white shadow-sm'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                }`}
+              >
+                Todas ({filteredCommissions.length})
+              </button>
+              <button
+                onClick={() => setFilterStatus('Pendente')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
+                  filterStatus === 'Pendente'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                }`}
+              >
+                Pendentes ({filteredCommissions.filter(c => c.status === 'Pendente').length})
+              </button>
+              <button
+                onClick={() => setFilterStatus('Paga')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
+                  filterStatus === 'Paga'
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                }`}
+              >
+                Pagas/Baixadas ({filteredCommissions.filter(c => c.status === 'Paga').length})
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <DateRangeFilter value={dateFilter} onChange={setDateFilter} />
+
+              {colaboradorOptions.length > 0 && (
+                <select
+                  value={selectedColabFilter}
+                  onChange={e => setSelectedColabFilter(e.target.value)}
+                  className="px-3 py-2 bg-white dark:bg-zinc-800 border border-brand-border dark:border-zinc-700 rounded-xl text-xs text-brand-charcoal dark:text-white font-medium focus:outline-none focus:border-brand-yellow"
+                  aria-label="Filtrar por técnico ou indicador"
+                >
+                  <option value="all">Todos os Indicadores</option>
+                  {colaboradorOptions.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              )}
+
+              <div className="relative text-brand-muted focus-within:text-brand-charcoal transition-colors w-full sm:w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Buscar lead ou indicador..."
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white dark:placeholder-gray-400 focus:outline-none focus:border-brand-yellow transition-all"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="relative text-brand-muted focus-within:text-brand-charcoal transition-colors w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar por lead ou indicador..."
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-zinc-800 border border-brand-border dark:border-gray-700 rounded-xl text-xs text-brand-charcoal dark:text-white dark:placeholder-gray-400 focus:outline-none focus:border-brand-yellow transition-all"
-            />
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>Período ativo de apuração: <strong className="text-zinc-800 dark:text-zinc-200">{getPeriodLabel(dateFilter)}</strong></span>
+            {selectedColabFilter !== 'all' && (
+              <span>• Indicador: <strong className="text-amber-600 dark:text-amber-400">{selectedColabFilter}</strong></span>
+            )}
           </div>
         </div>
 

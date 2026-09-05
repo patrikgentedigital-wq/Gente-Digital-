@@ -16,6 +16,10 @@ const LeadsView = dynamic(
   () => import('@/components/views/leads').then((module) => module.LeadsView),
   { loading: ViewLoading }
 );
+const VendasRastreamentoView = dynamic(
+  () => import('@/components/views/vendas-rastreamento').then((module) => module.VendasRastreamentoView),
+  { loading: ViewLoading }
+);
 const ColaboradoresView = dynamic(
   () => import('@/components/views/colaboradores').then((module) => module.ColaboradoresView),
   { loading: ViewLoading }
@@ -32,6 +36,7 @@ const IntegracoesView = dynamic(
 const tabNames = {
   dashboard: 'Dashboard',
   leads: 'Leads & Funil',
+  vendas: 'Vendas & Rastreamento',
   colaboradores: 'Colaboradores',
   comissoes: 'Gestão de Comissões & PIX',
   integracoes: 'Integrações (IXC & MS)',
@@ -126,6 +131,8 @@ function ActiveView({ tab }: { tab: TabId }) {
       return <DashboardView />;
     case 'leads':
       return <LeadsView />;
+    case 'vendas':
+      return <VendasRastreamentoView />;
     case 'colaboradores':
       return <ColaboradoresView />;
     case 'comissoes':
