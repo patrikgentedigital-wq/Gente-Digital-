@@ -2,7 +2,7 @@
 
 import { ChevronRight, Menu, Sun, Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { motion } from 'motion/react';
 
 interface HeaderProps {
@@ -10,16 +10,15 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
+const emptySubscribe = () => () => {};
+
 export function Header({ activeTabName, onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0f0f12]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-zinc-800/80 h-[68px] flex items-center justify-between px-4 md:px-8 transition-colors">
@@ -42,7 +41,7 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        {mounted && (
+        {mounted ? (
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -54,6 +53,8 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </motion.button>
+        ) : (
+          <div className="w-8 h-8 rounded-lg" />
         )}
       </div>
     </header>

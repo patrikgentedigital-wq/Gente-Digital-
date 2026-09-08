@@ -256,8 +256,16 @@ export async function POST(req: NextRequest) {
           note: `Payload duplicado recebido. Telefone: ${normalizedPhone}${externalRef ? ` | Ref: ${externalRef}` : ''}`,
         }]);
 
+        // Retorna status 200 para evitar que ferramentas de automação (MS Power Automate / Zapier)
+        // reexecutem tentativas desnecessárias, mas informa explicitamente que o lead é uma duplicata não reinserida.
         return NextResponse.json(
-          { success: true, duplicate: true, leadId: existingLead.id, message: 'Lead duplicado ignorado' },
+          { 
+            success: true, 
+            duplicate: true, 
+            isNewLead: false, 
+            leadId: existingLead.id, 
+            message: 'Lead duplicado identificado e ignorado com sucesso (idempotente)' 
+          },
           { status: 200 }
         );
       }

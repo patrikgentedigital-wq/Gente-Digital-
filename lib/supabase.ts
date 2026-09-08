@@ -6,20 +6,21 @@ const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://'
   : 'https://placeholder.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
 
-// Se o cookie do Supabase for removido pelo usuário, limpa o localStorage correspondente
-// para evitar que o cliente reidrate a sessão deletada.
+// Se o cookie do Supabase for removido pelo usuário e cookies estiverem ativos, limpa o localStorage correspondente
+// para evitar que o cliente reidrate a sessão deletada. Protegido para não deslogar em ambientes sem cookies acessíveis.
 if (typeof window !== 'undefined') {
-  const hasAuthCookie = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
-  if (!hasAuthCookie) {
-    try {
+  try {
+    const rawCookies = document.cookie || '';
+    const hasAuthCookie = rawCookies.split(';').some(c => c.trim().startsWith('sb-'));
+    if (!hasAuthCookie && rawCookies.trim() !== '') {
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
           localStorage.removeItem(key);
         }
       });
-    } catch (e) {
-      console.error('Erro ao limpar localStorage:', e);
     }
+  } catch (e) {
+    console.error('Erro ao verificar sessão local:', e);
   }
 }
 

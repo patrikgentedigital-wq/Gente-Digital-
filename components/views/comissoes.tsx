@@ -149,6 +149,10 @@ export function ComissoesView() {
       };
 
       // Contagem de indicações instaladas por Colaborador, separada por mês
+      // NOTA DE REGRA DE NEGÓCIO: Atualmente utiliza a data de registro do lead (created_at)
+      // para agrupar as indicações do colaborador no mês. Caso a regra comercial seja alterada
+      // para considerar estritamente a data do evento de conversão/instalação (status 'Ganho'),
+      // deve-se extrair a data do histórico de status ou do timestamp de instalação do IXC.
       const monthlyCounts: Record<string, Record<string, number>> = {};
       leadsData.forEach(lead => {
         const { isColab, officialName } = isColaborador(lead.ref);
@@ -330,6 +334,30 @@ export function ComissoesView() {
     }
   };
 
+  const colaboradorOptions = useMemo(() => {
+    const set = new Set<string>();
+    commissions.forEach(c => {
+      if (c.colaborador_name && !c.isBonus) set.add(c.colaborador_name);
+    });
+    return Array.from(set).sort();
+  }, [commissions]);
+
+  const availableMonths = useMemo(() => {
+    return extractAvailableMonths(commissions.map(c => c.raw_date));
+  }, [commissions]);
+
+  const filteredCommissions = useMemo(() => {
+    return commissions.filter(c => {
+      const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            c.colaborador_name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
+      const matchesColab = selectedColabFilter === 'all' || c.colaborador_name === selectedColabFilter;
+      const matchesDate = matchesDateFilter(c.raw_date, dateFilter);
+
+      return matchesSearch && matchesStatus && matchesColab && matchesDate;
+    });
+  }, [commissions, searchQuery, filterStatus, selectedColabFilter, dateFilter]);
+
   const handleExportCSV = () => {
     const headers = ['ID Lead', 'Nome do Lead / Prêmio', 'Indicador (Colaborador/Cliente)', 'Tipo', 'Valor Venda (R$)', 'Recompensa (R$)', 'Status', 'Data Conversao', 'Data Pagamento'];
     const rows = filteredCommissions.map(c => [
@@ -355,28 +383,6 @@ export function ComissoesView() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
-  const colaboradorOptions = useMemo(() => {
-    const set = new Set<string>();
-    commissions.forEach(c => {
-      if (c.colaborador_name && !c.isBonus) set.add(c.colaborador_name);
-    });
-    return Array.from(set).sort();
-  }, [commissions]);
-
-  const availableMonths = useMemo(() => {
-    return extractAvailableMonths(commissions.map(c => c.raw_date));
-  }, [commissions]);
-
-  const filteredCommissions = commissions.filter(c => {
-    const matchesSearch = c.lead_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.colaborador_name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
-    const matchesColab = selectedColabFilter === 'all' || c.colaborador_name === selectedColabFilter;
-    const matchesDate = matchesDateFilter(c.raw_date, dateFilter);
-
-    return matchesSearch && matchesStatus && matchesColab && matchesDate;
-  });
 
   const totalPendente = filteredCommissions.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + c.commission_amount, 0);
   const totalPago = filteredCommissions.filter(c => c.status === 'Paga').reduce((acc, c) => acc + c.commission_amount, 0);
@@ -637,7 +643,21 @@ export function ComissoesView() {
               ) : filteredCommissions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-brand-muted dark:text-gray-400">
-                    Nenhuma comissão/desconto localizado para o filtro selecionado.
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-md mx-auto">
+                      <p className="font-semibold text-sm text-zinc-700 dark:text-zinc-200">Nenhuma comissão ou recompensa localizada para os filtros ativos.</p>
+                      <p className="text-xs text-zinc-400">Período selecionado: {getPeriodLabel(dateFilter)}. Você pode limpar os filtros para visualizar todo o histórico.</p>
+                      <button
+                        onClick={() => {
+                          setDateFilter({ period: 'all' });
+                          setSelectedColabFilter('all');
+                          setFilterStatus('all');
+                          setSearchQuery('');
+                        }}
+                        className="mt-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-colors"
+                      >
+                        Exibir Todo o Histórico
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : filteredCommissions.map(comm => (

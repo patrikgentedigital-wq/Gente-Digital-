@@ -3,7 +3,6 @@
 import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X, FileText } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Avatar from 'boring-avatars';
-import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
@@ -28,7 +27,6 @@ const normalizeStr = (str: string) =>
   str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
 export function DashboardView() {
-  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -447,7 +445,7 @@ export function DashboardView() {
           <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           <button
             onClick={() => setShowExecutiveModal(true)}
             aria-label="Gerar Relatório PDF"
@@ -537,7 +535,7 @@ export function DashboardView() {
         <div className="flex-1 w-full h-full min-h-[300px]">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-gray-200 dark:stroke-zinc-700" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} dy={10} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} />
               <Tooltip 
@@ -683,14 +681,22 @@ export function DashboardView() {
   );
 }
 
-function StatCard({ icon: Icon, title, value, trend, trendUp }: any) {
+interface StatCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  value: string;
+  trend: string;
+  trendUp: boolean;
+}
+
+function StatCard({ icon: Icon, title, value, trend, trendUp }: StatCardProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="saas-card p-6 flex flex-col justify-between group cursor-pointer transition-shadow hover:shadow-lg"
+      className="saas-card p-6 flex flex-col justify-between group transition-shadow hover:shadow-lg"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="p-2.5 bg-slate-100 dark:bg-zinc-800 rounded-xl text-slate-700 dark:text-slate-200 group-hover:bg-brand-yellow group-hover:text-slate-950 transition-colors">

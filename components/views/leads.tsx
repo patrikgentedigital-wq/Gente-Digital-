@@ -89,6 +89,8 @@ export function LeadsView() {
   
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState<UILead | null>(null);
 
   // Auto-switch de visão conforme o tamanho da tela (lista no mobile, Kanban no desktop)
   useEffect(() => {
@@ -114,7 +116,7 @@ export function LeadsView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [isModalOpen, selectedLead]);
 
   const selectLead = (lead: UILead | null) => {
     setSelectedLead(lead);
@@ -143,8 +145,6 @@ export function LeadsView() {
   };
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingLead, setEditingLead] = useState<UILead | null>(null);
 
   const openCreateModal = () => {
     setEditingLead(null);
@@ -178,6 +178,54 @@ export function LeadsView() {
   const [selectedColabFilter, setSelectedColabFilter] = useState<string>('');
   const [minValueFilter, setMinValueFilter] = useState<number | ''>('');
   const [maxValueFilter, setMaxValueFilter] = useState<number | ''>('');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [specificMonth, setSpecificMonth] = useState(new Date().getMonth());
+  const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [lossReasonModalLead, setLossReasonModalLead] = useState<{ id: number; name: string } | null>(null);
+  const [selectedLossReason, setSelectedLossReason] = useState<string>('Sem viabilidade técnica');
+  const [customLossReason, setCustomLossReason] = useState<string>('');
+
+  const uniqueRefs = useMemo(
+    () => Array.from(new Set(leads.map(l => l.ref).filter(Boolean))),
+    [leads]
+  );
+  
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedColabFilter) count++;
+    if (minValueFilter !== '') count++;
+    if (maxValueFilter !== '') count++;
+    if (dateFilter !== 'all') count++;
+    if (dateFilter === 'custom' && (customStartDate || customEndDate)) count++;
+    return count;
+  }, [selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, customStartDate, customEndDate]);
+
+  const filteredLeads = useMemo(() => leads.filter(l => {
+    const matchesSearch = 
+      l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (l.phone && l.phone.includes(searchQuery)) ||
+      (l.ref && l.ref.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+    const matchesColab = selectedColabFilter ? l.ref === selectedColabFilter : true;
+    const matchesMinVal = minValueFilter !== '' ? (l.value || 0) >= Number(minValueFilter) : true;
+    const matchesMaxVal = maxValueFilter !== '' ? (l.value || 0) <= Number(maxValueFilter) : true;
+    
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const filterState: DateFilterState = {
+        period: dateFilter as any,
+        month: specificMonth,
+        year: specificYear,
+        startDate: customStartDate || undefined,
+        endDate: customEndDate || undefined,
+      };
+      matchesDate = matchesDateFilter(l.created_at, filterState);
+    }
+
+    return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
+  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear, customStartDate, customEndDate]);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -722,55 +770,6 @@ export function LeadsView() {
     }
   };
 
-  const [dateFilter, setDateFilter] = useState('all');
-  const [specificMonth, setSpecificMonth] = useState(new Date().getMonth());
-  const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [lossReasonModalLead, setLossReasonModalLead] = useState<{ id: number; name: string } | null>(null);
-  const [selectedLossReason, setSelectedLossReason] = useState<string>('Sem viabilidade técnica');
-  const [customLossReason, setCustomLossReason] = useState<string>('');
-
-  const uniqueRefs = useMemo(
-    () => Array.from(new Set(leads.map(l => l.ref).filter(Boolean))),
-    [leads]
-  );
-  
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (selectedColabFilter) count++;
-    if (minValueFilter !== '') count++;
-    if (maxValueFilter !== '') count++;
-    if (dateFilter !== 'all') count++;
-    return count;
-  }, [selectedColabFilter, minValueFilter, maxValueFilter, dateFilter]);
-
-  const now = useMemo(() => new Date(), []);
-
-  const filteredLeads = useMemo(() => leads.filter(l => {
-    const matchesSearch = 
-      l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (l.phone && l.phone.includes(searchQuery)) ||
-      (l.ref && l.ref.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-    const matchesColab = selectedColabFilter ? l.ref === selectedColabFilter : true;
-    const matchesMinVal = minValueFilter !== '' ? (l.value || 0) >= Number(minValueFilter) : true;
-    const matchesMaxVal = maxValueFilter !== '' ? (l.value || 0) <= Number(maxValueFilter) : true;
-    
-    let matchesDate = true;
-    if (dateFilter !== 'all') {
-      const filterState: DateFilterState = {
-        period: dateFilter as any,
-        month: specificMonth,
-        year: specificYear,
-        startDate: customStartDate || undefined,
-        endDate: customEndDate || undefined,
-      };
-      matchesDate = matchesDateFilter(l.created_at, filterState);
-    }
-
-    return matchesSearch && matchesColab && matchesMinVal && matchesMaxVal && matchesDate;
-  }), [leads, searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear, customStartDate, customEndDate]);
 
   // Paginação no cliente: o scroll/lista mostra apenas a página atual do dataset filtrado
   const pageLeads = useMemo(
@@ -782,7 +781,7 @@ export function LeadsView() {
   // Ao mudar filtros/busca, volta para a primeira página
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear]);
+  }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear, customStartDate, customEndDate]);
 
   return (
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
@@ -860,6 +859,8 @@ export function LeadsView() {
                         setDateFilter('all');
                         setSpecificMonth(new Date().getMonth());
                         setSpecificYear(new Date().getFullYear());
+                        setCustomStartDate('');
+                        setCustomEndDate('');
                       }}
                       className="text-xs text-red-500 hover:text-red-600 font-bold"
                     >
@@ -1099,7 +1100,7 @@ export function LeadsView() {
         <div 
           ref={scrollContainerRef} 
           onDragOver={handleDragOver}
-          className="flex-1 flex gap-6 overflow-x-auto pb-6 items-start min-h-[550px]"
+          className="flex-1 flex gap-6 overflow-x-auto pb-6 items-start min-h-[550px] snap-x"
         >
           {statuses.map(status => {
             const columnLeads = filteredLeads.filter(l => l.status === status);
@@ -1108,7 +1109,7 @@ export function LeadsView() {
                 key={status} 
                 onDrop={(e) => handleDrop(e, status)}
                 onDragOver={handleDragOver}
-                className="flex-shrink-0 w-[310px] flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-[calc(100vh-220px)] min-h-[480px] shadow-sm"
+                className="flex-shrink-0 w-[280px] lg:w-[310px] snap-start flex flex-col bg-gray-50 dark:bg-zinc-900 border border-brand-border dark:border-gray-800 rounded-[24px] p-4 max-h-[calc(100vh-220px)] min-h-[480px] shadow-sm"
               >
                 <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                   <div className="flex items-center gap-2">
