@@ -40,7 +40,7 @@ export interface GeneralSummary {
 
 function normalizeAnalyticsTimestamp(value: string | null, timezone: MetricWindow['timezone']): string | null {
   if (!value || timezone !== 'America/Sao_Paulo') return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim()) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value.trim())) return null;
   return normalizeSourceTimestamp(value);
 }
 
@@ -74,27 +74,55 @@ function uniqueBy<T>(records: readonly T[], key: (record: T) => string): T[] {
     [...values].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0]);
 }
 
+function attendanceDimensionKey(record: OpaAttendanceRecord): string {
+  return JSON.stringify({
+    canal: record.canal,
+    status: record.status,
+    status_vinculo: record.status_vinculo,
+  });
+}
+
+function deduplicateAttendance(records: readonly OpaAttendanceRecord[]): {
+  total: number;
+  dimensional: OpaAttendanceRecord[];
+  protocolConflicts: number;
+} {
+  const groups = new Map<string, OpaAttendanceRecord[]>();
+  for (const record of records) {
+    const key = record.protocolo?.trim()
+      ? `protocol:${record.protocolo.trim()}`
+      : `source:${record.source_id}`;
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  }
+
+  const dimensional: OpaAttendanceRecord[] = [];
+  let protocolConflicts = 0;
+  for (const [key, group] of [...groups.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const dimensions = new Set(group.map(attendanceDimensionKey));
+    if (key.startsWith('protocol:') && dimensions.size > 1) {
+      protocolConflicts += 1;
+      continue;
+    }
+    dimensional.push(group[0]);
+  }
+
+  return { total: groups.size, dimensional, protocolConflicts };
+}
+
 export function summarizeAttendance(records: readonly OpaAttendanceRecord[], window: MetricWindow): AttendanceSummary {
   const filtered = records.filter((record) => inWindow(record.data_referencia, window));
-  const unique = uniqueBy(filtered, (record) => record.protocolo?.trim() ? `protocol:${record.protocolo.trim()}` : `source:${record.source_id}`);
-  const protocolGroups = new Map<string, OpaAttendanceRecord[]>();
-  for (const record of filtered) if (record.protocolo?.trim()) {
-    const key = `protocol:${record.protocolo.trim()}`;
-    protocolGroups.set(key, [...(protocolGroups.get(key) ?? []), record]);
-  }
-  const protocolConflicts = [...protocolGroups.values()].filter((group) =>
-    new Set(group.map((record) => JSON.stringify({ canal: record.canal, status: record.status, status_vinculo: record.status_vinculo }))).size > 1).length;
-  const linked = unique.filter((record) => record.status_vinculo === 'vinculado').length;
-  const unlinked = unique.filter((record) => record.status_vinculo === 'nao_vinculado').length;
+  const { total, dimensional, protocolConflicts } = deduplicateAttendance(filtered);
+  const linked = dimensional.filter((record) => record.status_vinculo === 'vinculado').length;
+  const unlinked = dimensional.filter((record) => record.status_vinculo === 'nao_vinculado').length;
   return {
-    total: unique.length,
+    total,
     linked,
     unlinked,
-    ambiguous: unique.filter((record) => record.status_vinculo === 'ambiguo').length,
-    notApplicable: unique.filter((record) => record.status_vinculo === 'nao_aplicavel').length,
+    ambiguous: dimensional.filter((record) => record.status_vinculo === 'ambiguo').length,
+    notApplicable: dimensional.filter((record) => record.status_vinculo === 'nao_aplicavel').length,
     protocolConflicts,
-    byChannel: grouped(unique.flatMap((record) => record.canal ? [record.canal] : [])),
-    byStatus: grouped(unique.flatMap((record) => record.status ? [record.status] : [])),
+    byChannel: grouped(dimensional.flatMap((record) => record.canal ? [record.canal] : [])),
+    byStatus: grouped(dimensional.flatMap((record) => record.status ? [record.status] : [])),
   };
 }
 

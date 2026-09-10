@@ -53,7 +53,8 @@ test('summarizeAttendance trata duplicatas divergentes de modo determinístico e
   assert.deepEqual(forward, reverse);
   assert.equal(forward.total, 2);
   assert.equal(forward.protocolConflicts, 1);
-  assert.deepEqual(forward.byChannel, [{ key: 'a', count: 1 }, { key: 'source:y', count: 1 }]);
+  assert.deepEqual(forward.byChannel, [{ key: 'source:y', count: 1 }]);
+  assert.deepEqual(forward.byStatus, [{ key: 'aberto', count: 1 }]);
 });
 
 test('agregadores aceitam somente timestamps analíticos estritos e não dependem do TZ do processo', () => {
@@ -65,6 +66,9 @@ test('agregadores aceitam somente timestamps analíticos estritos e não depende
       { source_id: 'local', data_referencia: '2026-09-30T23:59:59' },
       { source_id: 'milliseconds', data_referencia: '2026-09-01T00:00:00.999Z' },
       { source_id: 'date-only', data_referencia: '2026-09-01' },
+      { source_id: 'br-date-only', data_referencia: '01/09/2026' },
+      { source_id: 'br-short-date-only', data_referencia: '1/9/2026' },
+      { source_id: 'br-full', data_referencia: '01/09/2026 00:00:00' },
       { source_id: 'impossible-day', data_referencia: '2026-02-31T12:00:00Z' },
       { source_id: 'impossible-time', data_referencia: '2026-09-01T25:00:00Z' },
       { source_id: 'junk', data_referencia: 'lixo' },
@@ -73,7 +77,7 @@ test('agregadores aceitam somente timestamps analíticos estritos e não depende
     sales: [], contracts: [], preContracts: [],
   }, strictWindow);
 
-  assert.equal(result.leads, 4);
+  assert.equal(result.leads, 5);
 });
 
 test('summarizeAttendance inclui os limites, ignora datas inválidas e ordena empates por chave', () => {
