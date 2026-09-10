@@ -25,3 +25,9 @@ Os componentes abaixo não recebem valor estimado nesta etapa:
 - fonte e regra de cálculo dos componentes compostos de `GERAL`.
 
 Uma linha só pode mudar para validável quando a fonte e a regra puderem ser comprovadas por leitura autorizada e evidência sanitizada. Nenhum workflow, carga, agenda ou consulta remota foi executado para produzir este mapa.
+
+## Estado da reconciliação
+
+Todas as linhas permanecem `not_comparable` até que exista uma rodada autorizada com a mesma janela, timezone, filtros, regra de data e deduplicação no Data Studio e no painel. O PDF anexado foi usado somente como base de entendimento do escopo; seus números não foram promovidos a `expected` de produção.
+
+A matriz e o procedimento de comparação estão em `docs/analytics/reconciliation-runbook.md`. Ausência de fonte, persistência ou evidência não é convertida em zero ou `match`.
