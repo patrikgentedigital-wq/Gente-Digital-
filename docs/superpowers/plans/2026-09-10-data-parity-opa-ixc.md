@@ -38,7 +38,7 @@ Se a rota de listagem ou alguma regra não puder ser comprovada, a tarefa corres
 
 ---
 
-### Tarefa 1: Mapear os componentes do Data Studio e congelar fixtures sanitizados
+### Task 1: Mapear os componentes do Data Studio e congelar fixtures sanitizados
 
 **Arquivos:**
 
@@ -158,7 +158,7 @@ git commit -m "docs: map data studio parity contract"
 
 ---
 
-### Tarefa 2: Criar contratos de domínio e normalização dos identificadores
+### Task 2: Criar contratos de domínio e normalização dos identificadores
 
 **Arquivos:**
 
@@ -288,7 +288,7 @@ git commit -m "feat: add analytics source contracts"
 
 ---
 
-### Tarefa 3: Implementar agregadores puros para os três conjuntos de indicadores
+### Task 3: Implementar agregadores puros para os três conjuntos de indicadores
 
 **Arquivos:**
 
@@ -404,7 +404,7 @@ git commit -m "feat: add analytics metric aggregators"
 
 ---
 
-### Tarefa 4: Criar o esquema Supabase para origem, proveniência e estado de sincronização
+### Task 4: Criar o esquema Supabase para origem, proveniência e estado de sincronização
 
 **Arquivos:**
 
@@ -517,7 +517,7 @@ git commit -m "feat: add analytics source schema"
 
 ---
 
-### Tarefa 5: Implementar o contrato de ingestão e o repositório server-side
+### Task 5: Implementar o contrato de ingestão e o repositório server-side
 
 **Arquivos:**
 
@@ -607,7 +607,7 @@ git commit -m "feat: add analytics ingestion repository"
 
 ---
 
-### Tarefa 6: Definir e documentar o workflow n8n analítico separado
+### Task 6: Definir e documentar o workflow n8n analítico separado
 
 **Arquivos:**
 
@@ -666,7 +666,7 @@ O workflow remoto não será considerado concluído por existir na interface. A 
 
 ---
 
-### Tarefa 7: Expor o resumo analítico por API protegida
+### Task 7: Expor o resumo analítico por API protegida
 
 **Arquivos:**
 
@@ -761,7 +761,7 @@ git commit -m "feat: expose protected analytics overview"
 
 ---
 
-### Tarefa 8: Adicionar o módulo de três páginas ao painel sem remover os módulos existentes
+### Task 8: Adicionar o módulo de três páginas ao painel sem remover os módulos existentes
 
 **Arquivos:**
 
@@ -844,7 +844,7 @@ git commit -m "feat: add analytics dashboard sections"
 
 ---
 
-### Tarefa 9: Implementar reconciliação formal com o Data Studio
+### Task 9: Implementar reconciliação formal com o Data Studio
 
 **Arquivos:**
 
@@ -935,7 +935,7 @@ git commit -m "feat: add analytics reconciliation checks"
 
 ---
 
-### Tarefa 10: Executar o primeiro piloto controlado de leitura
+### Task 10: Executar o primeiro piloto controlado de leitura
 
 **Arquivos:**
 
@@ -974,7 +974,7 @@ git commit -m "docs: record controlled analytics pilot"
 
 ---
 
-### Tarefa 11: Gate final de qualidade e entrega local
+### Task 11: Gate final de qualidade e entrega local
 
 **Arquivos:**
 
