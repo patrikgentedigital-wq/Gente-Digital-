@@ -249,20 +249,24 @@ Se uma nova inspeção perder a listagem histórica ou a paginação Opa!, o est
 
 ### Referência observada no Data Studio
 
-Janela observada: `01/09/2026` a `10/09/2026`, com atualização do relatório no próprio dia. Os números abaixo são um snapshot de referência, não foram escritos no banco e não foram promovidos a dados de produção:
+O controle de data do relatório apareceu como `Período automático`, sem uma janela textual selecionada. A tabela de `ATENDIMENTO` exibiu registros de agosto, embora o relatório estivesse atualizado em `10/09/2026`. Portanto, os números abaixo são um snapshot de referência, não foram escritos no banco e não foram promovidos a dados de produção; a janela do Data Studio ainda não é comparável com a janela do piloto.
 
 - `GERAL`: leads `239`, vendas `109`, contratos `95`, pré-contratos `5`.
 - `ATENDIMENTO`: total `5.040`, clientes vinculados `2.232`, clientes não vinculados `9`; canais whatsapp `4.562`, pabx `469`, instagram `5`, telegram `4`.
 - `CANCELAMENTOS`: total `29`; cartões de movimentação observados: renovações `24`, upgrade `10`, downgrade `1`, data de vencimento `1`.
 
+A estrutura de `ATENDIMENTO` usa `DataInicio`, `DataAbertura`, `DataUltimaInteracao`, `Protocolo`, `Status`, `Motivo` e `Atendente`, com agrupamento de canais `whatsapp`, `pabx`, `instagram` e `telegram`. Isso aponta para a família de registros do Opa!, não para uma leitura direta de `su_ticket` do IXC. O workflow existente consulta `su_ticket` com status `OSAB` e tipo `C`, enquanto o relatório exibe status `F`; a equivalência entre essas regras não foi comprovada.
+
+A página `CANCELAMENTOS` também exibe `ALTERAÇÃO DE CONTRATO` por `Tipo Alteração`, com códigos `UP`, `UV`, `AV`, `DV` e `DW`. O workflow existente contém uma leitura IXC do relatório de alterações de contrato. Essa é uma indicação de possível origem complementar, mas não prova a regra que produz o total `29` nem os cartões de movimentação.
+
 ### Leituras efetivas no piloto
 
-- Opa!: `200` na primeira amostra inicial confirmou o filtro temporal; com o limite efetivo de `1.000`, a primeira página retornou `1.000` e a página com `skip: 1.000` retornou `891`. A janela do primeiro lote observado foi de `2026-09-01T09:16:46.991Z` a `2026-09-10T15:33:06.377Z`. A amostra da primeira página foi `950` status `F` e `50` status `EA`, com canais `920` whatsapp e `80` pabx. Esses valores são de página, não o total da referência.
+- Opa!: `200` na primeira amostra inicial confirmou o filtro temporal usado no endpoint; com o limite efetivo de `1.000`, a primeira página retornou `1.000` e a página com `skip: 1.000` retornou `891`. A janela do primeiro lote observado foi de `2026-09-01T09:16:46.991Z` a `2026-09-10T15:33:06.377Z`. A amostra da primeira página foi `950` status `F` e `50` status `EA`, com canais `920` whatsapp e `80` pabx. Esses valores são de página, não o total da referência, e a equivalência com a janela automática do Data Studio não foi comprovada.
 - IXC: `cliente_contrato.data_cancelamento` com status `I` retornou `12` de `12`, com datas observadas entre `2026-09-01` e `2026-09-08`. O total `12` não coincide com o cartão `29` do Data Studio.
 - IXC `su_ticket`: uma tentativa com `qtype` temporal devolveu erro HTML do provedor; uma tentativa sem filtro temporal efetivo indicou `67.389` registros e foi interrompida como carga inadequada para o piloto. Nenhum desses retornos foi persistido.
 - Supabase: não houve upsert. O nó final registrou `persistence.status = blocked` porque a migration analítica não estava aplicada no ambiente alvo.
 
-Conclusão da rodada: o workflow remoto está tecnicamente separado e as credenciais referenciadas funcionam para leituras controladas, mas a paridade com os cartões `5.040` e `29` ainda está `not_comparable`. O sucesso da execução representa somente sucesso de leitura dos nodes, não paridade de negócio.
+Conclusão da rodada: o workflow remoto está tecnicamente separado e as credenciais referenciadas funcionam para leituras controladas, mas a paridade com os cartões `5.040` e `29` ainda está `not_comparable`. O formato dos campos aponta o atendimento para a família Opa! e indica uma possível leitura complementar de alterações no IXC, mas a janela automática e as regras de contagem ainda não estão fechadas. O sucesso da execução representa somente sucesso de leitura dos nodes, não paridade de negócio.
 
 ## Limites e não objetivos
 

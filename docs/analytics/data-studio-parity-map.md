@@ -34,7 +34,7 @@ A matriz e o procedimento de comparação estão em `docs/analytics/reconciliati
 
 ## Rodada autorizada de leitura
 
-Em `10/09/2026`, foi executado manualmente o workflow remoto isolado `ANALYTICS - Sincronização OPA e IXC` (ID `dqgBnd1OOci0T8A4`), sem publicação, agenda ou escrita no Supabase. A janela usada foi `2026-09-01` a `2026-09-10`, timezone `America/Sao_Paulo`.
+Em `10/09/2026`, foi executado manualmente o workflow remoto isolado `ANALYTICS - Sincronização OPA e IXC` (ID `dqgBnd1OOci0T8A4`), sem publicação, agenda ou escrita no Supabase. A janela do piloto foi `2026-09-01` a `2026-09-10`, timezone `America/Sao_Paulo`. Essa janela não foi comprovada como a mesma janela do Data Studio.
 
 ### Snapshot do Data Studio
 
@@ -48,9 +48,17 @@ Em `10/09/2026`, foi executado manualmente o workflow remoto isolado `ANALYTICS 
 
 | Fonte e regra testada | Resultado sanitizado | Estado de paridade |
 | --- | --- | --- |
-| Opa! `GET /api/v1/atendimento`, filtro pelo campo `date`, `limit: 1.000`, `skip: 0` | `1.000` registros, status `F:950` e `EA:50`, canais `whatsapp:920` e `pabx:80` | `partial`; não representa os `5.040` sem paginação completa e regra confirmada |
+| Opa! `GET /api/v1/atendimento`, filtro pelo campo `date`, `limit: 1.000`, `skip: 0` | `1.000` registros, status `F:950` e `EA:50`, canais `whatsapp:920` e `pabx:80` | `partial`; não representa os `5.040` sem paginação completa, janela equivalente e regra confirmada |
 | Opa! mesma consulta com `skip: 1.000` | `891` registros adicionais observados | `partial`; não há total de negócio confiável no envelope |
 | IXC `cliente_contrato.data_cancelamento`, status `I`, `rp:250` | `12` registros, `total:12`, datas observadas de `01/09` a `08/09` | `not_comparable` com o cartão `29` |
 | IXC `su_ticket` | filtro temporal não validado; sem janela efetiva o universo observado foi `67.389` e não foi usado no piloto | `blocked` para carga até definir paginação e filtro posterior |
 
-O campo Opa! `date` e a paginação por `skip` são evidências de capacidade técnica do endpoint, não confirmação de que a dimensão usada no relatório seja a mesma. O total exibido pelo painel analítico do Opa! também não foi tratado como equivalente ao total `5.040`, pois representa outra definição operacional. A próxima validação deve descobrir a fonte/regra do Data Studio para `ATENDIMENTO` e `CANCELAMENTOS` antes de mudar qualquer linha para `match`.
+## Evidência adicional de fonte e período
+
+Na leitura do relatório, o controle de data apareceu como `Período automático`, sem expor uma janela textual selecionada. A tabela de `ATENDIMENTO` exibiu registros de agosto, embora o relatório estivesse atualizado em `10/09/2026`; por isso, o snapshot `5.040` não pode ser comparado diretamente com a janela `01/09/2026` a `10/09/2026` do piloto.
+
+A estrutura da página `ATENDIMENTO` confirma uma família de dados compatível com o Opa!: a tabela usa `DataInicio`, `DataAbertura`, `DataUltimaInteracao`, `Protocolo`, `Status`, `Motivo` e `Atendente`, e os agrupamentos exibem canais `whatsapp`, `pabx`, `instagram` e `telegram`. Isso indica que `su_ticket` do IXC não deve ser usado como substituto direto. No workflow existente, `su_ticket` é consultado com status `OSAB` e tipo `C`, enquanto a tabela do Data Studio exibe status `F`; qualquer conversão entre os domínios ainda precisa ser comprovada.
+
+Na página `CANCELAMENTOS`, o relatório também mostra `ALTERAÇÃO DE CONTRATO` com a dimensão `Tipo Alteração` e códigos de movimentação como `UP`, `UV`, `AV`, `DV` e `DW`. O workflow existente possui uma leitura IXC de relatório de alterações de contrato, o que indica uma possível segunda origem para esses cartões, mas ainda não prova que ela seja a fonte do total `29` ou dos agrupamentos por motivo.
+
+O campo Opa! `date` e a paginação por `skip` são evidências de capacidade técnica do endpoint, não confirmação de que a dimensão usada no relatório seja a mesma. O total exibido pelo painel analítico do Opa! também não foi tratado como equivalente ao total `5.040`, pois representa outra definição operacional. A próxima validação deve fixar uma janela explícita no Data Studio ou obter sua configuração de fonte, e então comparar o campo de data, a métrica `Protocolo`, o status e a deduplicação antes de mudar qualquer linha para `match`.
