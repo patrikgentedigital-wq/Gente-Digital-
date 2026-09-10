@@ -155,6 +155,168 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
 };
 
+type ExpectedColumn = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  unique: boolean;
+  indexed: boolean;
+  payload: boolean;
+  allowedValues?: readonly string[];
+};
+
+function expectedColumn(
+  name: string,
+  type: string,
+  nullable: boolean,
+  options: Partial<Pick<ExpectedColumn, 'unique' | 'indexed' | 'payload' | 'allowedValues'>> = {},
+): ExpectedColumn {
+  return {
+    name,
+    type,
+    nullable,
+    unique: false,
+    indexed: false,
+    payload: false,
+    ...options,
+  };
+}
+
+const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
+  'integration.opa_records_raw': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('source_system', 'text', false),
+    expectedColumn('record_type', 'text', false),
+    expectedColumn('payload', 'jsonb', false, { payload: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('received_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'integration.ixc_records_raw': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('source_system', 'text', false),
+    expectedColumn('record_type', 'text', false),
+    expectedColumn('payload', 'jsonb', false, { payload: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('received_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'integration.sync_runs': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false),
+    expectedColumn('request_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('period_start', 'timestamptz', false, { indexed: true }),
+    expectedColumn('period_end', 'timestamptz', false, { indexed: true }),
+    expectedColumn('status', 'text', false, { allowedValues: ['success', 'partial', 'failed', 'unavailable'] }),
+    expectedColumn('received', 'integer', false),
+    expectedColumn('inserted', 'integer', false),
+    expectedColumn('updated', 'integer', false),
+    expectedColumn('failed', 'integer', false),
+    expectedColumn('last_source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('started_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('finished_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('error_message', 'text', true),
+  ],
+  'public.opa_attendances': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('protocolo', 'text', true),
+    expectedColumn('contato_bruto', 'text', true),
+    expectedColumn('tipo_identificador', 'text', false),
+    expectedColumn('canal', 'text', true),
+    expectedColumn('atendente', 'text', true),
+    expectedColumn('departamento', 'text', true),
+    expectedColumn('status', 'text', true),
+    expectedColumn('motivo', 'text', true),
+    expectedColumn('avaliacao', 'text', true),
+    expectedColumn('fcr', 'boolean', true),
+    expectedColumn('data_abertura', 'timestamptz', true, { indexed: true }),
+    expectedColumn('data_inicio', 'timestamptz', true, { indexed: true }),
+    expectedColumn('data_ultima_interacao', 'timestamptz', true, { indexed: true }),
+    expectedColumn('data_finalizacao', 'timestamptz', true, { indexed: true }),
+    expectedColumn('status_vinculo', 'text', false),
+    expectedColumn('ixc_customer_source_id', 'text', true, { indexed: true }),
+    expectedColumn('ixc_contract_source_id', 'text', true, { indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.opa_interactions': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('attendance_source_id', 'text', true, { indexed: true }),
+    expectedColumn('ixc_customer_source_id', 'text', true, { indexed: true }),
+    expectedColumn('ixc_contract_source_id', 'text', true, { indexed: true }),
+    expectedColumn('tipo', 'text', true),
+    expectedColumn('status', 'text', true),
+    expectedColumn('data_interacao', 'timestamptz', true, { indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.ixc_customers': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.ixc_contracts': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('customer_source_id', 'text', true, { indexed: true }),
+    expectedColumn('status', 'text', true),
+    expectedColumn('data_ativacao', 'timestamptz', true, { indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.ixc_sales': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('customer_source_id', 'text', true, { indexed: true }),
+    expectedColumn('contract_source_id', 'text', true, { indexed: true }),
+    expectedColumn('status', 'text', true),
+    expectedColumn('data_venda', 'timestamptz', true, { indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.ixc_cancellations': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+    expectedColumn('contract_source_id', 'text', true, { indexed: true }),
+    expectedColumn('motivo', 'text', true),
+    expectedColumn('tipo', 'text', true),
+    expectedColumn('data_cancelamento', 'timestamptz', true, { indexed: true }),
+    expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+  'public.analytics_sync_status': [
+    expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false),
+    expectedColumn('period_start', 'timestamptz', false, { indexed: true }),
+    expectedColumn('period_end', 'timestamptz', false, { indexed: true }),
+    expectedColumn('status', 'text', false, { allowedValues: ['success', 'partial', 'failed', 'unavailable'] }),
+    expectedColumn('received', 'integer', false),
+    expectedColumn('inserted', 'integer', false),
+    expectedColumn('updated', 'integer', false),
+    expectedColumn('failed', 'integer', false),
+    expectedColumn('last_source_updated_at', 'timestamptz', true, { indexed: true }),
+    expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
+    expectedColumn('error_message', 'text', true),
+    expectedColumn('sync_run_id', 'uuid', true, { indexed: true }),
+  ],
+};
+
+const expectedRawSourceIdColumns: Record<string, ExpectedColumn> = {
+  'integration.opa_records_raw': expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+  'integration.ixc_records_raw': expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
+};
+
 function findTable(qualifiedName: string) {
   const [schema, name] = qualifiedName.split('.');
   const tables = schema === 'public'
@@ -169,6 +331,26 @@ function findColumn(tableName: string, columnName: string) {
   const column = findTable(tableName).columns.find((candidate) => candidate.name === columnName);
   assert.ok(column, `coluna ausente no manifesto: ${tableName}.${columnName}`);
   return column;
+}
+
+function canonicalColumn(column: {
+  name: string;
+  type: string;
+  nullable: boolean;
+  unique?: boolean;
+  indexed?: boolean;
+  payload?: boolean;
+  allowedValues?: readonly string[];
+}): ExpectedColumn {
+  return {
+    name: column.name,
+    type: column.type,
+    nullable: column.nullable,
+    unique: column.unique as boolean,
+    indexed: column.indexed as boolean,
+    payload: column.payload as boolean,
+    ...(column.allowedValues === undefined ? {} : { allowedValues: [...column.allowedValues] }),
+  };
 }
 
 test('manifesto lista exatamente as tabelas de integração e public', () => {
@@ -210,6 +392,27 @@ test('manifesto lista exatamente os campos mínimos de cada tabela', () => {
     for (const columnName of expectedColumns) {
       assert.ok(findTable(tableName).columns.some((column) => column.name === columnName));
     }
+  }
+});
+
+test('manifesto fecha a lista completa e os atributos de cada coluna', () => {
+  assert.deepEqual(Object.keys(expectedColumnsByTable).sort(), [
+    ...expectedIntegrationTables.map((name) => `integration.${name}`),
+    ...expectedPublicTables.map((name) => `public.${name}`),
+  ].sort());
+
+  for (const [tableName, expectedColumns] of Object.entries(expectedColumnsByTable)) {
+    assert.deepEqual(
+      findTable(tableName).columns.map(canonicalColumn),
+      expectedColumns,
+      `colunas divergentes em ${tableName}`,
+    );
+  }
+});
+
+test('source_id das duas tabelas raw é text, not null, unique e indexado', () => {
+  for (const [tableName, expectedSourceId] of Object.entries(expectedRawSourceIdColumns)) {
+    assert.deepEqual(canonicalColumn(findColumn(tableName, 'source_id')), expectedSourceId);
   }
 });
 

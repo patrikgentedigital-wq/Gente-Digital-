@@ -29,9 +29,9 @@ export interface AnalyticsColumnContract {
   name: string;
   type: AnalyticsColumnType;
   nullable: boolean;
-  unique?: boolean;
-  indexed?: boolean;
-  payload?: boolean;
+  unique: boolean;
+  indexed: boolean;
+  payload: boolean;
   allowedValues?: readonly string[];
 }
 
@@ -71,14 +71,22 @@ export interface AnalyticsDatabaseManifest {
   syncStatuses: readonly ['success', 'partial', 'failed', 'unavailable'];
 }
 
-type ColumnOptions = Omit<AnalyticsColumnContract, 'name' | 'type' | 'nullable'>;
+type ColumnOptions = Partial<Omit<AnalyticsColumnContract, 'name' | 'type' | 'nullable'>>;
 
 const column = (
   name: string,
   type: AnalyticsColumnType,
   nullable: boolean,
   options: ColumnOptions = {},
-): AnalyticsColumnContract => ({ name, type, nullable, ...options });
+): AnalyticsColumnContract => ({
+  name,
+  type,
+  nullable,
+  unique: false,
+  indexed: false,
+  payload: false,
+  ...options,
+});
 
 const sourceId = () => column('source_id', 'text', false, { unique: true, indexed: true });
 const syncRunId = () => column('sync_run_id', 'uuid', true, { indexed: true });

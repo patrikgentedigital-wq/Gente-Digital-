@@ -84,7 +84,7 @@ success | partial | failed | unavailable
 
 A migration deverá criar unicidade em todos os `source_id`, índices para os campos usados em filtros de período e índices para `sync_run_id` e chaves opcionais quando houver junção. Foreign keys para registros de origem podem ser adicionadas apenas quando a cardinalidade e a retenção não quebrarem reprocessamento; a ausência de uma chave confirmada deve permanecer `NULL`.
 
-O manifesto fixture-only lista exatamente as seis entidades públicas com `source_id` único: `opa_attendances`, `opa_interactions`, `ixc_customers`, `ixc_contracts`, `ixc_sales` e `ixc_cancellations`. `sync_runs` usa `request_id text not null unique`; `analytics_sync_status` usa uma unicidade composta por `source_system`, `period_start` e `period_end`.
+O manifesto fixture-only lista exatamente as seis entidades públicas com `source_id` único: `opa_attendances`, `opa_interactions`, `ixc_customers`, `ixc_contracts`, `ixc_sales` e `ixc_cancellations`. As duas tabelas raw também têm seu próprio `source_id text not null unique`, com índice. Essa unicidade é local a cada tabela raw e não substitui a unicidade das seis projeções públicas. `sync_runs` usa `request_id text not null unique`; `analytics_sync_status`, que não tem `source_id`, usa uma unicidade composta por `source_system`, `period_start` e `period_end`. O teste fixture-only verifica essas invariantes separadamente.
 
 ## RLS e isolamento
 

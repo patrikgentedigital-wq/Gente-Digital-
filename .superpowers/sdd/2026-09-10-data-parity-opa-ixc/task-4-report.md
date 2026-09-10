@@ -2,7 +2,7 @@
 
 ## Status
 
-**Parcial, com bloqueio de infraestrutura local.** Esta rodada foi feita exclusivamente no worktree `data-parity-opa-ixc`, sobre o commit revisado `8783ab2aae2ed40e10ef0fa14673bf5223a14fdc`, partindo originalmente de `8f86aa9ba295fee5ed4a536fa9cdacbd975b33ee`.
+**Parcial, com bloqueio de infraestrutura local.** As rodadas 1 e 2 foram feitas exclusivamente no worktree `data-parity-opa-ixc`, sobre o commit revisado `468284e295741d61787b3a7817561f5796f351cc`, partindo originalmente de `8f86aa9ba295fee5ed4a536fa9cdacbd975b33ee`.
 
 ## Descoberta inicial
 
@@ -36,6 +36,24 @@ O reviewer apontou que os testes anteriores verificavam apenas comprimentos e pr
 - as sete tabelas `public` e as três de `integration` exigem RLS, começam sem policies permissivas e negam `anon`/`authenticated`;
 - `integration.*` permanece fora do Data API, e o alvo de `REVOKE`/`ALTER DEFAULT PRIVILEGES` é testado como contrato, não como SQL aplicado.
 
+## Correções da rodada 2
+
+O reviewer apontou duas lacunas remanescentes. A rodada adicionou uma expectativa independente para `source_id` nas duas tabelas raw, verificando explicitamente `text`, `not null`, `unique` e índice. Também substituiu o mapa parcial de tipos por `expectedColumnsByTable`, uma expectativa literal completa para cada coluna das três tabelas de integração e sete tabelas públicas.
+
+O teste canonicaliza somente a representação do manifesto para comparar todos os atributos exigidos (`name`, `type`, `nullable`, `unique`, `indexed`, `payload` e `allowedValues` quando aplicável). A comparação é feita contra a expectativa independente e falha para coluna ausente, extra, reordenada ou com qualquer atributo alterado. O manifesto agora materializa `unique`, `indexed` e `payload` como booleanos em cada coluna.
+
+A unicidade ficou separada em duas invariantes: cada `source_id` das duas raw e das seis entidades públicas é único dentro da respectiva tabela; `public.analytics_sync_status`, que não possui `source_id`, mantém adicionalmente a unicidade composta por `source_system`, `period_start` e `period_end`. O teste verifica ambas sem usar a composição como substituta de `source_id`.
+
+### Verificações da rodada 2
+
+- RED: 2 testes falharam, um para a expectativa completa e outro para o `source_id` independente das raw, devido aos atributos omitidos no manifesto anterior.
+- GREEN: `npx tsx --test tests/regression/analytics-database-contract.test.ts`: 13 passed, 0 failed.
+- `npm test`: 48 passed, 0 failed.
+- `npx tsc --noEmit`: passou.
+- `npm run lint`: passou com os 2 warnings preexistentes de `react-hooks/incompatible-library` em `components/views/colaboradores.tsx:160` e `components/views/leads.tsx:314`; nenhum erro novo.
+- `git diff --check`: passou.
+- Não executados: CLI Supabase, Docker, Postgres local, SQL remoto, `service_role`, workflows Opa! e migration manual.
+
 ## Verificações
 
 - RED da rodada: 8 testes falharam contra o manifesto antigo, confirmando a lacuna antes da implementação.
@@ -68,6 +86,8 @@ fix: strengthen analytics schema contract
 ```
 
 O relatório foi atualizado em um commit documental posterior. Nenhuma migration foi reescrita ou criada manualmente.
+
+Commit da rodada 2 será registrado após a criação, seguido de um commit documental que acrescentará o hash completo sem reescrever a migration bloqueada.
 
 ## Pendências e bloqueios
 
