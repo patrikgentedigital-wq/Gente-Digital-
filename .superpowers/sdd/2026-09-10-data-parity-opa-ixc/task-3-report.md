@@ -17,9 +17,8 @@ Concluída no worktree `data-parity-opa-ixc`, partindo de `9ea44bcf8c1713adeb704
 
 ## Validação
 
-- `npx tsx --test tests/regression/analytics-metrics.test.ts`: 4/4 testes aprovados.
-- `TZ=UTC npx tsx --test tests/regression/analytics-metrics.test.ts`: 7/7 testes aprovados.
-- `TZ=UTC npm test`: 32/32 testes aprovados.
+- `TZ=UTC npx tsx --test tests/regression/analytics-metrics.test.ts`: 10/10 testes aprovados.
+- `TZ=UTC npm test`: 35/35 testes aprovados.
 - `npx tsc --noEmit`: aprovado.
 - `npm run lint`: 0 erros; 2 warnings preexistentes em `components/views/colaboradores.tsx` e `components/views/leads.tsx`, ambos sobre `react-hook-form` e React Compiler.
 - `git diff --check`: aprovado.
@@ -29,6 +28,13 @@ Concluída no worktree `data-parity-opa-ixc`, partindo de `9ea44bcf8c1713adeb704
 - Removida a seleção de representante por `JSON.stringify` para grupos de protocolo conflitantes. O agregador não escolhe uma dimensão arbitrária para esses grupos.
 - Adicionados testes de permutação que confirmam a invariância à ordem e verificam que nenhuma dimensão do grupo conflitante aparece nos agrupamentos ou nos contadores de vínculo.
 - O filtro analítico passou a rejeitar date-only no formato ISO (`2026-09-01`) e nos formatos brasileiros (`01/09/2026` e `1/9/2026`). O formato brasileiro completo com horário válido continua aceito.
+
+## Rodada 3 de cobertura
+
+- O teste do protocolo conflitante verifica explicitamente `linked = 0`, `unlinked = 0`, `ambiguous = 0`, `notApplicable = 0`, além de `total`, `protocolConflicts`, `byChannel = []` e `byStatus = []`.
+- Cada variante date-only, com e sem espaços externos, é testada em uma chamada e um resultado independentes: `2026-09-01`, `01/09/2026` e `1/9/2026`.
+- O timestamp brasileiro completo com horário válido permanece em teste separado, incluindo as variantes preenchida e não preenchida do dia e mês.
+- A cobertura de namespaces de protocolo e `source_id` permanece em teste separado, sem alterar a produção.
 
 ## Limites e preocupações pendentes
 

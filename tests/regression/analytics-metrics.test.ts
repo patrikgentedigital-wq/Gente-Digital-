@@ -45,16 +45,33 @@ test('summarizeAttendance trata duplicatas divergentes de modo determinístico e
   const records = [
     { source_id: 'y', protocolo: 'source:y', contato_bruto: null, tipo_identificador: 'unknown' as const, status_vinculo: 'vinculado' as const, canal: 'z', status: 'aberto', data_referencia: '2026-09-10T12:00:00Z' },
     { source_id: 'other', protocolo: 'source:y', contato_bruto: null, tipo_identificador: 'unknown' as const, status_vinculo: 'nao_vinculado' as const, canal: 'a', status: 'fechado', data_referencia: '2026-09-10T12:00:00Z' },
-    { source_id: 'y', protocolo: null, contato_bruto: null, tipo_identificador: 'unknown' as const, status_vinculo: 'nao_aplicavel' as const, canal: 'source:y', status: 'aberto', data_referencia: '2026-09-10T12:00:00Z' },
   ];
   const forward = summarizeAttendance(records, window);
   const reverse = summarizeAttendance([...records].reverse(), window);
 
   assert.deepEqual(forward, reverse);
-  assert.equal(forward.total, 2);
+  assert.equal(forward.total, 1);
   assert.equal(forward.protocolConflicts, 1);
-  assert.deepEqual(forward.byChannel, [{ key: 'source:y', count: 1 }]);
-  assert.deepEqual(forward.byStatus, [{ key: 'aberto', count: 1 }]);
+  assert.equal(forward.linked, 0);
+  assert.equal(forward.unlinked, 0);
+  assert.equal(forward.ambiguous, 0);
+  assert.equal(forward.notApplicable, 0);
+  assert.deepEqual(forward.byChannel, []);
+  assert.deepEqual(forward.byStatus, []);
+});
+
+test('summarizeAttendance separa namespaces de protocolo e source_id', () => {
+  const result = summarizeAttendance([
+    { source_id: 'y', protocolo: 'source:y', contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'vinculado', canal: 'protocolo', status: 'aberto', data_referencia: '2026-09-10T12:00:00Z' },
+    { source_id: 'y', protocolo: null, contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'nao_aplicavel', canal: 'source:y', status: 'aberto', data_referencia: '2026-09-10T12:00:00Z' },
+  ], window);
+
+  assert.equal(result.total, 2);
+  assert.equal(result.protocolConflicts, 0);
+  assert.equal(result.linked, 1);
+  assert.equal(result.notApplicable, 1);
+  assert.deepEqual(result.byChannel, [{ key: 'protocolo', count: 1 }, { key: 'source:y', count: 1 }]);
+  assert.deepEqual(result.byStatus, [{ key: 'aberto', count: 2 }]);
 });
 
 test('agregadores aceitam somente timestamps analíticos estritos e não dependem do TZ do processo', () => {
@@ -65,10 +82,6 @@ test('agregadores aceitam somente timestamps analíticos estritos e não depende
       { source_id: 'offset', data_referencia: '2026-09-30T23:59:59-03:00' },
       { source_id: 'local', data_referencia: '2026-09-30T23:59:59' },
       { source_id: 'milliseconds', data_referencia: '2026-09-01T00:00:00.999Z' },
-      { source_id: 'date-only', data_referencia: '2026-09-01' },
-      { source_id: 'br-date-only', data_referencia: '01/09/2026' },
-      { source_id: 'br-short-date-only', data_referencia: '1/9/2026' },
-      { source_id: 'br-full', data_referencia: '01/09/2026 00:00:00' },
       { source_id: 'impossible-day', data_referencia: '2026-02-31T12:00:00Z' },
       { source_id: 'impossible-time', data_referencia: '2026-09-01T25:00:00Z' },
       { source_id: 'junk', data_referencia: 'lixo' },
@@ -77,7 +90,41 @@ test('agregadores aceitam somente timestamps analíticos estritos e não depende
     sales: [], contracts: [], preContracts: [],
   }, strictWindow);
 
-  assert.equal(result.leads, 5);
+  assert.equal(result.leads, 4);
+});
+
+test('rejeita cada formato date-only de forma independente', () => {
+  const dateOnlyValues = [
+    '2026-09-01',
+    ' 2026-09-01 ',
+    '01/09/2026',
+    ' 01/09/2026 ',
+    '1/9/2026',
+    ' 1/9/2026 ',
+  ];
+  for (const value of dateOnlyValues) {
+    const result = summarizeGeneral({
+      leads: [{ source_id: value, data_referencia: value }],
+      sales: [],
+      contracts: [],
+      preContracts: [],
+    }, window);
+    assert.equal(result.leads, 0, `date-only aceito: ${JSON.stringify(value)}`);
+  }
+});
+
+test('aceita timestamp brasileiro completo com horário válido', () => {
+  const result = summarizeGeneral({
+    leads: [
+      { source_id: 'br-full-padded', data_referencia: '01/09/2026 00:00:00' },
+      { source_id: 'br-full-short', data_referencia: '1/9/2026 00:00:00' },
+    ],
+    sales: [],
+    contracts: [],
+    preContracts: [],
+  }, window);
+
+  assert.equal(result.leads, 2);
 });
 
 test('summarizeAttendance inclui os limites, ignora datas inválidas e ordena empates por chave', () => {
