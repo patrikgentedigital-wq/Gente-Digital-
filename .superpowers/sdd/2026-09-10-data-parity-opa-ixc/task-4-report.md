@@ -87,7 +87,19 @@ fix: strengthen analytics schema contract
 
 O relatório foi atualizado em um commit documental posterior. Nenhuma migration foi reescrita ou criada manualmente.
 
-Commit da rodada 2 será registrado após a criação, seguido de um commit documental que acrescentará o hash completo sem reescrever a migration bloqueada.
+Commit da rodada 2:
+
+```text
+a277cdc8008e9740cd78efdbdef01369bc9ee198
+```
+
+Mensagem:
+
+```text
+fix: close analytics manifest invariants
+```
+
+O hash foi acrescentado em commit documental posterior. Nenhuma migration foi reescrita ou criada manualmente.
 
 ## Pendências e bloqueios
 
