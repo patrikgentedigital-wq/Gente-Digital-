@@ -16,6 +16,7 @@ export const ixcCustomerFixture = {
   source_id: 'ixc-test-customer-001',
   nome: 'Cliente de Fixture',
   telefone: '00000000000',
+  data_referencia: '2026-09-01',
 };
 
 export const ixcContractFixture = {
