@@ -18,6 +18,7 @@ As tabelas `public.*` são projeções normalizadas para consulta analítica. To
 Todas as entidades de origem usam:
 
 - `id uuid` como identificador interno, quando aplicável;
+- `source_system text not null` para registrar a origem da projeção. Nas tabelas normalizadas, o valor permitido é `opa` para `opa_attendances` e `opa_interactions`, e `ixc` para `ixc_customers`, `ixc_contracts`, `ixc_sales` e `ixc_cancellations`;
 - `source_id text not null unique` como chave estável recebida da origem;
 - `source_updated_at timestamptz` para o cursor ou ordenação incremental, quando a origem fornecer esse campo;
 - `synced_at timestamptz not null default now()`;
@@ -36,6 +37,8 @@ Valores de identificadores brutos continuam texto. A normalização não convert
 
 O payload bruto não deve ser duplicado nas tabelas `public.*`. Campos derivados podem carregar apenas o valor necessário para consulta, mantendo o campo original quando a proveniência exigir.
 
+As tabelas normalizadas públicas mantêm `source_system` mesmo quando a origem já está implícita no nome da tabela. A coluna é `text not null` e funciona como uma marca de proveniência validada pela camada de ingestão e pelo contrato do banco. As tabelas raw continuam usando a mesma coluna para o envelope da fonte recebida.
+
 ## Projeções públicas
 
 | Tabela | Finalidade e origem da métrica | Chave da origem | Campos de data | Campos brutos e relação IXC | Retenção e acesso |
@@ -47,6 +50,15 @@ O payload bruto não deve ser duplicado nas tabelas `public.*`. Campos derivados
 | `public.ixc_sales` | Projeção de vendas IXC para `GERAL`, após confirmação da fonte e da data de referência. | `source_id` da venda. | `data_venda`, `source_updated_at`, `synced_at`. | Campos de identificação da venda necessários ao cálculo; relações opcionais com cliente e contrato. | Retenção analítica definida pela política de dados. RLS obrigatório; sem valor estimado quando a fonte não estiver confirmada. |
 | `public.ixc_cancellations` | Projeção de eventos de cancelamento para `CANCELAMENTOS`. | `source_id` do evento. | `data_cancelamento`, `source_updated_at`, `synced_at`. | `motivo`, tipo do evento e `contract_source_id` opcional. | Retenção analítica definida pela política de dados. RLS obrigatório; leitura server-side autorizada. |
 | `public.analytics_sync_status` | Estado consultável da última sincronização por fonte e janela. | `source_system` + janela, com a unicidade definida pela migration. | `period_start`, `period_end`, `last_source_updated_at`, `synced_at`. | Contagens e `error_message` sanitizada; nenhum payload. | Retenção curta de estado e histórico em `integration.sync_runs`. RLS obrigatório; leitura somente pelo acesso autorizado. |
+
+### Mapeamento de ingestão para as projeções atuais
+
+Os mappers server-side não enviam o objeto recebido inteiro. Eles constroem rows explícitas, limitadas às colunas declaradas no manifesto, e sempre acrescentam `source_system`, `source_id`, `sync_run_id` e `synced_at`.
+
+- Opa: `data_referencia` é interpretada como a data de abertura e vai para `data_abertura`. O campo original `data_referencia` não existe na projeção e não é enviado.
+- IXC: `data_referencia` é interpretada como a data do cancelamento e vai para `data_cancelamento`. O campo original `data_referencia` não existe na projeção e não é enviado.
+- Datas são normalizadas por `normalizeSourceTimestamp`. Datas date-only, calendários impossíveis e formatos fora do contrato viram `NULL`; nenhum valor inválido é enviado a uma coluna `timestamptz`.
+- O conflito do upsert é sempre `source_id`, preservado como texto, incluindo zeros à esquerda.
 
 ## Convenção de relações
 
@@ -79,6 +91,12 @@ success | partial | failed | unavailable
 ```
 
 `unavailable` significa que a fonte ou a persistência não forneceu dados válidos para a janela. Não deve ser convertido em zero, lista vazia definitiva ou sucesso. `partial` exige que as contagens e a causa sanitizada sejam preservadas.
+
+## Política de contagens do repositório
+
+O PostgREST confirma o resultado do upsert em lote, mas a resposta padrão não distingue quais linhas foram inseridas e quais foram atualizadas. O executor padrão registra a quantidade de linhas aceitas como `persisted`, mantém `inserted` e `updated` desconhecidos, e devolve `partial` com uma mensagem sanitizada para o consumidor. Ele não transforma a quantidade total em inserções ou atualizações inventadas. Um executor injetado pode fornecer `inserted`, `updated` e `failed` quando possuir metadado confiável; o resultado detalhado só marca `success` quando essas contagens estão disponíveis e não há falha.
+
+Quando a configuração administrativa está ausente, ou quando o erro indica tabela, coluna ou schema indisponível, o resultado é `unavailable` com `failed` igual ao número de rows deduplicadas. Outros erros de persistência resultam em `failed`. Em ambos os casos, a mensagem exposta é sanitizada e não contém detalhes do provedor, payload, token, telefone, protocolo ou credencial.
 
 ## Índices e constraints esperados
 

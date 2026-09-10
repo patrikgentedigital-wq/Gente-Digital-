@@ -89,6 +89,7 @@ const column = (
 });
 
 const sourceId = () => column('source_id', 'text', false, { unique: true, indexed: true });
+const sourceSystem = (source: 'opa' | 'ixc') => column('source_system', 'text', false, { allowedValues: [source] });
 const syncRunId = () => column('sync_run_id', 'uuid', true, { indexed: true });
 const sourceUpdatedAt = () => column('source_updated_at', 'timestamptz', true, { indexed: true });
 const syncedAt = () => column('synced_at', 'timestamptz', false, { indexed: true });
@@ -202,6 +203,7 @@ const opaAttendances: AnalyticsTableContract = {
   name: 'opa_attendances',
   requiredColumns: [
     'id',
+    'source_system',
     'source_id',
     'protocolo',
     'contato_bruto',
@@ -216,6 +218,7 @@ const opaAttendances: AnalyticsTableContract = {
   ],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('opa'),
     sourceId(),
     column('protocolo', 'text', true),
     column('contato_bruto', 'text', true),
@@ -246,6 +249,7 @@ const opaInteractions: AnalyticsTableContract = {
   name: 'opa_interactions',
   requiredColumns: [
     'id',
+    'source_system',
     'source_id',
     'attendance_source_id',
     'ixc_customer_source_id',
@@ -257,6 +261,7 @@ const opaInteractions: AnalyticsTableContract = {
   ],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('opa'),
     sourceId(),
     column('attendance_source_id', 'text', true, { indexed: true }),
     column('ixc_customer_source_id', 'text', true, { indexed: true }),
@@ -274,9 +279,10 @@ const opaInteractions: AnalyticsTableContract = {
 const ixcCustomers: AnalyticsTableContract = {
   schema: 'public',
   name: 'ixc_customers',
-  requiredColumns: ['id', 'source_id', 'source_updated_at', 'synced_at', 'sync_run_id'],
+  requiredColumns: ['id', 'source_system', 'source_id', 'source_updated_at', 'synced_at', 'sync_run_id'],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('ixc'),
     sourceId(),
     sourceUpdatedAt(),
     syncedAt(),
@@ -290,6 +296,7 @@ const ixcContracts: AnalyticsTableContract = {
   name: 'ixc_contracts',
   requiredColumns: [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'status',
@@ -300,6 +307,7 @@ const ixcContracts: AnalyticsTableContract = {
   ],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('ixc'),
     sourceId(),
     column('customer_source_id', 'text', true, { indexed: true }),
     column('status', 'text', true),
@@ -316,6 +324,7 @@ const ixcSales: AnalyticsTableContract = {
   name: 'ixc_sales',
   requiredColumns: [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'contract_source_id',
@@ -327,6 +336,7 @@ const ixcSales: AnalyticsTableContract = {
   ],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('ixc'),
     sourceId(),
     column('customer_source_id', 'text', true, { indexed: true }),
     column('contract_source_id', 'text', true, { indexed: true }),
@@ -344,6 +354,7 @@ const ixcCancellations: AnalyticsTableContract = {
   name: 'ixc_cancellations',
   requiredColumns: [
     'id',
+    'source_system',
     'source_id',
     'contract_source_id',
     'motivo',
@@ -355,6 +366,7 @@ const ixcCancellations: AnalyticsTableContract = {
   ],
   columns: [
     column('id', 'uuid', false),
+    sourceSystem('ixc'),
     sourceId(),
     column('contract_source_id', 'text', true, { indexed: true }),
     column('motivo', 'text', true),

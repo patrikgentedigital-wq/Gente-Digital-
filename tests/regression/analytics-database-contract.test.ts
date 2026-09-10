@@ -77,6 +77,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.opa_attendances': [
     'id',
+    'source_system',
     'source_id',
     'protocolo',
     'contato_bruto',
@@ -91,6 +92,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.opa_interactions': [
     'id',
+    'source_system',
     'source_id',
     'attendance_source_id',
     'ixc_customer_source_id',
@@ -102,6 +104,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.ixc_customers': [
     'id',
+    'source_system',
     'source_id',
     'source_updated_at',
     'synced_at',
@@ -109,6 +112,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.ixc_contracts': [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'status',
@@ -119,6 +123,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.ixc_sales': [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'contract_source_id',
@@ -130,6 +135,7 @@ const expectedRequiredColumns: Record<string, string[]> = {
   ],
   'public.ixc_cancellations': [
     'id',
+    'source_system',
     'source_id',
     'contract_source_id',
     'motivo',
@@ -221,6 +227,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.opa_attendances': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['opa'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('protocolo', 'text', true),
     expectedColumn('contato_bruto', 'text', true),
@@ -245,6 +252,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.opa_interactions': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['opa'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('attendance_source_id', 'text', true, { indexed: true }),
     expectedColumn('ixc_customer_source_id', 'text', true, { indexed: true }),
@@ -258,6 +266,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.ixc_customers': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['ixc'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('source_updated_at', 'timestamptz', true, { indexed: true }),
     expectedColumn('synced_at', 'timestamptz', false, { indexed: true }),
@@ -265,6 +274,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.ixc_contracts': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['ixc'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('customer_source_id', 'text', true, { indexed: true }),
     expectedColumn('status', 'text', true),
@@ -275,6 +285,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.ixc_sales': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['ixc'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('customer_source_id', 'text', true, { indexed: true }),
     expectedColumn('contract_source_id', 'text', true, { indexed: true }),
@@ -286,6 +297,7 @@ const expectedColumnsByTable: Record<string, ExpectedColumn[]> = {
   ],
   'public.ixc_cancellations': [
     expectedColumn('id', 'uuid', false),
+    expectedColumn('source_system', 'text', false, { allowedValues: ['ixc'] }),
     expectedColumn('source_id', 'text', false, { unique: true, indexed: true }),
     expectedColumn('contract_source_id', 'text', true, { indexed: true }),
     expectedColumn('motivo', 'text', true),
@@ -431,24 +443,30 @@ test('manifesto atribui tipos aos identificadores, datas e payloads mínimos', (
     'integration.sync_runs.status': 'text',
     'public.opa_attendances.id': 'uuid',
     'public.opa_attendances.source_id': 'text',
+    'public.opa_attendances.source_system': 'text',
     'public.opa_attendances.contato_bruto': 'text',
     'public.opa_attendances.data_abertura': 'timestamptz',
     'public.opa_interactions.id': 'uuid',
     'public.opa_interactions.source_id': 'text',
+    'public.opa_interactions.source_system': 'text',
     'public.opa_interactions.data_interacao': 'timestamptz',
     'public.ixc_customers.id': 'uuid',
     'public.ixc_customers.source_id': 'text',
+    'public.ixc_customers.source_system': 'text',
     'public.ixc_contracts.id': 'uuid',
     'public.ixc_contracts.source_id': 'text',
+    'public.ixc_contracts.source_system': 'text',
     'public.ixc_contracts.customer_source_id': 'text',
     'public.ixc_contracts.data_ativacao': 'timestamptz',
     'public.ixc_sales.id': 'uuid',
     'public.ixc_sales.source_id': 'text',
+    'public.ixc_sales.source_system': 'text',
     'public.ixc_sales.customer_source_id': 'text',
     'public.ixc_sales.contract_source_id': 'text',
     'public.ixc_sales.data_venda': 'timestamptz',
     'public.ixc_cancellations.id': 'uuid',
     'public.ixc_cancellations.source_id': 'text',
+    'public.ixc_cancellations.source_system': 'text',
     'public.ixc_cancellations.contract_source_id': 'text',
     'public.ixc_cancellations.data_cancelamento': 'timestamptz',
     'public.analytics_sync_status.id': 'uuid',
@@ -465,6 +483,7 @@ test('manifesto atribui tipos aos identificadores, datas e payloads mínimos', (
 test('manifesto declara tipos e campos mínimos, incluindo contato_bruto', () => {
   assert.deepEqual(findTable('public.opa_attendances').requiredColumns, [
     'id',
+    'source_system',
     'source_id',
     'protocolo',
     'contato_bruto',
@@ -486,6 +505,7 @@ test('manifesto declara tipos e campos mínimos, incluindo contato_bruto', () =>
   );
   assert.deepEqual(findTable('public.ixc_contracts').requiredColumns, [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'status',
@@ -496,6 +516,7 @@ test('manifesto declara tipos e campos mínimos, incluindo contato_bruto', () =>
   ]);
   assert.deepEqual(findTable('public.ixc_sales').requiredColumns, [
     'id',
+    'source_system',
     'source_id',
     'customer_source_id',
     'contract_source_id',

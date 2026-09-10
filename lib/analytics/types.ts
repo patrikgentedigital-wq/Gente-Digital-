@@ -23,6 +23,7 @@ export interface OpaAttendanceRecord {
 
 export interface IxcCancellationRecord {
   source_id: string;
+  contract_source_id?: string | null;
   motivo: string | null;
   tipo: 'cancelamento' | 'renovacao' | 'upgrade' | 'downgrade' | 'outro';
   data_referencia: string | null;

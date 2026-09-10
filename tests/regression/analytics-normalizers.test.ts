@@ -68,12 +68,25 @@ test('normalizeSourceTimestamp usa o timezone explícito do domínio sob TZ=UTC'
 
 test('normalizeSourceTimestamp rejeita datas brasileiras impossíveis e sufixos', () => {
   for (const value of [
+    '31/02/2026 10:00:00',
     '31/02/2026',
     '32/01/2026',
     '13/13/2026',
     '01/09/2026 24:00:00',
     '01/09/2026 10:00:00 lixo',
     '01/09/2026T10:00:00.000',
+  ]) {
+    assert.equal(normalizeSourceTimestamp(value), null, value);
+  }
+});
+
+test('normalizeSourceTimestamp rejeita date-only e formatos ambíguos', () => {
+  for (const value of [
+    '2026-09-01',
+    '01/09/2026',
+    '2026/09/01 10:00:00',
+    '09-01-2026 10:00:00',
+    '2026-9-1T10:00:00Z',
   ]) {
     assert.equal(normalizeSourceTimestamp(value), null, value);
   }

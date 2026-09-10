@@ -17,8 +17,8 @@ const HINTS: Record<string, IdentifierKind> = {
   metric_id: 'metric',
 };
 
-const BRAZILIAN_TIMESTAMP_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
-const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:(?:T| )(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+const BRAZILIAN_TIMESTAMP_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?$/;
 const DOMAIN_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: ANALYTICS_TIMEZONE,
   calendar: 'gregory',
@@ -110,7 +110,7 @@ function parseIsoTimestamp(input: string): string | null {
   const match = input.match(ISO_TIMESTAMP_PATTERN);
   if (!match) return null;
 
-  const hasTime = match[4] !== undefined;
+  const hasTime = true;
   const parts: CalendarParts = {
     year: Number(match[1]),
     month: Number(match[2]),
