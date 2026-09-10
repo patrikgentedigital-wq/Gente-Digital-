@@ -1,4 +1,4 @@
-import { parseFlexibleDate } from '../date-filters';
+import { normalizeSourceTimestamp } from './normalizers';
 import type {
   DateStampedMetricRecord,
   GeneralMetricInput,
@@ -16,6 +16,9 @@ export interface AttendanceSummary {
   total: number;
   linked: number;
   unlinked: number;
+  ambiguous: number;
+  notApplicable: number;
+  protocolConflicts: number;
   byChannel: Array<{ key: string; count: number }>;
   byStatus: Array<{ key: string; count: number }>;
 }
@@ -35,13 +38,22 @@ export interface GeneralSummary {
   preContracts: number;
 }
 
+function normalizeAnalyticsTimestamp(value: string | null, timezone: MetricWindow['timezone']): string | null {
+  if (!value || timezone !== 'America/Sao_Paulo') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null;
+  return normalizeSourceTimestamp(value);
+}
+
 function inWindow(value: string | null, window: MetricWindow): boolean {
-  const date = parseFlexibleDate(value);
-  if (!date) return false;
-  const from = window.from ? parseFlexibleDate(window.from) : null;
-  const to = window.to ? parseFlexibleDate(window.to) : null;
-  if (window.from && !from || window.to && !to) return false;
-  return (!from || date >= from) && (!to || date <= to);
+  const normalized = normalizeAnalyticsTimestamp(value, window.timezone);
+  const date = normalized ? Date.parse(normalized) : Number.NaN;
+  if (Number.isNaN(date)) return false;
+  const fromValue = normalizeAnalyticsTimestamp(window.from, window.timezone);
+  const toValue = normalizeAnalyticsTimestamp(window.to, window.timezone);
+  const from = fromValue ? Date.parse(fromValue) : null;
+  const to = toValue ? Date.parse(toValue) : null;
+  if (window.from && from === null || window.to && to === null) return false;
+  return (from === null || date >= from) && (to === null || date <= to);
 }
 
 function grouped(values: readonly string[]): Array<{ key: string; count: number }> {
@@ -53,23 +65,34 @@ function grouped(values: readonly string[]): Array<{ key: string; count: number 
 }
 
 function uniqueBy<T>(records: readonly T[], key: (record: T) => string): T[] {
-  const seen = new Set<string>();
-  return records.filter((record) => {
+  const groups = new Map<string, T[]>();
+  for (const record of records) {
     const value = key(record);
-    if (seen.has(value)) return false;
-    seen.add(value);
-    return true;
-  });
+    groups.set(value, [...(groups.get(value) ?? []), record]);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, values]) =>
+    [...values].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0]);
 }
 
 export function summarizeAttendance(records: readonly OpaAttendanceRecord[], window: MetricWindow): AttendanceSummary {
   const filtered = records.filter((record) => inWindow(record.data_referencia, window));
-  const unique = uniqueBy(filtered, (record) => record.protocolo?.trim() || `source:${record.source_id}`);
+  const unique = uniqueBy(filtered, (record) => record.protocolo?.trim() ? `protocol:${record.protocolo.trim()}` : `source:${record.source_id}`);
+  const protocolGroups = new Map<string, OpaAttendanceRecord[]>();
+  for (const record of filtered) if (record.protocolo?.trim()) {
+    const key = `protocol:${record.protocolo.trim()}`;
+    protocolGroups.set(key, [...(protocolGroups.get(key) ?? []), record]);
+  }
+  const protocolConflicts = [...protocolGroups.values()].filter((group) =>
+    new Set(group.map((record) => JSON.stringify({ canal: record.canal, status: record.status, status_vinculo: record.status_vinculo }))).size > 1).length;
   const linked = unique.filter((record) => record.status_vinculo === 'vinculado').length;
+  const unlinked = unique.filter((record) => record.status_vinculo === 'nao_vinculado').length;
   return {
     total: unique.length,
     linked,
-    unlinked: unique.length - linked,
+    unlinked,
+    ambiguous: unique.filter((record) => record.status_vinculo === 'ambiguo').length,
+    notApplicable: unique.filter((record) => record.status_vinculo === 'nao_aplicavel').length,
+    protocolConflicts,
     byChannel: grouped(unique.flatMap((record) => record.canal ? [record.canal] : [])),
     byStatus: grouped(unique.flatMap((record) => record.status ? [record.status] : [])),
   };
