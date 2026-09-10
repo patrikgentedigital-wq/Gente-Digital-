@@ -2,11 +2,13 @@
 
 **Workflow proposto:** `ANALYTICS - Sincronização OPA e IXC`
 **Escopo:** ingestão server-side, somente leitura nas fontes, para a camada analítica do painel.
-**Estado deste documento:** definição local do contrato. Nenhum workflow remoto foi criado, configurado, executado, publicado ou alterado nesta tarefa.
+**Estado deste documento:** contrato local atualizado após uma rodada remota controlada. O workflow piloto foi criado e executado manualmente, permaneceu sem agenda/publicação e não gravou no Supabase.
 
 ## Decisão operacional
 
-O workflow deve existir separado do fluxo raiz de atendimento e permanecer pausado. A primeira execução, quando autorizada em tarefa própria, será manual e controlada. Um `Schedule Trigger` poderá ser acrescentado apenas depois dos gates externos e da validação de uma janela pequena de leitura.
+O workflow existe separado do fluxo raiz de atendimento e permanece pausado. A rodada autorizada foi manual e controlada, com janela de `2026-09-01` a `2026-09-10`, timezone `America/Sao_Paulo` e leitura sem efeito transacional. Um `Schedule Trigger` só poderá ser acrescentado depois dos gates externos e da validação de paridade.
+
+Workflow remoto do piloto: `ANALYTICS - Sincronização OPA e IXC`, ID `dqgBnd1OOci0T8A4`. O fluxo não foi publicado/ativado, não recebeu agenda e não alterou workflows existentes.
 
 O fluxo raiz, `ATEND - Piloto`, workflows de ciclo de vida, subworkflows e automações transacionais ficam fora do escopo e não devem chamar este workflow. O resultado analítico não pode alterar atendimento, cliente, contrato, cancelamento ou qualquer outra fonte operacional.
 
@@ -28,24 +30,23 @@ Quando uma família estiver sem fonte ou regra comprovada, a API e a interface d
 | --- | --- |
 | **Confirmado** | O nome do workflow, a separação da operação, a necessidade de ingestão server-side, a preservação de `source_id`, a deduplicação antes do upsert e o estado limitado a `success`, `partial`, `failed` e `unavailable`. |
 | **Confirmado** | Existe uma credencial n8n chamada `OPA Bearer`, que deve ser referenciada pelo node correspondente. O valor do token não faz parte deste documento, do workflow exportado, de fixtures, logs ou payloads de retorno. |
-| **Confirmado** | A evidência independente disponível demonstra uma consulta Opa! unitária por protocolo. Ela não demonstra uma rota de listagem histórica, seus filtros, paginação, limite ou cursor. |
-| **Condicionado** | A rota de listagem Opa!, a paginação, os campos de atualização e os endpoints IXC de clientes, contratos, vendas e cancelamentos só podem entrar na configuração após inspeção autorizada da configuração e da documentação da respectiva fonte. |
-| **Bloqueado** | Não é permitido ativar ou executar a sincronização histórica enquanto a listagem/paginação Opa! não estiver comprovada e enquanto as rotas IXC não forem confirmadas. Não se deve transformar a consulta por protocolo em uma listagem estimada. |
+| **Confirmado** | A rota Opa! `GET /api/v1/atendimento` respondeu `200` no piloto com filtro pelo campo `date`. O limite efetivo observado foi `1.000` registros por página; `skip: 1.000` retornou mais `891` registros na mesma janela. Não houve total agregado confiável no envelope da resposta. |
+| **Confirmado** | A rota IXC `POST /webservice/v1/cliente_contrato` respondeu no piloto com o campo `cliente_contrato.data_cancelamento`, status `I`, janela `2026-09-01` a `2026-09-10`, página `1` e `rp: 250`. O retorno informou `12` registros e `total: 12`. |
+| **Condicionado** | A semântica do campo Opa! `date` ainda não foi provada como a mesma definição do Data Studio. A semântica de canais, reabertura, deduplicação e o vínculo com clientes continuam condicionados. |
+| **Condicionado** | A origem IXC para o total `29` do Data Studio ainda não foi encontrada. O endpoint de contratos retornou `12`; o endpoint `su_ticket` não aceitou a filtragem temporal no piloto e não deve ser consultado em massa sem paginação e filtro posterior controlados. |
+| **Bloqueado** | A paridade histórica completa continua bloqueada. O workflow não deve ser publicado, ativado, agendado ou conectado ao Supabase enquanto as divergências de fonte/regra não forem resolvidas e a migration do destino não estiver aplicada. |
 | **Proposto** | O encadeamento e os contratos abaixo são o desenho para a configuração futura. Eles não são evidência de que as rotas ou os campos já estejam disponíveis no n8n. |
 
 ## Encadeamento isolado
 
 ```text
-Trigger manual controlado ou Schedule pausado
-  -> OPA - Lista atendimentos (somente leitura)
-  -> OPA - Pagina resultados
-  -> OPA - Normaliza atendimento
-  -> IXC - Lista clientes/contratos/cancelamentos (somente leitura)
-  -> IXC - Normaliza registros
-  -> Deduplica por source_id
-  -> Supabase - Upsert lote
-  -> Supabase - Registra sync run
-  -> Falha controlada e estado partial/failed
+Trigger manual controlado
+  -> FN - Janela piloto
+  -> OPA - Lista atendimentos período (somente leitura, página limitada)
+  -> FN - Resumo piloto (projeção sanitizada)
+  -> IXC - Cancelamentos período (somente leitura, página observada)
+  -> FN - Fechamento piloto (projeção sanitizada)
+  -> Persistência bloqueada até migration e paridade
 ```
 
 O encadeamento representa etapas lógicas. Na configuração real, nodes com lógica reutilizável só devem virar subworkflows quando houver contrato estável, teste ou reutilização que justifique a fronteira. Cada subworkflow futuro deverá declarar entradas tipadas com `Execute Workflow Trigger` em `Define Below`, documentar entradas e saídas e retornar uma forma consistente. O fluxo analítico não deve extrair o fluxo raiz para dentro dele nem criar uma dependência operacional reversa.
@@ -112,11 +113,12 @@ O estado consultável deve ser persistido em `analytics_sync_status`, com histó
 - Não executar nesta etapa.
 - Receber ou construir a janela e o cursor; gerar `requestId` antes das chamadas externas.
 
-### OPA - Lista atendimentos (somente leitura)
+### OPA - Lista atendimentos período (somente leitura)
 
 - Usar uma credencial n8n por referência. A credencial existente `OPA Bearer` é uma referência de configuração, nunca um valor a ser copiado para Set, Code, URL, nota, fixture ou export.
-- A operação precisa ser uma rota de listagem documentada, com filtros de período, limite, campo de ordenação/atualização e paginação comprovados.
-- A consulta unitária observada por protocolo não satisfaz esse contrato. Enquanto a rota de listagem não for confirmada, este node fica **Bloqueado** para configuração e execução.
+- A operação usada no piloto foi a rota de listagem `GET /api/v1/atendimento`, com filtro de `date` e `options.limit`.
+- O limite de `1.000` e o deslocamento por `skip` foram observados, mas a paginação completa e o total de negócio do Data Studio ainda não foram confirmados.
+- A consulta unitária por protocolo foi mantida como evidência histórica auxiliar, não como substituta da listagem.
 - O node deve ser somente leitura e não deve enviar dados de atendimento de volta ao Opa!.
 
 ### OPA - Pagina resultados
@@ -138,7 +140,8 @@ O estado consultável deve ser persistido em `analytics_sync_status`, com histó
 
 - Representa três famílias de registros: clientes, contratos e cancelamentos. Vendas só entram se o componente de `GERAL` tiver origem e regra confirmadas.
 - Cada rota, método, filtro, paginação, campo de data, status e limite precisa ser confirmado no n8n e na documentação autorizada antes de criar qualquer node.
-- Nenhum endpoint IXC é nomeado aqui porque ainda não há evidência suficiente. O caminho não pode ser inventado a partir de nomes de tabelas ou de uma integração semelhante.
+- O piloto confirmou `POST /webservice/v1/cliente_contrato` para a amostra de cancelamentos, com a credencial `IXC Basic Auth`, header padrão `ixcsoft` e corpo JSON de listagem.
+- A amostra não fechou com o total `29` do Data Studio. A rota `su_ticket` foi inspecionada, mas sua filtragem temporal não foi validada; não usar essa rota como carga sem paginação, filtro posterior e projeção sanitizada.
 - O node deve usar credencial server-side referenciada, com menor privilégio de leitura, sem token no texto do workflow.
 
 ### IXC - Normaliza registros
@@ -228,7 +231,7 @@ O fixture abaixo serve apenas para validar a forma do envelope e dos mappers. Os
 
 O marcador `record_type` descreve a forma possível do fixture e não afirma que uma rota IXC foi localizada. O fixture Opa também não constitui prova de listagem: ele só permite testar a estrutura de normalização.
 
-## Gates antes de qualquer configuração ou execução
+## Gates antes de publicação, ativação ou persistência
 
 1. Confirmar, por inspeção autorizada, a rota de listagem Opa!, filtros de período, paginação, limite, ordenação e campo de atualização.
 2. Confirmar os endpoints IXC de clientes, contratos, vendas e cancelamentos, suas permissões e seus campos de data/status.
@@ -237,14 +240,35 @@ O marcador `record_type` descreve a forma possível do fixture e não afirma que
 5. Confirmar que a janela de teste será curta, somente leitura nas fontes e persistirá apenas no destino autorizado.
 6. Verificar a credencial correta em cada node na interface n8n. Referência de credencial não substitui essa verificação.
 7. Configurar o error workflow de nível de workflow e conferir as saídas de erro dos nodes que podem falhar antes de qualquer execução não assistida.
-8. Validar conexões e configurações sem executar a carga. O workflow deve permanecer pausado.
+8. Validar conexões e configurações sem publicar/ativar a agenda. O workflow deve permanecer pausado.
+9. Aplicar e validar a migration do destino antes de qualquer upsert. O piloto confirmou explicitamente `persistence.status = blocked`.
 
-Se a inspeção encontrar apenas a consulta unitária Opa! por protocolo, a configuração deve parar no gate 1 e o estado permanece `unavailable`/`Bloqueado`. A criação de um workflow na interface não prova listagem, persistência, reconciliação ou paridade de dados.
+Se uma nova inspeção perder a listagem histórica ou a paginação Opa!, o estado deve voltar a `unavailable`/`Bloqueado`. A criação ou execução manual do workflow não prova persistência, reconciliação ou paridade de dados.
+
+## Rodada controlada de 10/09/2026
+
+### Referência observada no Data Studio
+
+Janela observada: `01/09/2026` a `10/09/2026`, com atualização do relatório no próprio dia. Os números abaixo são um snapshot de referência, não foram escritos no banco e não foram promovidos a dados de produção:
+
+- `GERAL`: leads `239`, vendas `109`, contratos `95`, pré-contratos `5`.
+- `ATENDIMENTO`: total `5.040`, clientes vinculados `2.232`, clientes não vinculados `9`; canais whatsapp `4.562`, pabx `469`, instagram `5`, telegram `4`.
+- `CANCELAMENTOS`: total `29`; cartões de movimentação observados: renovações `24`, upgrade `10`, downgrade `1`, data de vencimento `1`.
+
+### Leituras efetivas no piloto
+
+- Opa!: `200` na primeira amostra inicial confirmou o filtro temporal; com o limite efetivo de `1.000`, a primeira página retornou `1.000` e a página com `skip: 1.000` retornou `891`. A janela do primeiro lote observado foi de `2026-09-01T09:16:46.991Z` a `2026-09-10T15:33:06.377Z`. A amostra da primeira página foi `950` status `F` e `50` status `EA`, com canais `920` whatsapp e `80` pabx. Esses valores são de página, não o total da referência.
+- IXC: `cliente_contrato.data_cancelamento` com status `I` retornou `12` de `12`, com datas observadas entre `2026-09-01` e `2026-09-08`. O total `12` não coincide com o cartão `29` do Data Studio.
+- IXC `su_ticket`: uma tentativa com `qtype` temporal devolveu erro HTML do provedor; uma tentativa sem filtro temporal efetivo indicou `67.389` registros e foi interrompida como carga inadequada para o piloto. Nenhum desses retornos foi persistido.
+- Supabase: não houve upsert. O nó final registrou `persistence.status = blocked` porque a migration analítica não estava aplicada no ambiente alvo.
+
+Conclusão da rodada: o workflow remoto está tecnicamente separado e as credenciais referenciadas funcionam para leituras controladas, mas a paridade com os cartões `5.040` e `29` ainda está `not_comparable`. O sucesso da execução representa somente sucesso de leitura dos nodes, não paridade de negócio.
 
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.
-- Não configurar, publicar, ativar ou executar workflow remoto nesta tarefa.
+- Não publicar, ativar ou agendar o workflow remoto nesta etapa.
+- Não persistir no Supabase enquanto a migration, o contrato de destino e a paridade de negócio não estiverem validados.
 - Não ativar agenda, fazer carga real, testar envio ou consultar fontes pelo navegador.
 - Não inventar endpoint IXC, parâmetro de paginação, nome de campo ou chave de relacionamento.
 - Não expor segredo, token, header Bearer, PII, protocolo real ou ID real em documentação, export, logs ou fixture.

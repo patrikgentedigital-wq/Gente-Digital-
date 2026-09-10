@@ -24,10 +24,33 @@ Os componentes abaixo não recebem valor estimado nesta etapa:
 - regra de relação entre protocolo, cliente, contrato, lead e vendedor;
 - fonte e regra de cálculo dos componentes compostos de `GERAL`.
 
-Uma linha só pode mudar para validável quando a fonte e a regra puderem ser comprovadas por leitura autorizada e evidência sanitizada. Nenhum workflow, carga, agenda ou consulta remota foi executado para produzir este mapa.
+Uma linha só pode mudar para validável quando a fonte e a regra puderem ser comprovadas por leitura autorizada e evidência sanitizada. A matriz inicial foi criada antes do piloto; a rodada posterior está registrada abaixo e não altera automaticamente o estado das linhas.
 
 ## Estado da reconciliação
 
 Todas as linhas permanecem `not_comparable` até que exista uma rodada autorizada com a mesma janela, timezone, filtros, regra de data e deduplicação no Data Studio e no painel. O PDF anexado foi usado somente como base de entendimento do escopo; seus números não foram promovidos a `expected` de produção.
 
 A matriz e o procedimento de comparação estão em `docs/analytics/reconciliation-runbook.md`. Ausência de fonte, persistência ou evidência não é convertida em zero ou `match`.
+
+## Rodada autorizada de leitura
+
+Em `10/09/2026`, foi executado manualmente o workflow remoto isolado `ANALYTICS - Sincronização OPA e IXC` (ID `dqgBnd1OOci0T8A4`), sem publicação, agenda ou escrita no Supabase. A janela usada foi `2026-09-01` a `2026-09-10`, timezone `America/Sao_Paulo`.
+
+### Snapshot do Data Studio
+
+| Página | Indicadores observados |
+| --- | --- |
+| `GERAL` | leads `239`, vendas `109`, contratos `95`, pré-contratos `5` |
+| `ATENDIMENTO` | total `5.040`, vinculados `2.232`, não vinculados `9`; canais whatsapp `4.562`, pabx `469`, instagram `5`, telegram `4` |
+| `CANCELAMENTOS` | total `29`; cartões de movimentação renovações `24`, upgrade `10`, downgrade `1`, data de vencimento `1` |
+
+### Evidência das fontes consultadas
+
+| Fonte e regra testada | Resultado sanitizado | Estado de paridade |
+| --- | --- | --- |
+| Opa! `GET /api/v1/atendimento`, filtro pelo campo `date`, `limit: 1.000`, `skip: 0` | `1.000` registros, status `F:950` e `EA:50`, canais `whatsapp:920` e `pabx:80` | `partial`; não representa os `5.040` sem paginação completa e regra confirmada |
+| Opa! mesma consulta com `skip: 1.000` | `891` registros adicionais observados | `partial`; não há total de negócio confiável no envelope |
+| IXC `cliente_contrato.data_cancelamento`, status `I`, `rp:250` | `12` registros, `total:12`, datas observadas de `01/09` a `08/09` | `not_comparable` com o cartão `29` |
+| IXC `su_ticket` | filtro temporal não validado; sem janela efetiva o universo observado foi `67.389` e não foi usado no piloto | `blocked` para carga até definir paginação e filtro posterior |
+
+O campo Opa! `date` e a paginação por `skip` são evidências de capacidade técnica do endpoint, não confirmação de que a dimensão usada no relatório seja a mesma. O total exibido pelo painel analítico do Opa! também não foi tratado como equivalente ao total `5.040`, pois representa outra definição operacional. A próxima validação deve descobrir a fonte/regra do Data Studio para `ATENDIMENTO` e `CANCELAMENTOS` antes de mudar qualquer linha para `match`.
