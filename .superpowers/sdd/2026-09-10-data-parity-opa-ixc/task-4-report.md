@@ -55,13 +55,19 @@ Commit-base revisado:
 8783ab2aae2ed40e10ef0fa14673bf5223a14fdc
 ```
 
-Commit da rodada 1 será criado com:
+Commit da rodada 1:
+
+```text
+ffcc71e6f4297e73bb23f1ca731c4d125cb21642
+```
+
+Mensagem:
 
 ```text
 fix: strengthen analytics schema contract
 ```
 
-O hash completo do commit da rodada será acrescentado a esta seção após a criação, sem reescrever a migration bloqueada.
+O relatório foi atualizado em um commit documental posterior. Nenhuma migration foi reescrita ou criada manualmente.
 
 ## Pendências e bloqueios
 
