@@ -61,4 +61,15 @@ A estrutura da página `ATENDIMENTO` confirma uma família de dados compatível 
 
 Na página `CANCELAMENTOS`, o relatório também mostra `ALTERAÇÃO DE CONTRATO` com a dimensão `Tipo Alteração` e códigos de movimentação como `UP`, `UV`, `AV`, `DV` e `DW`. O workflow existente possui uma leitura IXC de relatório de alterações de contrato, o que indica uma possível segunda origem para esses cartões, mas ainda não prova que ela seja a fonte do total `29` ou dos agrupamentos por motivo.
 
-O campo Opa! `date` e a paginação por `skip` são evidências de capacidade técnica do endpoint, não confirmação de que a dimensão usada no relatório seja a mesma. O total exibido pelo painel analítico do Opa! também não foi tratado como equivalente ao total `5.040`, pois representa outra definição operacional. A próxima validação deve fixar uma janela explícita no Data Studio ou obter sua configuração de fonte, e então comparar o campo de data, a métrica `Protocolo`, o status e a deduplicação antes de mudar qualquer linha para `match`.
+O campo Opa! `date` e a paginação por `skip` são evidências de capacidade técnica do endpoint, não confirmação de que a dimensão usada no relatório seja a mesma. O total exibido pelo painel analítico do Opa! também não foi tratado como equivalente ao total `5.040`, pois representa outra definição operacional. A próxima validação deve repetir a leitura Opa! com a mesma janela explícita e o mesmo corte final observado no Data Studio, comparando o campo de data, a métrica `Protocolo`, o status e a deduplicação antes de mudar qualquer linha para `match`.
+
+## Conferência controlada com janela explícita
+
+Em `10/09/2026`, foi aplicada somente na visualização do Data Studio a janela `01/09/2026` a `10/09/2026`, timezone exibido pelo relatório, nas páginas `ATENDIMENTO` e `CANCELAMENTOS`. Depois da leitura, o filtro foi redefinido e as duas páginas voltaram a `Selecionar período`/`Período automático`; nenhuma configuração do relatório foi salva.
+
+| Página | Resultado na janela explícita | Comparação disponível |
+| --- | --- | --- |
+| `ATENDIMENTO` | total `1.918`; vinculados `1.121`; não vinculados `4`; anúncios `39`; canais whatsapp `1.773`, pabx `141`, telegram `4` | o total é o novo esperado observável para essa janela; ainda precisa ser confrontado com a mesma janela e o mesmo corte temporal no Opa! |
+| `CANCELAMENTOS` | total `12`; renovações `7`, upgrade `3`, downgrade `1`, data de vencimento `1` | o total `12` coincide numericamente com a leitura IXC de `cliente_contrato.data_cancelamento`, status `I`, `total:12`; a coincidência não prova sozinha a regra completa dos cartões ou dos motivos |
+
+Essa conferência confirma que o controle de data é funcional e que os valores `5.040` e `29` eram resultados do modo automático, não uma janela comprovadamente equivalente ao piloto. A leitura Opa! anteriormente observada somou `1.891` registros (`1.000` mais `891` adicionais), mas o lote terminou em `2026-09-10T15:33:06.377Z`; como a janela do relatório inclui o dia 10, a diferença de `27` permanece condicionada ao corte horário, à definição da métrica e à deduplicação. É necessário repetir a leitura Opa! até o mesmo limite final do relatório antes de classificar a linha como `match`.

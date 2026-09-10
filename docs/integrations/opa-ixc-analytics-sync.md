@@ -268,6 +268,17 @@ A página `CANCELAMENTOS` também exibe `ALTERAÇÃO DE CONTRATO` por `Tipo Alte
 
 Conclusão da rodada: o workflow remoto está tecnicamente separado e as credenciais referenciadas funcionam para leituras controladas, mas a paridade com os cartões `5.040` e `29` ainda está `not_comparable`. O formato dos campos aponta o atendimento para a família Opa! e indica uma possível leitura complementar de alterações no IXC, mas a janela automática e as regras de contagem ainda não estão fechadas. O sucesso da execução representa somente sucesso de leitura dos nodes, não paridade de negócio.
 
+### Conferência posterior do período no Data Studio
+
+Foi aplicada uma janela somente de visualização, `01/09/2026` a `10/09/2026`, nas páginas `ATENDIMENTO` e `CANCELAMENTOS`. Após a coleta dos números, o relatório foi redefinido para `Selecionar período`/`Período automático`; não houve edição, salvamento, publicação ou alteração de compartilhamento.
+
+- `ATENDIMENTO`: total `1.918`; vinculados `1.121`; não vinculados `4`; anúncios `39`; canais whatsapp `1.773`, pabx `141` e telegram `4`.
+- `CANCELAMENTOS`: total `12`; renovações `7`, upgrade `3`, downgrade `1` e data de vencimento `1`.
+- O total `12` de cancelamentos coincide numericamente com o retorno IXC de `cliente_contrato.data_cancelamento`, status `I`, `total:12`, para a mesma janela. Isso é uma evidência de alinhamento do total, não confirmação da regra completa dos motivos e cartões.
+- O atendimento não fecha ainda: a leitura Opa! anterior observou `1.891` itens paginados, enquanto o Data Studio mostrou `1.918`. O lote Opa! terminou em `2026-09-10T15:33:06.377Z`; a diferença de `27` pode decorrer do corte horário do dia 10, além de métrica distinta ou deduplicação. A hipótese precisa ser testada com uma nova leitura até o mesmo limite do relatório.
+
+Essa rodada mudou o diagnóstico do período: os cartões `5.040` e `29` pertencem ao estado automático do relatório, e não devem ser usados como expectativa de uma janela parcial sem registrar essa condição. A paridade permanece `not_comparable` para o atendimento e para os demais indicadores até repetir Opa!, validar o campo temporal e fechar a métrica `Protocolo`.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.
