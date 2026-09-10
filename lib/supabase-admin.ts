@@ -5,20 +5,14 @@ const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://'
   ? rawUrl
   : 'https://placeholder.supabase.co';
 
-// The Service Role key gives full admin access and bypasses RLS. Never expose it to the client.
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const isProd = process.env.NODE_ENV === 'production';
+// Operações administrativas exigem a service role. Nunca use a anon key como fallback.
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-if (isProd && !serviceRoleKey && !supabaseUrl.includes('placeholder')) {
-  console.error('ALERTA DE SEGURANÇA CRÍTICO: SUPABASE_SERVICE_ROLE_KEY não configurada no ambiente de produção. Não utilize anon_key como fallback em operações administrativas.');
-}
+export const isSupabaseAdminConfigured = Boolean(
+  serviceRoleKey && !supabaseUrl.includes('placeholder'),
+);
 
-const supabaseServiceKey = 
-  serviceRoleKey || 
-  (!isProd ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '') || 
-  'placeholder_key';
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey || 'placeholder_key', {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
