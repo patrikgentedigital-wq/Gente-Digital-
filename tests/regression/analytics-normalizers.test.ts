@@ -9,6 +9,20 @@ test('preserveRawIdentifier mantém zeros à esquerda e não converte para numbe
   assert.equal(identifier.kind, 'unknown');
 });
 
+test('preserveRawIdentifier preserva uma string inteira além do limite seguro byte a byte', () => {
+  const rawValue = '9007199254740993';
+  const identifier = preserveRawIdentifier(rawValue);
+
+  assert.equal(identifier.rawValue, rawValue);
+  assert.equal(typeof identifier.rawValue, 'string');
+});
+
+test('preserveRawIdentifier rejeita inteiro não seguro em vez de serializar valor corrompido', () => {
+  const unsafeNumber = Number('9007199254740993');
+  assert.equal(Number.isSafeInteger(unsafeNumber), false);
+  assert.throws(() => preserveRawIdentifier(unsafeNumber), RangeError);
+});
+
 test('preserveRawIdentifier normaliza somente espaços externos e nulos', () => {
   assert.deepEqual(preserveRawIdentifier(null), { rawValue: null, kind: 'unknown' });
   assert.deepEqual(preserveRawIdentifier('   '), { rawValue: null, kind: 'unknown' });
@@ -32,8 +46,35 @@ test('classifyIdentifier não infere tipo de valor ambíguo', () => {
 
 test('normalizeSourceTimestamp retorna ISO ou null', () => {
   assert.equal(normalizeSourceTimestamp('2026-09-01T10:00:00-03:00'), '2026-09-01T13:00:00.000Z');
+  assert.equal(normalizeSourceTimestamp('2026-09-01T10:00:00+02:00'), '2026-09-01T08:00:00.000Z');
   assert.equal(normalizeSourceTimestamp('01/09/2026 10:00:00'), '2026-09-01T13:00:00.000Z');
+  assert.equal(normalizeSourceTimestamp('2026-09-01T10:00:00'), '2026-09-01T13:00:00.000Z');
   assert.equal(normalizeSourceTimestamp('valor-invalido'), null);
   assert.equal(normalizeSourceTimestamp(null), null);
   assert.equal(normalizeSourceTimestamp(new Date('2026-09-01T13:00:00Z')), '2026-09-01T13:00:00.000Z');
+});
+
+test('normalizeSourceTimestamp usa o timezone explícito do domínio sob TZ=UTC', () => {
+  const originalTimezone = process.env.TZ;
+  process.env.TZ = 'UTC';
+
+  try {
+    assert.equal(normalizeSourceTimestamp('01/09/2026 10:00:00'), '2026-09-01T13:00:00.000Z');
+  } finally {
+    if (originalTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTimezone;
+  }
+});
+
+test('normalizeSourceTimestamp rejeita datas brasileiras impossíveis e sufixos', () => {
+  for (const value of [
+    '31/02/2026',
+    '32/01/2026',
+    '13/13/2026',
+    '01/09/2026 24:00:00',
+    '01/09/2026 10:00:00 lixo',
+    '01/09/2026T10:00:00.000',
+  ]) {
+    assert.equal(normalizeSourceTimestamp(value), null, value);
+  }
 });

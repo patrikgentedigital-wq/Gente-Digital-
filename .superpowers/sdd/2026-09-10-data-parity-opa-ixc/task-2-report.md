@@ -10,17 +10,23 @@ Concluída localmente a partir de `2c99ddd`, sem chamadas Opa, IXC ou Supabase, 
 - Criado `lib/analytics/normalizers.ts`.
 - `preserveRawIdentifier` mantém o identificador como texto, remove apenas espaços externos e retorna `null` para entrada nula ou vazia. Zeros à esquerda são preservados.
 - `classifyIdentifier` só classifica quando recebe uma dica de campo explícita. Valores numéricos, tamanhos de telefone e dicas genéricas permanecem `unknown`.
-- `normalizeSourceTimestamp` reutiliza o parser de datas do domínio atual e retorna ISO UTC ou `null` para entradas inválidas.
-- Criada a regressão `tests/regression/analytics-normalizers.test.ts`, incluindo nulos, string vazia, valor numérico, espaços, identificadores ambíguos, timestamp ISO e timestamp brasileiro.
+- `normalizeSourceTimestamp` usa o timezone explícito `America/Sao_Paulo` para valores sem offset, preserva a semântica de offsets fornecidos em ISO e retorna ISO UTC ou `null` para entradas inválidas.
+- O parser brasileiro exige correspondência integral, valida limites de calendário e relógio e rejeita rollovers, como `31/02/2026`, `32/01/2026`, `13/13/2026`, `24:00:00` e lixo residual.
+- `preserveRawIdentifier` mantém strings na fronteira, inclusive `9007199254740993`, e lança `RangeError` para inteiro numérico não seguro em vez de serializar o valor arredondado.
+- Criada e ampliada a regressão `tests/regression/analytics-normalizers.test.ts`, incluindo nulos, string vazia, valor numérico, espaços, identificadores ambíguos, inteiros fora do limite seguro, timestamp ISO com offsets e timestamp brasileiro sob `TZ=UTC`.
 
 ## Evidência TDD
 
-- RED confirmado antes da implementação: `MODULE_NOT_FOUND` para `../../lib/analytics/normalizers`.
-- GREEN confirmado após a implementação: 5 testes específicos aprovados.
-- Suíte completa aprovada: 21 testes, 21 aprovados, 0 falhas.
+- RED confirmado antes da implementação: 3 falhas nas regressões dos achados do reviewer, cobrindo serialização de inteiro não seguro, timezone local e rollover de data.
+- GREEN confirmado após a implementação: 9 testes específicos aprovados.
+- Suíte específica executada com o processo iniciado em `TZ=UTC`: 9 testes aprovados, 0 falhas.
+- Suíte completa executada com `TZ=UTC`: 25 testes aprovados, 0 falhas.
+- `npx tsc --noEmit`: aprovado.
+- `npm run lint`: 0 erros e 2 warnings preexistentes de `react-hooks/incompatible-library` em `components/views/colaboradores.tsx` e `components/views/leads.tsx`.
 
 ## Limites e preocupações pendentes
 
 - A classificação depende do contrato/dica do campo. Não há inferência automática de telefone, cliente ou protocolo por formato, conforme o contrato da tarefa.
-- A interpretação de data brasileira segue `lib/date-filters.ts`, incluindo o timezone local do ambiente. A validação de ingestão e persistência ficará para as tarefas posteriores.
+- Datas brasileiras sem offset são interpretadas em `America/Sao_Paulo`; timestamps ISO com offset usam o offset recebido. A validação de ingestão e persistência ficará para as tarefas posteriores.
+- Inteiros não seguros recebidos como número são rejeitados. A origem deve transportar identificadores como strings para preservar todos os dígitos.
 - Não foi feita validação contra fontes ou bancos reais, nem ativação/publicação de workflow.
