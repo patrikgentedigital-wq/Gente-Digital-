@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UsersRound, Network, LogOut, X, Wallet, ShieldCheck, User as UserIcon, TrendingUp, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, Network, LogOut, X, Wallet, ShieldCheck, User as UserIcon, TrendingUp, BarChart3, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Avatar from 'boring-avatars';
@@ -106,6 +106,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto relative">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+          <NavItem id="indicadores" icon={BarChart3} label="Indicadores" active={activeTab === 'indicadores'} onClick={() => setActiveTab('indicadores')} />
           <NavItem id="leads" icon={Users} label="Leads & Funil" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
           <NavItem id="vendas" icon={TrendingUp} label="Vendas & Rastreamento" active={activeTab === 'vendas'} onClick={() => setActiveTab('vendas')} />
           <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />

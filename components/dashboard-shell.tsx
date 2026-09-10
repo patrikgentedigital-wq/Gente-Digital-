@@ -32,6 +32,10 @@ const IntegracoesView = dynamic(
   () => import('@/components/views/integracoes').then((module) => module.IntegracoesView),
   { loading: ViewLoading }
 );
+const AnalyticsView = dynamic(
+  () => import('@/components/views/analytics/analytics-view').then((module) => module.AnalyticsView),
+  { loading: ViewLoading }
+);
 
 const tabNames = {
   dashboard: 'Dashboard',
@@ -40,6 +44,7 @@ const tabNames = {
   colaboradores: 'Colaboradores',
   comissoes: 'Gestão de Comissões & PIX',
   integracoes: 'Integrações (IXC & MS)',
+  indicadores: 'Indicadores',
 } as const;
 
 type TabId = keyof typeof tabNames;
@@ -139,6 +144,8 @@ function ActiveView({ tab }: { tab: TabId }) {
       return <ComissoesView />;
     case 'integracoes':
       return <IntegracoesView />;
+    case 'indicadores':
+      return <AnalyticsView />;
     default:
       return <DashboardView />;
   }
