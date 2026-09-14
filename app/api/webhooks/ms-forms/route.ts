@@ -71,6 +71,7 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
+      id_canal_venda: '22',
       canal_venda: '22',
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
