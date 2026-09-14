@@ -300,6 +300,14 @@ Ao encerrar a inspeção, o formulário do node foi restaurado para `skip: 0`, `
 - `Bloqueado`: a contagem completa, a deduplicação, a equivalência com `1.918` e a paridade dos demais indicadores continuam sem prova atualizada.
 - `Proposto`: fazer uma próxima leitura com projeção sanitizada de contagem por página e metadados HTTP mínimos, mantendo a consulta sem persistência; só depois decidir entre corrigir a URL/proxy, manter redirects desligados ou tratar a paginação em um node próprio.
 
+## Correção controlada aplicada em 14/09/2026
+
+O node `OPA - Lista atendimentos período` foi ajustado no workflow analítico isolado para não seguir redirects. A execução manual completa foi repetida sem alterar os workflows operacionais e terminou com sucesso nos nodes de janela, Opa!, resumo, IXC e fechamento.
+
+O fechamento sanitizado registrou `1.000` linhas Opa!, `reported_total: null`, cobertura `limited_at_1000`, status `F:953` e `EA:47`, com canais `whatsapp:920` e `pabx:80`. No IXC, a consulta de contratos cancelados registrou `12` linhas e `total:12`. A persistência permaneceu `blocked` porque a migration do Supabase não foi aplicada.
+
+Essa correção resolve o erro de redirects observado na execução, mas não resolve a paginação completa. O próprio fechamento confirma que o workflow atual ainda cobre somente a primeira página Opa!. A configuração foi testada no workflow isolado, o botão `Publish` não foi acionado e não houve ativação de agenda.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.

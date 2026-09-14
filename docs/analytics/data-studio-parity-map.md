@@ -87,3 +87,16 @@ O workflow remoto isolado foi executado manualmente com a mesma janela explícit
 O corpo das consultas manteve `date >= 2026-09-01T00:00:00-03:00` e `date <= 2026-09-10T23:59:59-03:00`. O toggle e o deslocamento foram restaurados na interface ao final da inspeção e o workflow não foi publicado. A diferença entre a configuração com redirects ligados e desligados é um bloqueio de transporte/configuração ainda não explicado; não deve ser convertida diretamente em alteração permanente.
 
 Essa rodada aumenta a evidência de que a listagem Opa! é tecnicamente acessível e paginável por `skip`, mas não fecha a reconciliação. A próxima leitura precisa devolver somente contagens e metadados sanitizados por página, confirmar o critério de parada e comparar a métrica de linhas com `Protocolo` distinto antes de avaliar a equivalência com `1.918`.
+
+## Correção do transporte e teste completo
+
+No workflow analítico isolado, `Follow Redirects` foi desligado no node Opa! para eliminar o loop observado. A execução manual seguinte terminou com sucesso em todos os nodes, incluindo a consulta IXC e o fechamento sanitizado.
+
+| Resultado do teste | Evidência | Limite |
+| --- | --- | --- |
+| Transporte Opa! | execução completa sem `ERR_FR_TOO_MANY_REDIRECTS` | a correção ainda está restrita ao workflow isolado e não foi publicada |
+| Opa! | `returned_rows: 1.000`, `reported_total: null`, `coverage: limited_at_1000`; status `F:953` e `EA:47`; canais `whatsapp:920` e `pabx:80` | somente a primeira página foi consumida |
+| IXC | `returned_rows: 12`, `reported_total: 12`, `coverage: observed` | confirma a leitura da consulta de contratos cancelados, não todos os cartões do Data Studio |
+| Persistência | `status: blocked` | migration analítica do Supabase ainda não aplicada |
+
+A correção elimina o erro de transporte no piloto, mas a linha `ATENDIMENTO` permanece `partial` e `not_comparable` com `1.918`. A próxima alteração deve tratar a paginação e a contagem sanitizada antes de qualquer publicação ou persistência.
