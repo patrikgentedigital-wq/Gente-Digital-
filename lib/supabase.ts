@@ -1,28 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
 const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
-  ? rawUrl
+  ? rawUrl.replace(/\/+$/, '')
   : 'https://placeholder.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
+const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key').trim();
 
-// Se o cookie do Supabase for removido pelo usuário e cookies estiverem ativos, limpa o localStorage correspondente
-// para evitar que o cliente reidrate a sessão deletada. Protegido para não deslogar em ambientes sem cookies acessíveis.
-if (typeof window !== 'undefined') {
-  try {
-    const rawCookies = document.cookie || '';
-    const hasAuthCookie = rawCookies.split(';').some(c => c.trim().startsWith('sb-'));
-    if (!hasAuthCookie && rawCookies.trim() !== '') {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-          localStorage.removeItem(key);
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Erro ao verificar sessão local:', e);
-  }
-}
 
 export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 

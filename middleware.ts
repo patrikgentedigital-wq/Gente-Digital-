@@ -16,8 +16,11 @@ export async function middleware(request: NextRequest) {
   // Garantir que a resposta HTTP sempre retorne o header x-request-id
   supabaseResponse.headers.set('x-request-id', requestId);
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+  const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+    ? rawUrl.replace(/\/+$/, '')
+    : 'https://placeholder.supabase.co';
+  const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder').trim();
 
   // Rotas públicas não precisam consultar a sessão antes de renderizar.
   // Isso mantém a landing de indicação rápida e permite que o fluxo funcione

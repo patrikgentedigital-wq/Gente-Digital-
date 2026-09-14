@@ -3,8 +3,11 @@ import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function createSupabaseServerClient(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+    ? rawUrl.replace(/\/+$/, '')
+    : 'https://placeholder.supabase.co';
+  const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() { return req.cookies.getAll(); },
@@ -18,7 +21,10 @@ function createSupabaseServerClient(req: NextRequest) {
  * Retorna null se não autenticado ou se Supabase não estiver configurado.
  */
 export async function getAuthenticatedUser(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+    ? rawUrl.replace(/\/+$/, '')
+    : '';
 
   if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
     if (process.env.NODE_ENV === 'production') {
