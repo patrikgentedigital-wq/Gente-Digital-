@@ -279,6 +279,27 @@ Foi aplicada uma janela somente de visualização, `01/09/2026` a `10/09/2026`, 
 
 Essa rodada mudou o diagnóstico do período: os cartões `5.040` e `29` pertencem ao estado automático do relatório, e não devem ser usados como expectativa de uma janela parcial sem registrar essa condição. A paridade permanece `not_comparable` para o atendimento e para os demais indicadores até repetir Opa!, validar o campo temporal e fechar a métrica `Protocolo`.
 
+## Diagnóstico controlado de 14/09/2026
+
+Foi repetida a leitura remota controlada na janela explícita `2026-09-01` a `2026-09-10`, com `period_start_ts` em `2026-09-01T00:00:00-03:00`, `period_end_ts` em `2026-09-10T23:59:59-03:00` e timezone `America/Sao_Paulo`. O workflow continuou manual, sem agenda, publicação, ativação ou escrita no Supabase.
+
+### Resultado do comportamento de redirects
+
+- Com `Follow Redirects` ligado, a execução do workflow parou no node Opa! em `ERR_FR_TOO_MANY_REDIRECTS`, antes de alcançar o node IXC. Esse erro comprova uma falha de transporte/configuração nessa combinação, mas não prova se a causa está no endpoint, proxy, autenticação ou tratamento de redirects do cliente.
+- Em uma execução diagnóstica do node, sem seguir redirects, a página `skip: 0`, `limit: 1.000` respondeu `200` e exibiu uma coleção de atendimentos no campo `data`.
+- A mesma execução diagnóstica, sem seguir redirects, com `skip: 1.000` também respondeu `200` e exibiu uma coleção não vazia no campo `data`. O envelope não apresentou um total agregado confiável; portanto, essa rodada confirma a disponibilidade de duas páginas, não o número final de atendimentos.
+- O corpo usado nas duas chamadas manteve o filtro por `date` e a janela inclusiva acima. Não foram registrados payloads brutos, credenciais, headers ou identificadores de registros na documentação.
+
+Ao encerrar a inspeção, o formulário do node foi restaurado para `skip: 0`, `limit: 1.000` e `Follow Redirects` ligado. O botão `Publish` não foi acionado. A opção sem redirects é apenas uma hipótese diagnóstica e não deve ser promovida como correção de produção sem verificar o comportamento HTTP e os efeitos de autenticação no endpoint.
+
+### Estado após a rodada
+
+- `Confirmado`: o endpoint de listagem Opa! responde `200` para as duas páginas testadas quando o cliente não segue redirects.
+- `Confirmado`: a execução normal com redirects ligados falha antes do IXC, então não houve nova leitura IXC nem persistência nessa execução completa.
+- `Condicionado`: a causa do loop de redirects e a configuração permanente correta ainda não foram identificadas.
+- `Bloqueado`: a contagem completa, a deduplicação, a equivalência com `1.918` e a paridade dos demais indicadores continuam sem prova atualizada.
+- `Proposto`: fazer uma próxima leitura com projeção sanitizada de contagem por página e metadados HTTP mínimos, mantendo a consulta sem persistência; só depois decidir entre corrigir a URL/proxy, manter redirects desligados ou tratar a paginação em um node próprio.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.

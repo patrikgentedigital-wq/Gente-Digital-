@@ -73,3 +73,17 @@ Em `10/09/2026`, foi aplicada somente na visualização do Data Studio a janela 
 | `CANCELAMENTOS` | total `12`; renovações `7`, upgrade `3`, downgrade `1`, data de vencimento `1` | o total `12` coincide numericamente com a leitura IXC de `cliente_contrato.data_cancelamento`, status `I`, `total:12`; a coincidência não prova sozinha a regra completa dos cartões ou dos motivos |
 
 Essa conferência confirma que o controle de data é funcional e que os valores `5.040` e `29` eram resultados do modo automático, não uma janela comprovadamente equivalente ao piloto. A leitura Opa! anteriormente observada somou `1.891` registros (`1.000` mais `891` adicionais), mas o lote terminou em `2026-09-10T15:33:06.377Z`; como a janela do relatório inclui o dia 10, a diferença de `27` permanece condicionada ao corte horário, à definição da métrica e à deduplicação. É necessário repetir a leitura Opa! até o mesmo limite final do relatório antes de classificar a linha como `match`.
+
+## Nova rodada controlada do Opa! em 14/09/2026
+
+O workflow remoto isolado foi executado manualmente com a mesma janela explícita, `01/09/2026` a `10/09/2026`, timezone `America/Sao_Paulo`, sem agenda, publicação, ativação ou escrita no Supabase.
+
+| Consulta | Resultado sanitizado | Estado de paridade |
+| --- | --- | --- |
+| Opa! `GET /api/v1/atendimento`, `limit: 1.000`, `skip: 0`, `Follow Redirects` ligado | execução interrompida por `ERR_FR_TOO_MANY_REDIRECTS` no node Opa!, antes do IXC | `blocked` para a execução normal |
+| Opa! mesma rota, `skip: 0`, `Follow Redirects` desligado | HTTP `200`; coleção de atendimentos presente no campo `data`; sem total agregado confiável no envelope | `partial`; confirma leitura da página, não a contagem final |
+| Opa! mesma rota, `skip: 1.000`, `Follow Redirects` desligado | HTTP `200`; coleção não vazia presente no campo `data`; sem total agregado confiável no envelope | `partial`; confirma uma segunda página, não o total `1.918` |
+
+O corpo das consultas manteve `date >= 2026-09-01T00:00:00-03:00` e `date <= 2026-09-10T23:59:59-03:00`. O toggle e o deslocamento foram restaurados na interface ao final da inspeção e o workflow não foi publicado. A diferença entre a configuração com redirects ligados e desligados é um bloqueio de transporte/configuração ainda não explicado; não deve ser convertida diretamente em alteração permanente.
+
+Essa rodada aumenta a evidência de que a listagem Opa! é tecnicamente acessível e paginável por `skip`, mas não fecha a reconciliação. A próxima leitura precisa devolver somente contagens e metadados sanitizados por página, confirmar o critério de parada e comparar a métrica de linhas com `Protocolo` distinto antes de avaliar a equivalência com `1.918`.
