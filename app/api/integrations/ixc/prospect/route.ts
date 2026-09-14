@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
+      canal_venda: '22',
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
 
