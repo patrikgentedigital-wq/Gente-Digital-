@@ -11,7 +11,7 @@ export interface AuditLog {
 
 export async function logAuditEvent(action: string, details: string, user_email = 'Admin') {
   try {
-    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
     const isConfigured = !!rawUrl && !rawUrl.includes('placeholder');
 
     if (isConfigured) {

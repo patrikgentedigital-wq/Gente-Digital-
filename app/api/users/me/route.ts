@@ -5,8 +5,11 @@ import { getUserRole } from '@/lib/auth-server';
 // GET /api/users/me — retorna o role do usuário autenticado
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+      ? rawUrl.replace(/\/+$/, '')
+      : '';
+    const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
       if (process.env.NODE_ENV === 'production') {

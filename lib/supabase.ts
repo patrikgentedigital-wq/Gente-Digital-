@@ -10,7 +10,7 @@ const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_k
 export const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
 export const isSupabaseConfigured = () => {
-  return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+  return !supabaseUrl.includes('placeholder');
 };
 // Interfaces for our tables
 export interface Lead {

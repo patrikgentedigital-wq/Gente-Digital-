@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2, Calendar } from 'lucide-react';
-import { supabase, Lead, Colaborador } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, Lead, Colaborador } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -107,9 +107,7 @@ export function ComissoesView() {
       setIsLoading(true);
       setLoadError(null);
 
-      const isConfigured = typeof window !== 'undefined' &&
-        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const isConfigured = isSupabaseConfigured();
 
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
@@ -119,10 +117,28 @@ export function ComissoesView() {
 
       if (isConfigured) {
         const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
-        if (lData) leadsData = lData;
+        if (lData && lData.length > 0) leadsData = lData;
 
         const { data: cData } = await supabase.from('colaboradores').select('*');
-        if (cData) colabsData = cData;
+        if (cData && cData.length > 0) colabsData = cData;
+
+        if (leadsData.length === 0 || colabsData.length === 0) {
+          try {
+            const [lRes, cRes] = await Promise.all([fetch('/api/leads'), fetch('/api/colaboradores')]);
+            if (lRes.ok) {
+              const lJson = await lRes.json();
+              if (lJson.success && Array.isArray(lJson.leads) && lJson.leads.length > 0) {
+                leadsData = lJson.leads.filter((l: Lead) => l.status === 'Ganho');
+              }
+            }
+            if (cRes.ok) {
+              const cJson = await cRes.json();
+              if (cJson.success && Array.isArray(cJson.colaboradores) && cJson.colaboradores.length > 0) {
+                colabsData = cJson.colaboradores;
+              }
+            }
+          } catch (e) {}
+        }
       } else {
         // Modo demo: simula leads ganhos e colaboradores para o painel não ficar vazio
         colabsData = initialColaboradores;

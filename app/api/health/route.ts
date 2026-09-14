@@ -20,11 +20,20 @@ export async function GET(request: NextRequest) {
   let dbLatencyMs = 0;
   let dbErrorDetails: string | null = null;
 
+  let leadsCount: number | null = null;
+  let colabsCount: number | null = null;
+
   try {
     const dbCheck = await executeDbQuery(
       'health_check_ping',
       async () => {
         const { data, error } = await supabaseAdmin.from('audit_logs').select('id').limit(1);
+        const [leadsRes, colabsRes] = await Promise.all([
+          supabaseAdmin.from('leads').select('*', { count: 'exact', head: true }),
+          supabaseAdmin.from('colaboradores').select('*', { count: 'exact', head: true }),
+        ]);
+        leadsCount = leadsRes.count ?? 0;
+        colabsCount = colabsRes.count ?? 0;
         return { data, error };
       },
       requestId
@@ -80,6 +89,8 @@ export async function GET(request: NextRequest) {
       database: {
         status: dbStatus,
         latencyMs: dbLatencyMs,
+        leadsCount,
+        colabsCount,
         error: dbErrorDetails,
       },
       cache: {

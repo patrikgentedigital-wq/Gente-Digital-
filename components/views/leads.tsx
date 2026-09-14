@@ -451,6 +451,20 @@ export function LeadsView() {
     try {
       setIsLoading(true);
       if (isSupabaseConfigured()) {
+        // Tenta buscar via API server-side primeiro (garante bypass de RLS e integridade de sessão)
+        try {
+          const apiRes = await fetch('/api/leads');
+          if (apiRes.ok) {
+            const apiData = await apiRes.json();
+            if (apiData.success && Array.isArray(apiData.leads) && apiData.leads.length > 0) {
+              setLeads(apiData.leads);
+              return;
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Fallback para query direta do Supabase:', apiErr);
+        }
+
         // Carrega TODOS os leads para busca, filtros e exportação operarem no dataset completo.
         // (No dataset atual, a paginação é feita no cliente.)
         const { data: leadsData, error: leadsError } = await supabase
@@ -496,10 +510,25 @@ export function LeadsView() {
 
       if (isSupabaseConfigured()) {
         const { data, error } = await supabase.from('colaboradores').select('id, name');
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           data.forEach(c => {
             map.set(c.id, { id: c.id, name: c.name });
           });
+        } else {
+          // Fallback via API server-side
+          try {
+            const apiRes = await fetch('/api/colaboradores');
+            if (apiRes.ok) {
+              const apiData = await apiRes.json();
+              if (apiData.success && Array.isArray(apiData.colaboradores)) {
+                apiData.colaboradores.forEach((c: any) => {
+                  map.set(c.id, { id: c.id, name: c.name });
+                });
+              }
+            }
+          } catch (apiErr) {
+            console.warn('Erro no fallback de colaboradores:', apiErr);
+          }
         }
       } else {
         initialColaboradores.forEach(c => {

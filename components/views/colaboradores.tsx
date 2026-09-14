@@ -215,9 +215,19 @@ export function ColaboradoresView() {
       if (isSupabaseConfigured()) {
         try {
           const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
-          if (!error && data) {
+          if (!error && data && data.length > 0) {
             baseColabs = data;
             loadedFromSupabase = true;
+          } else {
+            // Fallback via API server-side
+            const apiRes = await fetch('/api/colaboradores');
+            if (apiRes.ok) {
+              const apiData = await apiRes.json();
+              if (apiData.success && Array.isArray(apiData.colaboradores) && apiData.colaboradores.length > 0) {
+                baseColabs = apiData.colaboradores;
+                loadedFromSupabase = true;
+              }
+            }
           }
         } catch (e) {
           console.error("Supabase fetch error:", e);
@@ -231,20 +241,32 @@ export function ColaboradoresView() {
       let leadsData: Lead[] = [];
       if (isSupabaseConfigured()) {
         try {
-          // Busca resiliente: carrega os leads ordenados por created_at
-          const { data: lData, error: lError } = await supabase
-            .from('leads')
-            .select('*')
-            .order('created_at', { ascending: false });
+          // Busca resiliente: tenta primeiro API server-side
+          try {
+            const apiLRes = await fetch('/api/leads');
+            if (apiLRes.ok) {
+              const apiLData = await apiLRes.json();
+              if (apiLData.success && Array.isArray(apiLData.leads) && apiLData.leads.length > 0) {
+                leadsData = apiLData.leads;
+              }
+            }
+          } catch (apiErr) {}
 
-          if (!lError && lData) {
-            leadsData = lData as Lead[];
-          } else {
-            if (lError) console.warn("Aviso ao buscar leads (tentando fallback de colunas canônicas):", lError.message);
-            const { data: fallbackData } = await supabase
+          if (leadsData.length === 0) {
+            const { data: lData, error: lError } = await supabase
               .from('leads')
-              .select('id, name, phone, ref, status, value, source, created_at');
-            if (fallbackData) leadsData = fallbackData as Lead[];
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            if (!lError && lData) {
+              leadsData = lData as Lead[];
+            } else {
+              if (lError) console.warn("Aviso ao buscar leads (tentando fallback de colunas canônicas):", lError.message);
+              const { data: fallbackData } = await supabase
+                .from('leads')
+                .select('id, name, phone, ref, status, value, source, created_at');
+              if (fallbackData) leadsData = fallbackData as Lead[];
+            }
           }
         } catch (e) {
           console.error("Erro ao buscar leads em colaboradores:", e);

@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const role = await getRole(user);
 
     // Se Supabase não estiver configurado (dev local / demo)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
       return NextResponse.json({ success: true, payments: [] });
     }
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Se Supabase não estiver configurado (dev local / demo)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
       return NextResponse.json({ 
         success: true, 

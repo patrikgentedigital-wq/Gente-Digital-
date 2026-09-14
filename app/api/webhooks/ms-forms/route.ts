@@ -206,9 +206,8 @@ export async function POST(req: NextRequest) {
     const normalizedPhone = normalizePhone(validData.phone);
 
     // Check if Supabase is configured (avoid crashing on local mock state)
-    const isSupabaseConfigured = 
-      process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+    const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    const isSupabaseConfigured = rawSbUrl && !rawSbUrl.includes('placeholder');
 
     let insertedLead = null;
 

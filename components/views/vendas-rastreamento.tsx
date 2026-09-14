@@ -66,13 +66,37 @@ export function VendasRastreamentoView() {
           supabase.from('lead_history').select('*').order('created_at', { ascending: false }).limit(2000),
         ]);
 
-        if (lData) leadsData = lData as Lead[];
-        if (cData) colabsData = cData as Colaborador[];
+        if (lData && lData.length > 0) leadsData = lData as Lead[];
+        if (cData && cData.length > 0) colabsData = cData as Colaborador[];
         if (hData) {
           hData.forEach((h: LeadHistory) => {
             if (!historyMap[h.lead_id]) historyMap[h.lead_id] = [];
             historyMap[h.lead_id].push(h);
           });
+        }
+
+        // Fallback via API se Supabase client retornar vazio
+        if (leadsData.length === 0 || colabsData.length === 0) {
+          try {
+            const [lRes, cRes] = await Promise.all([fetch('/api/leads'), fetch('/api/colaboradores')]);
+            if (lRes.ok) {
+              const lJson = await lRes.json();
+              if (lJson.success && Array.isArray(lJson.leads) && lJson.leads.length > 0) {
+                leadsData = lJson.leads;
+                leadsData.forEach((lead: any) => {
+                  if (lead.history && Array.isArray(lead.history)) {
+                    historyMap[lead.id] = lead.history;
+                  }
+                });
+              }
+            }
+            if (cRes.ok) {
+              const cJson = await cRes.json();
+              if (cJson.success && Array.isArray(cJson.colaboradores) && cJson.colaboradores.length > 0) {
+                colabsData = cJson.colaboradores;
+              }
+            }
+          } catch (e) {}
         }
       } else {
         leadsData = (initialLeads as any[]) as Lead[];

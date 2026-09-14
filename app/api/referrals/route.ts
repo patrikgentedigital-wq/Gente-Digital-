@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Indicação inválida.' }, { status: 400 });
     }
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    if (!rawSbUrl || rawSbUrl.includes('placeholder')) {
       return NextResponse.json(
         { success: false, error: 'O cadastro está temporariamente indisponível.' },
         { status: 503 },

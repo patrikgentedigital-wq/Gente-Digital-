@@ -14,7 +14,8 @@ const REF_PATTERN = /^[A-Za-z0-9 _\-.\u00C0-\u024F]+$/;
 // Conta cliques do mês atual e do mês anterior para tendência real no Dashboard
 async function getMonthClickCounts(): Promise<{ currentMonthClicks: number; previousMonthClicks: number }> {
   const fallback = { currentMonthClicks: 0, previousMonthClicks: 0 };
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+  const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  if (!rawSbUrl || rawSbUrl.includes('placeholder')) {
     return fallback;
   }
 
@@ -72,7 +73,8 @@ export async function POST(req: NextRequest) {
 
     const { ref } = parsed.data;
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    if (!rawSbUrl || rawSbUrl.includes('placeholder')) {
       return NextResponse.json({ success: true, tracked: false });
     }
 
@@ -101,7 +103,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+    const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    if (!rawSbUrl || rawSbUrl.includes('placeholder')) {
       return NextResponse.json({ success: true, clicks: [] });
     }
 

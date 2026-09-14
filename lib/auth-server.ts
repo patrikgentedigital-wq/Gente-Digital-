@@ -55,13 +55,32 @@ export async function getUserRole(
 
   const emailLower = (userEmail || '').trim().toLowerCase();
 
-  // 2. Checar ADMIN_EMAILS no .env (fonte oficial de bootstrap de admins)
+  // 2. Administradores fixos do sistema (garante que o proprietário nunca perca acesso)
+  const defaultAdminEmails = [
+    'patrikgentedigital@gmail.com',
+    'patrick@gentedigital.com.br',
+  ];
+
+  // Checar ADMIN_EMAILS no .env (sanitizando aspas, colchetes e espaços da Vercel)
   const configuredAdminEmails = (process.env.ADMIN_EMAILS || '')
+    .replace(/^[\["']|[\]"']$/g, '')
     .split(',')
-    .map(e => e.trim().toLowerCase())
+    .map(e => e.trim().toLowerCase().replace(/^["']|["']$/g, '').trim())
     .filter(Boolean);
 
-  if (emailLower && configuredAdminEmails.includes(emailLower)) {
+  const allAdminEmails = Array.from(new Set([...defaultAdminEmails, ...configuredAdminEmails]));
+
+  if (emailLower && allAdminEmails.includes(emailLower)) {
+    // Sincronizar na tabela user_roles e nos metadados do Supabase Auth para que as policies RLS (public.is_admin) funcionem no banco de dados
+    try {
+      if (userId && userId !== 'dev-local') {
+        await supabaseAdmin
+          .from('user_roles')
+          .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id' });
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar user_roles para admin:', err);
+    }
     return 'admin';
   }
 
