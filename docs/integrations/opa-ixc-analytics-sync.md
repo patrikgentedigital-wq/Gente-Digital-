@@ -308,6 +308,23 @@ O fechamento sanitizado registrou `1.000` linhas Opa!, `reported_total: null`, c
 
 Essa correção resolve o erro de redirects observado na execução, mas não resolve a paginação completa. O próprio fechamento confirma que o workflow atual ainda cobre somente a primeira página Opa!. A configuração foi testada no workflow isolado, o botão `Publish` não foi acionado e não houve ativação de agenda.
 
+## Correção controlada da paginação em 14/09/2026
+
+Depois da correção de transporte, a paginação foi testada primeiro com `Body` e nome `options.skip`. O node executou três requisições, porém repetiu a mesma página. O resumo sanitizado identificou `3.000` linhas brutas, `1.000` distintas e `2.000` duplicadas. A configuração foi então corrigida para atualizar o objeto `options` inteiro, usando o valor em modo de expressão `{{ ({ limit: 1000, skip: $pageCount * 1000 }) }}`. Essa forma preserva o filtro e aplica o deslocamento no corpo efetivamente enviado.
+
+O node `OPA - Lista atendimentos período` ficou com a paginação nativa `Update a Parameter in Each Request`, tipo `Body`, nome `options`, limite de `1.000` por página, expressão de deslocamento baseada em `$pageCount`, parada quando `data.length < 1000`, teto de `20` páginas, intervalo de `0` ms e `Follow Redirects` desligado. O node `FN - Resumo piloto` foi ajustado para consumir todas as entradas de página com `$input.all()`, deduplicar registros com `_id` e registrar `raw_returned_rows`, `returned_rows`, `duplicate_rows`, `pages_fetched`, `page_lengths` e `coverage`.
+
+### Evidência da execução completa
+
+- `Confirmado`: workflow manual concluído com sucesso nos nodes de janela, Opa!, resumo, IXC e fechamento.
+- `Confirmado`: Opa! retornou `2.003` linhas brutas e distintas, sem duplicidade, em `3` páginas com tamanhos `[1.000, 1.000, 3]`; o envelope continuou sem `reported_total` confiável.
+- `Confirmado`: o resumo Opa! registrou status `F:1.933` e `EA:70`, e canais `whatsapp:1.851`, `pabx:148` e `telegram:4`.
+- `Confirmado`: IXC retornou `12` contratos cancelados, com `total:12`, para `data_cancelamento` entre `01/09/2026` e `08/09/2026`.
+- `Condicionado`: `2.003` não é considerado equivalente ao total `1.918` do Data Studio. A diferença de `85` ainda depende de métrica, campo de data, corte horário e deduplicação equivalentes.
+- `Bloqueado`: persistência no Supabase permanece bloqueada pela migration não aplicada; publicação, agenda e ativação não foram feitas.
+
+Esta rodada corrige a paginação técnica e o consumo de múltiplas páginas no resumo. Ela ainda não autoriza carga de produção, não prova paridade de negócio e não substitui a validação do corte efetivo do Data Studio.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.

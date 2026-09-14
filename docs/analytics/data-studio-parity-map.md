@@ -100,3 +100,19 @@ No workflow analítico isolado, `Follow Redirects` foi desligado no node Opa! pa
 | Persistência | `status: blocked` | migration analítica do Supabase ainda não aplicada |
 
 A correção elimina o erro de transporte no piloto, mas a linha `ATENDIMENTO` permanece `partial` e `not_comparable` com `1.918`. A próxima alteração deve tratar a paginação e a contagem sanitizada antes de qualquer publicação ou persistência.
+
+## Correção controlada da paginação em 14/09/2026
+
+Na mesma execução isolada, a paginação nativa do node Opa! foi validada em duas etapas. A primeira configuração usou `Body` com o nome `options.skip`, mas as três respostas retornaram a mesma página. O resumo sanitizado identificou `3.000` linhas brutas, `1.000` distintas e `2.000` duplicadas. A causa operacional observada foi a atualização de uma chave aninhada que não alterou o objeto `options` enviado no corpo.
+
+A configuração foi corrigida para substituir o objeto `options` inteiro a cada requisição, com o valor em modo de expressão `{{ ({ limit: 1000, skip: $pageCount * 1000 }) }}`. O node ficou com `Follow Redirects` desligado, `Limit Pages Fetched` ligado com teto de `20` páginas, intervalo de `0` ms e parada quando `data.length < 1000`. O node `FN - Resumo piloto` também passou a ler `$input.all()`, somar as páginas, deduplicar por `_id` e expor contagens brutas, distintas, duplicadas, páginas e tamanhos de página.
+
+| Resultado da execução completa | Evidência sanitizada | Estado |
+| --- | --- | --- |
+| Opa! | `raw_returned_rows: 2.003`, `returned_rows: 2.003`, `duplicate_rows: 0`, `pages_fetched: 3`, `page_lengths: [1.000, 1.000, 3]`, `reported_total: null`, `coverage: observed` | leitura paginada confirmada para a janela técnica do piloto |
+| Opa! por status | `F: 1.933`, `EA: 70` | dimensão observada, ainda sem equivalência comprovada com o Data Studio |
+| Opa! por canal | `whatsapp: 1.851`, `pabx: 148`, `telegram: 4` | dimensão observada, ainda sem equivalência comprovada com o Data Studio |
+| IXC | `returned_rows: 12`, `reported_total: 12`, `coverage: observed`, datas observadas de cancelamento de `01/09` a `08/09` | leitura confirmada para contratos cancelados |
+| Persistência | `status: blocked`; migration analítica do Supabase não aplicada | não houve escrita |
+
+O teste confirma a paginação técnica e elimina a duplicação causada pela configuração anterior. Ele não transforma `2.003` em paridade com o total `1.918` do Data Studio. A diferença de `85` ainda exige comparação da mesma métrica, campo temporal, corte horário e regra de deduplicação. O workflow continua sem publicação, agenda ou conexão com o Supabase.
