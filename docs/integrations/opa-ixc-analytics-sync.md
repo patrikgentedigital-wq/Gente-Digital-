@@ -2,7 +2,7 @@
 
 **Workflow proposto:** `ANALYTICS - Sincronização OPA e IXC`
 **Escopo:** ingestão server-side, somente leitura nas fontes, para a camada analítica do painel.
-**Estado deste documento:** contrato local atualizado após uma rodada remota controlada. O workflow piloto foi criado e executado manualmente, permaneceu sem agenda/publicação e não gravou no Supabase.
+**Estado deste documento:** contrato local atualizado após a aplicação controlada do schema analítico, a configuração do draft de persistência e o primeiro upsert controlado. O workflow continua manual, sem publicação e sem agenda.
 
 ## Decisão operacional
 
@@ -34,8 +34,9 @@ Quando uma família estiver sem fonte ou regra comprovada, a API e a interface d
 | **Confirmado** | A rota IXC `POST /webservice/v1/cliente_contrato` respondeu no piloto com o campo `cliente_contrato.data_cancelamento`, status `I`, janela `2026-09-01` a `2026-09-10`, página `1` e `rp: 250`. O retorno informou `12` registros e `total: 12`. |
 | **Condicionado** | A semântica do campo Opa! `date` ainda não foi provada como a mesma definição do Data Studio. A semântica de canais, reabertura, deduplicação e o vínculo com clientes continuam condicionados. |
 | **Condicionado** | A origem IXC para o total `29` do Data Studio ainda não foi encontrada. O endpoint de contratos retornou `12`; o endpoint `su_ticket` não aceitou a filtragem temporal no piloto e não deve ser consultado em massa sem paginação e filtro posterior controlados. |
-| **Bloqueado** | A paridade histórica completa continua bloqueada. O workflow não deve ser publicado, ativado, agendado ou conectado ao Supabase enquanto as divergências de fonte/regra não forem resolvidas e a migration do destino não estiver aplicada. |
-| **Proposto** | O encadeamento e os contratos abaixo são o desenho para a configuração futura. Eles não são evidência de que as rotas ou os campos já estejam disponíveis no n8n. |
+| **Bloqueado** | A paridade histórica completa continua bloqueada. O workflow não deve ser publicado, ativado ou agendado enquanto as divergências de fonte/regra não forem resolvidas. Novas cargas devem continuar manuais e controladas, com runtime e allow-list conferidos. |
+| **Confirmado** | O draft remoto contém `FN - Preparar persistência` e `Supabase - Upsert lote analítico`, conectados depois do fechamento. O segundo node faz POST em lote por tabela, com upsert por conflito, perfis de schema dinâmicos, retry limitado e parada em caso de erro. |
+| **Confirmado** | O desenho está salvo no workflow remoto e a primeira chamada de escrita controlada foi executada. A variável de runtime foi mantida fora do texto do node e a allow-list do Data API foi validada no ambiente do n8n. |
 
 ## Encadeamento isolado
 
@@ -46,7 +47,8 @@ Trigger manual controlado
   -> FN - Resumo piloto (projeção sanitizada)
   -> IXC - Cancelamentos período (somente leitura, página observada)
   -> FN - Fechamento piloto (projeção sanitizada)
-  -> Persistência bloqueada até migration e paridade
+  -> FN - Preparar persistência
+  -> Supabase - Upsert lote analítico (manual controlado, sem agenda/publicação)
 ```
 
 O encadeamento representa etapas lógicas. Na configuração real, nodes com lógica reutilizável só devem virar subworkflows quando houver contrato estável, teste ou reutilização que justifique a fronteira. Cada subworkflow futuro deverá declarar entradas tipadas com `Execute Workflow Trigger` em `Define Below`, documentar entradas e saídas e retornar uma forma consistente. O fluxo analítico não deve extrair o fluxo raiz para dentro dele nem criar uma dependência operacional reversa.
@@ -241,7 +243,7 @@ O marcador `record_type` descreve a forma possível do fixture e não afirma que
 6. Verificar a credencial correta em cada node na interface n8n. Referência de credencial não substitui essa verificação.
 7. Configurar o error workflow de nível de workflow e conferir as saídas de erro dos nodes que podem falhar antes de qualquer execução não assistida.
 8. Validar conexões e configurações sem publicar/ativar a agenda. O workflow deve permanecer pausado.
-9. Aplicar e validar a migration do destino antes de qualquer upsert. O piloto confirmou explicitamente `persistence.status = blocked`.
+9. Antes de cada nova carga, confirmar que a migration do destino está aplicada, que o segredo existe apenas no runtime do n8n e que as tabelas necessárias estão na allow-list do Data API. A carga deve permanecer manual e controlada enquanto a paridade não estiver fechada.
 
 Se uma nova inspeção perder a listagem histórica ou a paginação Opa!, o estado deve voltar a `unavailable`/`Bloqueado`. A criação ou execução manual do workflow não prova persistência, reconciliação ou paridade de dados.
 
@@ -325,12 +327,24 @@ O node `OPA - Lista atendimentos período` ficou com a paginação nativa `Updat
 
 Esta rodada corrige a paginação técnica e o consumo de múltiplas páginas no resumo. Ela ainda não autoriza carga de produção, não prova paridade de negócio e não substitui a validação do corte efetivo do Data Studio.
 
+## Estado atual da implementação em 15/09/2026
+
+- `Confirmado`: a migration `create_analytics_sources` está aplicada no projeto Supabase alvo. A verificação remota encontrou as 10 tabelas novas com RLS habilitado; o piloto persistiu `2.003` registros Opa!, `12` registros IXC e `2` estados de sincronização.
+- `Confirmado`: o workflow remoto `ANALYTICS - Sincronização OPA e IXC` continua manual, não publicado e sem agenda. O botão `Publish` não foi acionado.
+- `Confirmado`: `FN - Preparar persistência` produz sete lotes: dois `integration.sync_runs`, raw Opa!, atendimento Opa!, raw IXC, cancelamentos IXC e dois estados em `public.analytics_sync_status`.
+- `Confirmado`: `Supabase - Upsert lote analítico` usa `POST /rest/v1/{{$json.table}}?on_conflict={{$json.conflict}}`, os headers de perfil são derivados do schema do lote e a autorização usa uma credencial Custom Auth dedicada no runtime do n8n. O node tem três tentativas e espera de `5.000` ms. O piloto confirmou `12` linhas IXC recebidas e inseridas, além de `2.003` linhas Opa! recebidas e inseridas.
+- `Condicionado`: a carga atual do IXC cobre cancelamentos. Vendas e contratos ainda não têm uma rota de ingestão confirmada neste workflow e permanecem como `—` no `GERAL`, sem conversão para zero.
+- `Confirmado`: a credencial de runtime do piloto foi configurada sem inserir o segredo no texto do node, e o schema `integration` e as tabelas necessárias foram expostos no Data API. A carga controlada foi executada e os contadores persistidos foram conferidos no destino.
+- `Condicionado`: a chave legada de serviço do projeto Supabase ainda precisa ser inventariada e rotacionada separadamente. Ela não foi usada no novo node do piloto e nenhum valor de segredo deve entrar neste documento.
+- `Bloqueado`: a diferença observada de `85` registros entre a leitura paginada Opa! (`2.003`) e o Data Studio (`1.918`) continua sem causa comprovada. Isso impede declarar paridade de `ATENDIMENTO`, mesmo que a infraestrutura de persistência esteja pronta para o teste controlado.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.
 - Não publicar, ativar ou agendar o workflow remoto nesta etapa.
-- Não persistir no Supabase enquanto a migration, o contrato de destino e a paridade de negócio não estiverem validados.
-- Não ativar agenda, fazer carga real, testar envio ou consultar fontes pelo navegador.
+- Não publicar, ativar ou agendar o workflow nesta etapa.
+- Executar novas cargas somente em rodada manual controlada, com chave de runtime, allow-list do Data API, janela e evidência registrados.
+- Não ativar agenda, testar envio ou consultar fontes pelo navegador.
 - Não inventar endpoint IXC, parâmetro de paginação, nome de campo ou chave de relacionamento.
 - Não expor segredo, token, header Bearer, PII, protocolo real ou ID real em documentação, export, logs ou fixture.
 - Não considerar HTTP 200, workflow presente na interface ou retorno de uma chamada unitária como prova de ingestão ou paridade.

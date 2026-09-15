@@ -1,6 +1,15 @@
 export type AnalyticsSource = 'opa' | 'ixc' | 'indique';
 export type IdentifierKind = 'phone' | 'client_id' | 'contract_id' | 'protocol' | 'metric' | 'unknown';
 export type LinkStatus = 'vinculado' | 'nao_vinculado' | 'ambiguo' | 'nao_aplicavel';
+export type AnalyticsSyncStatus = 'success' | 'partial' | 'failed' | 'unavailable';
+
+export interface AnalyticsSyncStatusRecord {
+  source_system: 'opa' | 'ixc';
+  period_start: string;
+  period_end: string;
+  status: AnalyticsSyncStatus;
+  synced_at: string | null;
+}
 
 export interface RawIdentifier {
   rawValue: string | null;

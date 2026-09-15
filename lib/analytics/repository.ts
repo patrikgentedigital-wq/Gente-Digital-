@@ -6,7 +6,7 @@ import {
   sanitizeSyncError,
   type DetailedSyncRunResult,
 } from './ingestion';
-import { normalizeSourceTimestamp } from './normalizers';
+import { normalizeSourceBusinessDate, normalizeSourceTimestamp } from './normalizers';
 import type { IxcCancellationRecord, OpaAttendanceRecord } from './types';
 
 export type AnalyticsPersistenceTable = 'opa_attendances' | 'ixc_cancellations';
@@ -105,7 +105,7 @@ export function mapIxcCancellationToPersistenceRow(
     motivo: record.motivo,
     tipo: record.tipo,
     // data_referencia é a data de cancelamento para a projeção IXC.
-    data_cancelamento: normalizeSourceTimestamp(record.data_referencia),
+    data_cancelamento: normalizeSourceBusinessDate(record.data_referencia),
     source_updated_at: normalizeSourceTimestamp(record.source_updated_at),
     synced_at: syncedAt,
     sync_run_id: runId,

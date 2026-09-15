@@ -10,7 +10,7 @@ import {
 } from './analytics-primitives';
 
 export function CancelamentosView({ overview }: { overview: AnalyticsOverviewResponse }) {
-  const canShowValues = overview.meta.status === 'success';
+  const canShowValues = overview.meta.sections.cancelamentos === 'success';
   const { cancelamentos } = overview.data;
 
   return (
@@ -21,7 +21,7 @@ export function CancelamentosView({ overview }: { overview: AnalyticsOverviewRes
         description="Identifique o volume de cancelamentos e os motivos que precisam de ação operacional."
         source="IXC"
       />
-      <AnalyticsSourceNotice status={overview.meta.status} />
+      <AnalyticsSourceNotice status={overview.meta.sections.cancelamentos} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsMetricCard
           label="Cancelamentos"

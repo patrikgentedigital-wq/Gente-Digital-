@@ -88,6 +88,24 @@ export function normalizeSourceTimestamp(value: unknown): string | null {
   return parseIsoTimestamp(input);
 }
 
+/**
+ * Normaliza uma data de negócio cuja origem não fornece horário. O valor é
+ * interpretado como 00:00 no fuso da operação, sem alterar a regra mais
+ * restritiva de normalizeSourceTimestamp para timestamps técnicos.
+ */
+export function normalizeSourceBusinessDate(value: unknown): string | null {
+  if (typeof value !== 'string') return normalizeSourceTimestamp(value);
+
+  const input = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return normalizeSourceTimestamp(`${input}T00:00:00`);
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(input)) {
+    return normalizeSourceTimestamp(`${input} 00:00:00`);
+  }
+  return normalizeSourceTimestamp(value);
+}
+
 function parseBrazilianTimestamp(input: string): string | null | undefined {
   const match = input.match(BRAZILIAN_TIMESTAMP_PATTERN);
   if (!match) return undefined;

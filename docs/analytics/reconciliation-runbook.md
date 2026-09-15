@@ -6,9 +6,11 @@ Comparar, com evidência registrada, os indicadores das páginas `GERAL`, `ATEND
 
 ## Estado atual
 
-**Status:** `not_comparable` para a matriz inteira.
+**Status:** `not_comparable` para a matriz inteira. A infraestrutura do destino e a primeira leitura persistida do piloto estão prontas, mas a janela e a regra de contagem ainda não fecham a comparação com o Data Studio.
 
-Ainda não houve leitura autorizada do Data Studio junto com uma execução válida de ingestão Opa!/IXC e uma leitura persistida no painel. Portanto, não há valor `expected`, `actual` ou `difference` de produção neste documento. Os valores exibidos no PDF não devem ser copiados para a matriz como se fossem uma fotografia atual.
+Houve uma execução válida de ingestão Opa!/IXC e uma leitura persistida no destino, mas ela ainda não é comparável ao Data Studio porque a equivalência da janela, da regra de data, da deduplicação e das famílias de métrica não foi fechada. Portanto, este documento não promove nenhum valor a `expected`, `actual` ou `difference` de produção. Os valores exibidos no PDF continuam sendo referência de conferência, não uma fotografia atual. A migration, o segredo de runtime do workflow e a exposição necessária do Data API já foram conferidos.
+
+Na leitura persistida do piloto, o Opa! registrou `2.003` atendimentos e o IXC registrou `12` cancelamentos na janela de `01/09/2026` a `10/09/2026`. O painel pode liberar essas duas abas por estado de fonte, mas a matriz permanece `not_comparable`: o atendimento diverge em `85` registros da leitura parcial do Data Studio e vendas, contratos e pré-contratos ainda não têm carga própria confirmada.
 
 ## Pré-condições
 

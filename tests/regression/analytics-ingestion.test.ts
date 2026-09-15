@@ -15,6 +15,7 @@ import {
   upsertOpaAttendanceBatchDetailed,
   type AnalyticsPersistenceExecutor,
 } from '../../lib/analytics/repository';
+import { normalizeSourceBusinessDate } from '../../lib/analytics/normalizers';
 
 const opaRecord = (overrides: Record<string, unknown> = {}) => ({
   source_id: 'opa-source-001',
@@ -137,6 +138,21 @@ test('mapper IXC usa data_cancelamento e não envia data_referencia', () => {
     sync_run_id: 'run-fixture',
   });
   assert.equal('data_referencia' in row, false);
+});
+
+test('data de negócio do IXC aceita date-only no início do dia operacional', () => {
+  assert.equal(
+    normalizeSourceBusinessDate('2026-09-01'),
+    '2026-09-01T03:00:00.000Z',
+  );
+  assert.equal(
+    mapIxcCancellationToPersistenceRow(
+      ixcRecord({ data_referencia: '2026-09-01' }),
+      'run-fixture',
+      '2026-09-10T12:00:00.000Z',
+    ).data_cancelamento,
+    '2026-09-01T03:00:00.000Z',
+  );
 });
 
 function successfulFake(capture: { table?: string; rows?: readonly unknown[]; options?: unknown }): AnalyticsPersistenceExecutor {

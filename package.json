@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --conditions react-server --test tests/regression/*.test.ts",
-    "clean": "next clean"
+    "clean": "node -e \"require('node:fs').rmSync('.next', { recursive: true, force: true })\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

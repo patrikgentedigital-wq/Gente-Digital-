@@ -35,6 +35,11 @@ const overview: AnalyticsOverviewResponse = {
     lastUpdatedAt: '2026-09-10T15:00:00.000Z',
     status: 'success',
     coverage: 1,
+    sections: {
+      geral: 'success',
+      atendimento: 'success',
+      cancelamentos: 'success',
+    },
   },
 };
 

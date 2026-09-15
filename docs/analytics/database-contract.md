@@ -1,13 +1,13 @@
 # Contrato do banco analítico
 
-Este documento define o contrato esperado para a camada de proveniência de Opa! Suite e IXC. A migration ainda não foi criada nem aplicada neste worktree: a verificação inicial exigida pela Tarefa 4 mostrou que a CLI `supabase` não está disponível, e também não há Docker ou banco local acessível. Nenhum SQL remoto foi executado.
+Este documento define o contrato da camada de proveniência de Opa! Suite e IXC. A migration local foi criada em `supabase_migration_analytics_sources.sql` e aplicada no projeto Supabase autorizado em `14/09/2026` por uma operação remota controlada. A CLI `supabase`, o Docker e um Postgres local continuam indisponíveis neste worktree, portanto `supabase db reset` não foi executado.
 
 ## Estado da entrega
 
-- **Confirmado:** o contrato abaixo mantém payloads crus fora de `public`, usa `source_id` único nas entidades normalizadas, prevê RLS para as tabelas públicas e limita o estado de sincronização a `success`, `partial`, `failed` e `unavailable`.
-- **Bloqueado:** gerar a migration pelo comando oficial `supabase migration new create_analytics_sources`, aplicar `supabase db reset` e executar as asserções contra Postgres local.
-- **Condicionado:** nomes de campos de data e regras de relacionamento devem permanecer compatíveis com os endpoints e payloads sanitizados que serão confirmados antes da ingestão.
-- **Proposto:** quando a CLI e o banco local estiverem disponíveis, gerar a migration oficial, aplicar somente com `supabase db reset` e executar as asserções SQL da Tarefa 4 antes de qualquer uso remoto.
+- **Confirmado:** a migration criou as 10 tabelas analíticas previstas, habilitou RLS em todas elas, manteve `anon` e `authenticated` sem acesso direto e concedeu acesso somente a `service_role` nas tabelas novas. A verificação remota confirmou as tabelas, colunas, unicidades e checks de estado. Depois do piloto controlado, foram persistidos `2.003` registros brutos e projetados do Opa!, `12` registros brutos e projetados do IXC e `2` estados de sincronização.
+- **Confirmado:** o payload bruto permanece em `integration.*`; as projeções normalizadas ficam em `public.*`; nenhuma policy de leitura permissiva foi criada.
+- **Bloqueado:** executar `supabase db reset` e as asserções contra Postgres local, pois a CLI e o Docker não estão disponíveis neste ambiente.
+- **Confirmado:** o schema `integration` e as tabelas `public.*` usadas pelo fluxo foram expostos no allow-list do Data API para o endpoint REST usado pelo n8n. Essa exposição foi conferida no ambiente e não é concedida pela migration.
 
 ## Camadas e regras comuns
 
@@ -108,14 +108,22 @@ O manifesto fixture-only lista exatamente as seis entidades públicas com `sourc
 
 As sete tabelas `public.*` e as três tabelas `integration.*` têm `rlsRequired=true` no manifesto. A escolha de RLS em `integration` é defesa em profundidade, mesmo com o schema fora da exposição do Data API. O manifesto marca `integration.*` como `dataApiExposed=false`. As tabelas `public.*` são projeções do schema público, mas não têm política de leitura permissiva nem acesso direto autorizado para `anon` ou `authenticated`; o consumo previsto é pela API protegida server-side.
 
-Na migration inicial, `policies` permanece vazio e `defaultPolicies` é `deny`. O alvo de grants e privilégios padrão, ainda não executado, é:
+Na migration aplicada, `policies` permanece vazio e `defaultPolicies` é `deny`. O SQL usa grants somente nas tabelas novas. O bloco abaixo representa o princípio de isolamento, não deve ser executado como um revoke amplo sobre todas as tabelas existentes do aplicativo:
 
 ```sql
 REVOKE ALL ON SCHEMA integration FROM anon, authenticated;
-REVOKE ALL ON ALL TABLES IN SCHEMA integration FROM anon, authenticated;
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA integration REVOKE ALL ON TABLES FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+REVOKE ALL ON TABLE
+  integration.opa_records_raw,
+  integration.ixc_records_raw,
+  integration.sync_runs,
+  public.opa_attendances,
+  public.opa_interactions,
+  public.ixc_customers,
+  public.ixc_contracts,
+  public.ixc_sales,
+  public.ixc_cancellations,
+  public.analytics_sync_status
+FROM anon, authenticated;
 ```
 
 O cliente server-side autorizado deverá receber somente o acesso necessário quando o modelo de autorização estiver definido. Nenhuma policy baseada apenas em `TO authenticated` é presumida neste contrato.
@@ -136,4 +144,4 @@ O teste final também deverá consultar `pg_class.relrowsecurity`, verificar as 
 
 ## Limites de segurança
 
-Não entram neste contrato: tokens, headers de autenticação, chaves Supabase, `service_role`, nomes, telefones, protocolos ou IDs reais. A relação Opa! Suite ↔ IXC só pode ser preenchida quando a chave e seu significado forem confirmados por evidência sanitizada. A criação do schema não autoriza ingestão, agenda n8n, carga remota ou alteração de workflows Opa!.
+Não entram neste contrato: tokens, headers de autenticação, chaves Supabase, `service_role`, nomes, telefones, protocolos ou IDs reais. A relação Opa! Suite ↔ IXC só pode ser preenchida quando a chave e seu significado forem confirmados por evidência sanitizada. A criação do schema não autoriza agenda n8n, carga remota ou alteração de workflows Opa!. O upsert só pode ocorrer pelo processo server-side autorizado, com segredo injetado no runtime e validação do allow-list do Data API.

@@ -6,7 +6,7 @@ import type {
 
 interface AnalyticsMetricCardProps {
   label: string;
-  value: number;
+  value: number | null;
   detail: string;
   icon: LucideIcon;
   tone?: 'amber' | 'blue' | 'emerald' | 'slate' | 'rose';
@@ -29,20 +29,28 @@ export function AnalyticsMetricCard({
   tone = 'slate',
   canShowValues,
 }: AnalyticsMetricCardProps) {
+  const showValue = canShowValues && value !== null;
+
   return (
     <article className="group rounded-2xl border border-zinc-800/80 bg-zinc-950/80 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.16)] transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
           <p className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white">
-            {canShowValues ? value.toLocaleString('pt-BR') : '—'}
+            {showValue ? value.toLocaleString('pt-BR') : '—'}
           </p>
         </div>
         <div className={`rounded-xl p-2.5 ring-1 ${toneClasses[tone]}`} aria-hidden="true">
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className="mt-4 text-xs leading-5 text-zinc-500">{canShowValues ? detail : 'Aguardando cobertura completa da fonte.'}</p>
+      <p className="mt-4 text-xs leading-5 text-zinc-500">
+        {showValue
+          ? detail
+          : value === null
+            ? 'Fonte ainda não confirmada.'
+            : 'Aguardando cobertura da fonte.'}
+      </p>
     </article>
   );
 }
@@ -102,8 +110,12 @@ export function AnalyticsSourceNotice({ status }: { status: AnalyticsStatus }) {
       className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-sm text-amber-100"
       role="status"
     >
-      <span className="font-semibold">Leitura parcial:</span>{' '}
-      os indicadores desta aba só serão exibidos quando a cobertura das fontes estiver completa.
+      <span className="font-semibold">
+        {status === 'partial' ? 'Leitura parcial:' : 'Fonte indisponível:'}
+      </span>{' '}
+      {status === 'partial'
+        ? 'Alguns indicadores desta aba ainda aguardam cobertura confirmada.'
+        : 'Os indicadores desta aba ainda não têm uma sincronização válida.'}
     </div>
   );
 }

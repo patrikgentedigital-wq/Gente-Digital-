@@ -10,7 +10,7 @@ import {
 } from './analytics-primitives';
 
 export function AtendimentoView({ overview }: { overview: AnalyticsOverviewResponse }) {
-  const canShowValues = overview.meta.status === 'success';
+  const canShowValues = overview.meta.sections.atendimento === 'success';
   const { atendimento } = overview.data;
 
   return (
@@ -21,7 +21,7 @@ export function AtendimentoView({ overview }: { overview: AnalyticsOverviewRespo
         description="Veja o volume de atendimentos, os vínculos reconhecidos e a distribuição por canal e status."
         source="Opa! Suite"
       />
-      <AnalyticsSourceNotice status={overview.meta.status} />
+      <AnalyticsSourceNotice status={overview.meta.sections.atendimento} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <AnalyticsMetricCard
           label="Total"

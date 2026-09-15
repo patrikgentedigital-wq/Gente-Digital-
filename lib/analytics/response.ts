@@ -6,6 +6,12 @@ import type {
 
 export type AnalyticsStatus = 'success' | 'partial' | 'failed' | 'unavailable';
 
+export interface AnalyticsSectionStatuses {
+  geral: AnalyticsStatus;
+  atendimento: AnalyticsStatus;
+  cancelamentos: AnalyticsStatus;
+}
+
 export interface AnalyticsOverviewData {
   geral: GeneralSummary;
   atendimento: AttendanceSummary;
@@ -18,6 +24,7 @@ export interface AnalyticsOverviewMeta {
   lastUpdatedAt: string | null;
   status: AnalyticsStatus;
   coverage: number;
+  sections: AnalyticsSectionStatuses;
 }
 
 export interface AnalyticsOverviewResponse {
@@ -28,6 +35,11 @@ export interface AnalyticsOverviewResponse {
 
 function nonNegativeInteger(value: unknown): number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function nonNegativeIntegerOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return nonNegativeInteger(value);
 }
 
 function safeString(value: unknown): string | null {
@@ -49,22 +61,22 @@ function safeDimensionList(value: unknown): Array<{ key: string; count: number }
 function serializeGeneralSummary(value: unknown): GeneralSummary {
   const candidate = value && typeof value === 'object' ? value as Partial<GeneralSummary> : {};
   return {
-    leads: nonNegativeInteger(candidate.leads),
-    sales: nonNegativeInteger(candidate.sales),
-    contracts: nonNegativeInteger(candidate.contracts),
-    preContracts: nonNegativeInteger(candidate.preContracts),
+    leads: nonNegativeIntegerOrNull(candidate.leads),
+    sales: nonNegativeIntegerOrNull(candidate.sales),
+    contracts: nonNegativeIntegerOrNull(candidate.contracts),
+    preContracts: nonNegativeIntegerOrNull(candidate.preContracts),
   };
 }
 
 function serializeAttendanceSummary(value: unknown): AttendanceSummary {
   const candidate = value && typeof value === 'object' ? value as Partial<AttendanceSummary> : {};
   return {
-    total: nonNegativeInteger(candidate.total),
-    linked: nonNegativeInteger(candidate.linked),
-    unlinked: nonNegativeInteger(candidate.unlinked),
-    ambiguous: nonNegativeInteger(candidate.ambiguous),
-    notApplicable: nonNegativeInteger(candidate.notApplicable),
-    protocolConflicts: nonNegativeInteger(candidate.protocolConflicts),
+    total: nonNegativeIntegerOrNull(candidate.total),
+    linked: nonNegativeIntegerOrNull(candidate.linked),
+    unlinked: nonNegativeIntegerOrNull(candidate.unlinked),
+    ambiguous: nonNegativeIntegerOrNull(candidate.ambiguous),
+    notApplicable: nonNegativeIntegerOrNull(candidate.notApplicable),
+    protocolConflicts: nonNegativeIntegerOrNull(candidate.protocolConflicts),
     byChannel: safeDimensionList(candidate.byChannel),
     byStatus: safeDimensionList(candidate.byStatus),
   };
@@ -73,22 +85,37 @@ function serializeAttendanceSummary(value: unknown): AttendanceSummary {
 function serializeCancellationSummary(value: unknown): CancellationSummary {
   const candidate = value && typeof value === 'object' ? value as Partial<CancellationSummary> : {};
   return {
-    total: nonNegativeInteger(candidate.total),
+    total: nonNegativeIntegerOrNull(candidate.total),
     byReason: safeDimensionList(candidate.byReason),
-    renewals: nonNegativeInteger(candidate.renewals),
-    upgrades: nonNegativeInteger(candidate.upgrades),
-    downgrades: nonNegativeInteger(candidate.downgrades),
+    renewals: nonNegativeIntegerOrNull(candidate.renewals),
+    upgrades: nonNegativeIntegerOrNull(candidate.upgrades),
+    downgrades: nonNegativeIntegerOrNull(candidate.downgrades),
+  };
+}
+
+function serializeStatus(value: unknown): AnalyticsStatus {
+  return value === 'success'
+    || value === 'partial'
+    || value === 'failed'
+    || value === 'unavailable'
+    ? value
+    : 'unavailable';
+}
+
+function serializeSectionStatuses(value: unknown): AnalyticsSectionStatuses {
+  const candidate = value && typeof value === 'object'
+    ? value as Partial<AnalyticsSectionStatuses>
+    : {};
+  return {
+    geral: serializeStatus(candidate.geral),
+    atendimento: serializeStatus(candidate.atendimento),
+    cancelamentos: serializeStatus(candidate.cancelamentos),
   };
 }
 
 function serializeMeta(value: unknown): AnalyticsOverviewMeta {
   const candidate = value && typeof value === 'object' ? value as Partial<AnalyticsOverviewMeta> : {};
-  const status: AnalyticsStatus = candidate.status === 'success'
-    || candidate.status === 'partial'
-    || candidate.status === 'failed'
-    || candidate.status === 'unavailable'
-    ? candidate.status
-    : 'unavailable';
+  const status = serializeStatus(candidate.status);
   const coverage = typeof candidate.coverage === 'number' && Number.isFinite(candidate.coverage)
     ? Math.min(1, Math.max(0, candidate.coverage))
     : 0;
@@ -99,6 +126,7 @@ function serializeMeta(value: unknown): AnalyticsOverviewMeta {
     lastUpdatedAt: safeString(candidate.lastUpdatedAt),
     status,
     coverage,
+    sections: serializeSectionStatuses(candidate.sections),
   };
 }
 

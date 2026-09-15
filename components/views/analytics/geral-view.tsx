@@ -9,7 +9,7 @@ import {
 } from './analytics-primitives';
 
 export function GeralView({ overview }: { overview: AnalyticsOverviewResponse }) {
-  const canShowValues = overview.meta.status === 'success';
+  const canShowValues = overview.meta.sections.geral !== 'unavailable';
   const { geral } = overview.data;
 
   return (
@@ -20,7 +20,7 @@ export function GeralView({ overview }: { overview: AnalyticsOverviewResponse })
         description="Acompanhe o fluxo de indicação e a conversão consolidada do Indique e Ganhe."
         source="Indique e Ganhe + IXC"
       />
-      <AnalyticsSourceNotice status={overview.meta.status} />
+      <AnalyticsSourceNotice status={overview.meta.sections.geral} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsMetricCard
           label="Leads"

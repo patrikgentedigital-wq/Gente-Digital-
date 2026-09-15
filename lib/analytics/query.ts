@@ -7,8 +7,14 @@ import {
   type GeneralSummary,
   type MetricWindow,
 } from './metrics';
-import { normalizeSourceTimestamp, preserveRawIdentifier } from './normalizers';
+import {
+  normalizeSourceBusinessDate,
+  normalizeSourceTimestamp,
+  preserveRawIdentifier,
+} from './normalizers';
 import type {
+  AnalyticsSyncStatus,
+  AnalyticsSyncStatusRecord,
   DateStampedMetricRecord,
   IxcCancellationRecord,
   OpaAttendanceRecord,
@@ -16,6 +22,7 @@ import type {
 import type {
   AnalyticsOverviewResponse,
   AnalyticsStatus,
+  AnalyticsSectionStatuses,
 } from './response';
 
 export interface AnalyticsQueryDataset {
@@ -27,6 +34,7 @@ export interface AnalyticsQueryDataset {
   cancellations: readonly IxcCancellationRecord[];
   availableSources: readonly AnalyticsSourceFamily[];
   failedSources: readonly AnalyticsSourceFamily[];
+  syncStatuses: readonly AnalyticsSyncStatusRecord[];
   lastUpdatedAt: string | null;
 }
 
@@ -48,17 +56,17 @@ export interface AnalyticsOverviewQueryResult {
 const SOURCE_FAMILY_COUNT = 5;
 
 function emptyGeneral(): GeneralSummary {
-  return { leads: 0, sales: 0, contracts: 0, preContracts: 0 };
+  return { leads: null, sales: null, contracts: null, preContracts: null };
 }
 
 function emptyAttendance(): AttendanceSummary {
   return {
-    total: 0,
-    linked: 0,
-    unlinked: 0,
-    ambiguous: 0,
-    notApplicable: 0,
-    protocolConflicts: 0,
+    total: null,
+    linked: null,
+    unlinked: null,
+    ambiguous: null,
+    notApplicable: null,
+    protocolConflicts: null,
     byChannel: [],
     byStatus: [],
   };
@@ -66,11 +74,11 @@ function emptyAttendance(): AttendanceSummary {
 
 function emptyCancellations(): CancellationSummary {
   return {
-    total: 0,
+    total: null,
     byReason: [],
-    renewals: 0,
-    upgrades: 0,
-    downgrades: 0,
+    renewals: null,
+    upgrades: null,
+    downgrades: null,
   };
 }
 
@@ -84,7 +92,134 @@ function emptyDataset(): AnalyticsQueryDataset {
     cancellations: [],
     availableSources: [],
     failedSources: [],
+    syncStatuses: [],
     lastUpdatedAt: null,
+  };
+}
+
+function summarizeAvailableGeneral(
+  dataset: AnalyticsQueryDataset,
+  window: MetricWindow,
+): GeneralSummary {
+  const summary = summarizeGeneral({
+    leads: dataset.leads,
+    sales: dataset.sales,
+    contracts: dataset.contracts,
+    preContracts: dataset.preContracts,
+  }, window);
+
+  const available = new Set(dataset.availableSources);
+  const failed = new Set(dataset.failedSources);
+  // A tabela de pré-contratos não faz parte do contrato aprovado. Zero seria
+  // uma afirmação de ausência de registros, não uma indicação de fonte não
+  // implementada.
+  return {
+    leads: available.has('leads') && !failed.has('leads') ? summary.leads : null,
+    sales: available.has('sales') && !failed.has('sales') ? summary.sales : null,
+    contracts: available.has('contracts') && !failed.has('contracts') ? summary.contracts : null,
+    preContracts: null,
+  };
+}
+
+function familyStatus(
+  family: AnalyticsSourceFamily,
+  available: ReadonlySet<AnalyticsSourceFamily>,
+  failed: ReadonlySet<AnalyticsSourceFamily>,
+): AnalyticsStatus {
+  if (available.has(family) && failed.has(family)) return 'partial';
+  if (available.has(family)) return 'success';
+  return 'unavailable';
+}
+
+function sectionStatuses(dataset: AnalyticsQueryDataset): AnalyticsSectionStatuses {
+  const available = new Set(dataset.availableSources);
+  const failed = new Set(dataset.failedSources);
+  const generalFamilies: readonly AnalyticsSourceFamily[] = ['leads', 'sales', 'contracts'];
+  const readyGeneralFamilies = generalFamilies.filter((family) =>
+    available.has(family) && !failed.has(family));
+
+  const geral: AnalyticsStatus = readyGeneralFamilies.length === 0
+    ? 'unavailable'
+    : readyGeneralFamilies.length < generalFamilies.length
+      ? 'partial'
+      : 'success';
+
+  return {
+    geral,
+    atendimento: familyStatus('attendance', available, failed),
+    cancelamentos: familyStatus('cancellations', available, failed),
+  };
+}
+
+function coversWindow(status: AnalyticsSyncStatusRecord, window: MetricWindow): boolean {
+  const periodStart = Date.parse(status.period_start);
+  const periodEnd = Date.parse(status.period_end);
+  if (Number.isNaN(periodStart) || Number.isNaN(periodEnd) || periodStart > periodEnd) return false;
+
+  const from = window.from ? Date.parse(window.from) : null;
+  const to = window.to ? Date.parse(window.to) : null;
+  if (from !== null && Number.isNaN(from)) return false;
+  if (to !== null && Number.isNaN(to)) return false;
+  return (from === null || periodStart <= from)
+    && (to === null || periodEnd >= to);
+}
+
+function latestStatusFor(
+  statuses: readonly AnalyticsSyncStatusRecord[],
+  source: AnalyticsSyncStatusRecord['source_system'],
+  window: MetricWindow,
+): AnalyticsSyncStatusRecord | null {
+  return statuses
+    .filter((status) => status.source_system === source && coversWindow(status, window))
+    .sort((left, right) => {
+      const leftSynced = Date.parse(left.synced_at ?? '');
+      const rightSynced = Date.parse(right.synced_at ?? '');
+      return (Number.isNaN(rightSynced) ? 0 : rightSynced)
+        - (Number.isNaN(leftSynced) ? 0 : leftSynced);
+    })[0] ?? null;
+}
+
+function applySourceReadiness(
+  dataset: AnalyticsQueryDataset,
+  window: MetricWindow,
+): AnalyticsQueryDataset {
+  const available = new Set(dataset.availableSources);
+  const failed = new Set(dataset.failedSources);
+  const sourceFamilies: Record<'opa' | 'ixc', readonly AnalyticsSourceFamily[]> = {
+    opa: ['attendance'],
+    // O workflow remoto atual alimenta somente cancelamentos. Vendas e
+    // contratos ficam indisponíveis até existir uma carga própria para cada
+    // família, evitando liberar zero como se fosse dado sincronizado.
+    ixc: ['cancellations'],
+  };
+
+  for (const family of ['sales', 'contracts'] as const) {
+    if (available.has(family)) {
+      available.delete(family);
+      failed.add(family);
+    }
+  }
+
+  for (const [source, families] of Object.entries(sourceFamilies) as Array<[
+    'opa' | 'ixc',
+    readonly AnalyticsSourceFamily[],
+  ]>) {
+    const status = latestStatusFor(dataset.syncStatuses, source, window);
+    for (const family of families) {
+      if (!available.has(family)) continue;
+      if (!status || status.status === 'failed' || status.status === 'unavailable') {
+        available.delete(family);
+        failed.add(family);
+      } else if (status.status === 'partial') {
+        failed.add(family);
+      }
+    }
+  }
+
+  return {
+    ...dataset,
+    availableSources: [...available],
+    failedSources: [...failed],
   };
 }
 
@@ -93,9 +228,10 @@ function buildOverview(
   dataset: AnalyticsQueryDataset,
 ): AnalyticsOverviewQueryResult {
   const availableCount = dataset.availableSources.length;
+  const sections = sectionStatuses(dataset);
   const status: AnalyticsStatus = availableCount === 0
     ? 'unavailable'
-    : dataset.failedSources.length > 0
+    : dataset.failedSources.length > 0 || availableCount < SOURCE_FAMILY_COUNT
       ? 'partial'
       : 'success';
 
@@ -105,18 +241,13 @@ function buildOverview(
       data: {
         geral: availableCount === 0
           ? emptyGeneral()
-          : summarizeGeneral({
-            leads: dataset.leads,
-            sales: dataset.sales,
-            contracts: dataset.contracts,
-            preContracts: dataset.preContracts,
-          }, window),
-        atendimento: availableCount === 0
-          ? emptyAttendance()
-          : summarizeAttendance(dataset.attendance, window),
-        cancelamentos: availableCount === 0
-          ? emptyCancellations()
-          : summarizeCancellations(dataset.cancellations, window),
+          : summarizeAvailableGeneral(dataset, window),
+        atendimento: sections.atendimento === 'success'
+          ? summarizeAttendance(dataset.attendance, window)
+          : emptyAttendance(),
+        cancelamentos: sections.cancelamentos === 'success'
+          ? summarizeCancellations(dataset.cancellations, window)
+          : emptyCancellations(),
       },
       meta: {
         from: window.from,
@@ -124,6 +255,7 @@ function buildOverview(
         lastUpdatedAt: dataset.lastUpdatedAt,
         status,
         coverage: availableCount / SOURCE_FAMILY_COUNT,
+        sections,
       },
     },
   };
@@ -235,9 +367,34 @@ function mapCancellationRows(rows: readonly unknown[]): IxcCancellationRecord[] 
       contract_source_id: stringOrNull(row.contract_source_id),
       motivo: stringOrNull(row.motivo),
       tipo,
-      data_referencia: stringOrNull(row.data_cancelamento),
+      data_referencia: normalizeSourceBusinessDate(row.data_cancelamento),
       source_updated_at: stringOrNull(row.source_updated_at),
     };
+  });
+}
+
+function mapSyncStatusRows(rows: readonly unknown[]): AnalyticsSyncStatusRecord[] {
+  return rows.flatMap((value) => {
+    const row = value as Record<string, unknown>;
+    const source = row.source_system === 'opa' || row.source_system === 'ixc'
+      ? row.source_system
+      : null;
+    const status: AnalyticsSyncStatus = row.status === 'success'
+      || row.status === 'partial'
+      || row.status === 'failed'
+      || row.status === 'unavailable'
+      ? row.status
+      : 'unavailable';
+    const periodStart = stringOrNull(row.period_start);
+    const periodEnd = stringOrNull(row.period_end);
+    if (!source || !periodStart || !periodEnd) return [];
+    return [{
+      source_system: source,
+      period_start: periodStart,
+      period_end: periodEnd,
+      status,
+      synced_at: stringOrNull(row.synced_at),
+    }];
   });
 }
 
@@ -260,8 +417,18 @@ async function loadDefaultDataset(window: MetricWindow): Promise<AnalyticsQueryD
     ),
   };
 
+  const syncStatusRequest = selectRows(
+    'analytics_sync_status',
+    'source_system,period_start,period_end,status,synced_at',
+    'synced_at',
+    { from: null, to: null, timezone: window.timezone },
+  );
+
   const entries = Object.entries(requests) as Array<[AnalyticsSourceFamily, Promise<unknown[]>]>;
-  const settled = await Promise.allSettled(entries.map(([, request]) => request));
+  const [settled, syncStatusSettled] = await Promise.all([
+    Promise.allSettled(entries.map(([, request]) => request)),
+    Promise.allSettled([syncStatusRequest]),
+  ]);
   const rowsBySource = new Map<AnalyticsSourceFamily, unknown[]>();
   const availableSources: AnalyticsSourceFamily[] = [];
   const failedSources: AnalyticsSourceFamily[] = [];
@@ -281,14 +448,20 @@ async function loadDefaultDataset(window: MetricWindow): Promise<AnalyticsQueryD
   const contractRows = rowsBySource.get('contracts') ?? [];
   const attendanceRows = rowsBySource.get('attendance') ?? [];
   const cancellationRows = rowsBySource.get('cancellations') ?? [];
+  const syncStatusRows = syncStatusSettled[0].status === 'fulfilled'
+    ? syncStatusSettled[0].value
+    : [];
+  const syncStatuses = mapSyncStatusRows(syncStatusRows);
   const updateValues = [
+    ...leadRows,
     ...salesRows,
     ...contractRows,
     ...attendanceRows,
     ...cancellationRows,
+    ...syncStatuses,
   ].flatMap((value) => {
     const row = value as Record<string, unknown>;
-    return [row.source_updated_at, row.synced_at];
+    return [row.source_updated_at, row.synced_at, row.created_at];
   });
 
   return {
@@ -302,6 +475,7 @@ async function loadDefaultDataset(window: MetricWindow): Promise<AnalyticsQueryD
     cancellations: mapCancellationRows(cancellationRows),
     availableSources,
     failedSources,
+    syncStatuses,
     lastUpdatedAt: latestTimestamp(updateValues),
   };
 }
@@ -346,7 +520,8 @@ export async function queryAnalyticsOverview(
   if (!executor) return unavailableOverview(window);
 
   try {
-    return buildOverview(window, await executor.load(window));
+    const dataset = await executor.load(window);
+    return buildOverview(window, applySourceReadiness(dataset, window));
   } catch {
     return unavailableOverview(window);
   }

@@ -13,29 +13,29 @@ export interface MetricWindow {
 }
 
 export interface AttendanceSummary {
-  total: number;
-  linked: number;
-  unlinked: number;
-  ambiguous: number;
-  notApplicable: number;
-  protocolConflicts: number;
+  total: number | null;
+  linked: number | null;
+  unlinked: number | null;
+  ambiguous: number | null;
+  notApplicable: number | null;
+  protocolConflicts: number | null;
   byChannel: Array<{ key: string; count: number }>;
   byStatus: Array<{ key: string; count: number }>;
 }
 
 export interface CancellationSummary {
-  total: number;
+  total: number | null;
   byReason: Array<{ key: string; count: number }>;
-  renewals: number;
-  upgrades: number;
-  downgrades: number;
+  renewals: number | null;
+  upgrades: number | null;
+  downgrades: number | null;
 }
 
 export interface GeneralSummary {
-  leads: number;
-  sales: number;
-  contracts: number;
-  preContracts: number;
+  leads: number | null;
+  sales: number | null;
+  contracts: number | null;
+  preContracts: number | null;
 }
 
 function normalizeAnalyticsTimestamp(value: string | null, timezone: MetricWindow['timezone']): string | null {
