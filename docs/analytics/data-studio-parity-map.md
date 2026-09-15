@@ -124,7 +124,7 @@ Os gates técnicos que estavam abertos foram fechados em uma rodada manual contr
 | Área | Estado atual | Limite que permanece |
 | --- | --- | --- |
 | `ATENDIMENTO` | Opa! paginado e persistido com `2.003` linhas na janela técnica, sem duplicidade observada; canais brutos disponíveis para o painel | o Data Studio mostrou `1.918` na janela explícita, portanto a diferença de `85` ainda não é paridade |
-| Vínculo no `ATENDIMENTO` | o painel não exibe zero quando a classificação está indisponível; a carga preserva `id_cliente` bruto quando recebido | falta comprovar a chave entre Opa! e IXC e carregar a dimensão de clientes do IXC |
+| Vínculo no `ATENDIMENTO` | o painel não exibe zero quando a classificação está indisponível; a carga preserva `id_cliente` bruto quando recebido; clientes e contratos IXC já foram carregados em workflows isolados | falta comprovar a chave entre Opa! e IXC e a regra temporal do vínculo |
 | `CANCELAMENTOS` | IXC persistido com `12` registros e janela final inclusiva correta | o total coincide com a leitura explícita, mas motivos e cartões de alteração ainda não têm regra fechada |
 | `GERAL` | métricas sem origem confirmada permanecem indisponíveis | leads, vendas e contratos exigem fontes e semântica próprias |
 | Aplicação | pagina a leitura da tabela analítica e diferencia `indisponível` de `zero` | o commit local ainda precisa ser promovido para a Vercel para alterar o domínio de produção |
@@ -132,3 +132,15 @@ Os gates técnicos que estavam abertos foram fechados em uma rodada manual contr
 ### Decisão de reconciliação
 
 Não ajustar os `2.003` para `1.918` por meio de um corte inventado, nem usar `id_cliente` bruto como vínculo confirmado. A origem correta para o próximo teste é repetir a extração Opa! com o mesmo campo temporal e limite efetivo do relatório, depois carregar clientes e contratos do IXC por uma rota autorizada e comparar chaves estáveis. Até isso acontecer, `ATENDIMENTO` permanece `partial` e os cartões de vínculo permanecem `unavailable`, enquanto o total e as dimensões efetivamente persistidos continuam utilizáveis.
+
+## Dimensões IXC carregadas e fluxo principal estabilizado em 15/09/2026
+
+A etapa de dimensão foi concluída em workflows separados para evitar que as respostas completas de clientes e contratos fossem mantidas simultaneamente na memória do n8n.
+
+| Carga | Evidência sanitizada | Limite de interpretação |
+| --- | --- | --- |
+| Clientes IXC | endpoint `cliente` informou `12.023`; workflow dimensional terminou com sucesso e persistiu a projeção normalizada e o bruto restrito | não contém, nesta etapa, uma regra que ligue automaticamente `id_cliente` do Opa! ao cliente |
+| Contratos IXC | endpoint `cliente_contrato` informou `12.287`; após reduzir o lote de 250 para 50 por `statement timeout`, o workflow terminou com `received: 12.287`, `inserted: 12.287` | `customer_source_id` foi preservado quando disponível, mas a correspondência com o Opa! ainda não foi demonstrada |
+| Fluxo Opa! e cancelamentos | workflow principal leve terminou com sucesso; Opa! `2.003` registros, cancelamentos IXC `12`, persistência concluída | a dimensão de clientes e contratos não é recarregada nessa execução |
+
+O estado técnico agora permite consultar as dimensões no banco sem misturá-las à extração de atendimento. Isso fecha a carga de fonte, mas não fecha a paridade de negócio: `ATENDIMENTO` continua `partial` contra o `1.918` do Data Studio e os cartões `Vinculados`, `Não vinculados`, `Ambíguos` e `Conflitos` continuam `unavailable` até a chave, a janela e a regra de classificação serem comprovadas. Os workflows permanecem manuais, sem agenda e sem publicação. A aplicação local corrigida ainda depende da promoção na Vercel para alterar o domínio de produção.

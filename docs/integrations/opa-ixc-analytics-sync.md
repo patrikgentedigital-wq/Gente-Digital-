@@ -353,6 +353,16 @@ Essa rodada corrige a perda de páginas, o limite temporal persistido e a aprese
 - `Condicionado`: a chave legada de serviço do projeto Supabase ainda precisa ser inventariada e rotacionada separadamente. Ela não foi usada no novo node do piloto e nenhum valor de segredo deve entrar neste documento.
 - `Bloqueado`: a diferença observada de `85` registros entre a leitura paginada Opa! (`2.003`) e o Data Studio (`1.918`) continua sem causa comprovada. Isso impede declarar paridade de `ATENDIMENTO`, mesmo que a infraestrutura de persistência esteja pronta para o teste controlado.
 
+## Carga isolada das dimensões IXC em 15/09/2026
+
+As dimensões de clientes e contratos foram retiradas do workflow principal porque manter as duas respostas completas na mesma execução provocou esgotamento de memória no n8n. Elas passaram a ser carregadas por workflows manuais separados, com a mesma credencial IXC e persistência em lotes:
+
+- `ANALYTICS - IXC Clientes dimensão` (`YtN1uxlvx0VKKkvE`): leitura confirmada com `total: 12.023`; a execução terminou como `Succeeded` e persistiu 12.023 clientes normalizados e seus registros brutos restritos.
+- `ANALYTICS - IXC Contratos dimensão` (`MiRLaMPLm8zVy3JX`): leitura confirmada com `total: 12.287`; a primeira persistência com lotes de 250 encontrou `statement timeout` no Supabase. O lote foi reduzido para 50 e a nova execução terminou como `Succeeded`, com `received: 12.287`, `inserted: 12.287` e 493 operações de upsert concluídas.
+- `ANALYTICS - Sincronização OPA e IXC` (`dqgBnd1OOci0T8A4`): os nós de dimensão foram removidos do encadeamento. A nova execução leve terminou como `Succeeded` em 16,438 s, com Opa! `received: 2.003`, IXC cancelamentos `received: 12` e upsert concluído.
+
+Os três workflows continuam manuais, sem agenda e sem publicação. As tabelas normalizadas de clientes e contratos guardam somente os campos mínimos previstos no contrato analítico; o payload bruto fica restrito à camada `integration`. A presença das dimensões não comprova, por si só, que o identificador bruto do Opa! corresponde a um cliente ou contrato específico do IXC. Os cartões de vínculo continuam indisponíveis até essa chave ser validada.
+
 ## Limites e não objetivos
 
 - Não editar workflows transacionais ou subworkflows existentes.
