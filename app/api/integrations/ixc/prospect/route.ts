@@ -39,16 +39,14 @@ export async function POST(req: NextRequest) {
       nome: name,
       razao: name,
       fone_celular: phone,
-      id_filial: '1',
+      id_filial: 1,
       data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
-      id_candidato_tipo: '22',
-      id_candato_tipo: '22',
-      id_canal_origem: '22',
-      id_canal_venda: '22',
-      canal_venda: '22',
+      id_candidato_tipo: 22,
+      id_canal_origem: 22,
+      id_canal_venda: 22,
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
 
