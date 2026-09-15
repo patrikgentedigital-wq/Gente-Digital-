@@ -17,10 +17,9 @@ export const PROGRAM_RULES = {
   },
   prazoPagamento: 'em até 7 dias úteis após a instalação do cliente',
   cookieDuracaoDias: 30,
-  // TODO(config): o link base real deve ser configurado no painel admin
-  // (settings -> base_link). O default é vazio para não apontar para um
-  // formulário externo hardcoded no código.
-  linkBasePadrao: '',
+  // Link base do programa: o Microsoft Forms que coleta a indicação.
+  // Pode ser sobrescrito no painel admin (settings -> base_link).
+  linkBasePadrao: 'https://forms.cloud.microsoft/r/xwCZ3REw80',
 } as const;
 
 export const RULES_COPY = {

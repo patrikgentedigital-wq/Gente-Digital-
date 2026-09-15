@@ -174,15 +174,12 @@ export function ColaboradoresView() {
       const res = await fetch('/api/settings/base-link');
       if (res.ok) {
         const data = await res.json();
-        const isFormsDefault = !!data?.base_link?.includes('forms.cloud.microsoft');
-        if (!data?.base_link || isFormsDefault) {
-          // Link não configurado (vazio ou herdado do default do Forms):
-          // usa a landing local /indicar como base dos links/QR.
-          if (typeof window !== 'undefined') {
-            setBaseLink(`${window.location.origin}/indicar`);
-          }
+        // base_link configurado no painel tem prioridade; sem configuração,
+        // usa o link base do Microsoft Forms (PROGRAM_RULES.linkBasePadrao).
+        if (data?.base_link && typeof data.base_link === 'string' && data.base_link.trim()) {
+          setBaseLink(data.base_link.trim());
         } else {
-          setBaseLink(data.base_link);
+          setBaseLink(PROGRAM_RULES.linkBasePadrao);
         }
       }
     } catch (err) {
