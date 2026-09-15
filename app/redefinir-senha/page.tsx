@@ -17,13 +17,13 @@ export default function RedefinirSenhaPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.replace('/login');
-      } else {
-        setChecking(false);
-      }
-    });
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        // Sem sessão válida: trata como não-logado e exibe o formulário
+        if (!user) setChecking(false);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {

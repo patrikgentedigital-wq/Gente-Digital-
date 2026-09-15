@@ -42,6 +42,7 @@ export function VendasRastreamentoView() {
   const [leadHistories, setLeadHistories] = useState<Record<number, LeadHistory[]>>({});
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [clicks, setClicks] = useState<Record<string, number>>({});
+  const [clicksDaily, setClicksDaily] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Filtros
@@ -55,6 +56,7 @@ export function VendasRastreamentoView() {
 
   const fetchData = useCallback(async () => {
     try {
+      setIsLoading(true);
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
       const historyMap: Record<number, LeadHistory[]> = {};
@@ -114,6 +116,9 @@ export function VendasRastreamentoView() {
               map[normalizeStr(c.ref)] = (map[normalizeStr(c.ref)] || 0) + c.count;
             });
             setClicks(map);
+          }
+          if (cData.success && cData.clicksDaily && typeof cData.clicksDaily === 'object') {
+            setClicksDaily(cData.clicksDaily as Record<string, number>);
           }
         }
       } catch (e) {
@@ -230,9 +235,19 @@ export function VendasRastreamentoView() {
     return Math.round((leadsErrados.length / filteredLeads.length) * 100);
   }, [filteredLeads.length, leadsErrados.length]);
 
+  // Cliques do período: a API expõe a agregação diária (clicksDaily),
+  // então o mesmo matchesDateFilter aplicado às vendas é usado aqui
   const totalCliquesPeriodo = useMemo(() => {
+    const hasDaily = Object.keys(clicksDaily).length > 0;
+    if (hasDaily) {
+      return Object.entries(clicksDaily).reduce((acc, [day, count]) => {
+        return matchesDateFilter(day, dateFilter) ? acc + count : acc;
+      }, 0);
+    }
+    // Fallback: se a API não devolveu a agregação diária (deploy antigo/erro),
+    // usa o total sem filtro para não exibir conversão zerada
     return Object.values(clicks).reduce((acc, val) => acc + val, 0);
-  }, [clicks]);
+  }, [clicks, clicksDaily, dateFilter]);
 
   const taxaConversaoCliquesParaVendas = useMemo(() => {
     if (totalCliquesPeriodo === 0) return 0;

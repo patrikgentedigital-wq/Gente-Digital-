@@ -9,6 +9,11 @@ const ProspectSchema = z.object({
   ref: z.string().trim().max(100).optional(),
 });
 
+// Remove não-dígitos antes de enviar ao IXC como fone_celular
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const isAuthenticated = await verifyAuthAny(req);
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       nome: name,
       razao: name,
-      fone_celular: phone,
+      fone_celular: normalizePhone(phone),
       id_filial: 1,
       data_cadastro: formatIxcDate(),
       lead: 'S',

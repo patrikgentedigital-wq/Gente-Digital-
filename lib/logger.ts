@@ -44,9 +44,16 @@ class StructuredLogger {
 
     if (typeof err === 'object') {
       const errObj = err as any;
+      // JSON.stringify pode lançar (referências circulares, BigInt) — proteger com fallback
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(err);
+      } catch {
+        serialized = '[objeto não serializável]';
+      }
       return {
         name: errObj.name || 'CustomObjectError',
-        message: errObj.message || JSON.stringify(err),
+        message: errObj.message || serialized || String(err),
         stack: errObj.stack || new Error().stack || 'No stack trace available',
       };
     }

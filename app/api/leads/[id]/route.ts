@@ -13,10 +13,28 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const leadId = parseInt(id, 10);
+    const idNum = Number(id);
 
-    if (isNaN(leadId)) {
+    if (!Number.isInteger(idNum) || idNum <= 0) {
       return NextResponse.json({ success: false, error: 'ID de lead inválido.' }, { status: 400 });
+    }
+
+    const leadId = idNum;
+
+    // 0. Confere se o lead existe antes de apagar qualquer coisa
+    const { data: existingLead, error: findError } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error(`Erro ao buscar lead ${leadId} antes da exclusão:`, findError.message);
+      return NextResponse.json({ success: false, error: 'Erro ao localizar o lead antes da exclusão.' }, { status: 500 });
+    }
+
+    if (!existingLead) {
+      return NextResponse.json({ success: false, error: 'Lead não encontrado.' }, { status: 404 });
     }
 
     // 1. Apaga o histórico vinculado ao lead
@@ -37,7 +55,7 @@ export async function DELETE(
 
     if (leadError) {
       console.error(`Erro ao apagar lead ${leadId}:`, leadError.message);
-      return NextResponse.json({ success: false, error: leadError.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: `Não foi possível excluir o lead: ${leadError.message}` }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: `Lead ${leadId} excluído com sucesso.` });

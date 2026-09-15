@@ -15,14 +15,22 @@ interface CacheEntry<T> {
 class TrackedCacheClient {
   private store = new Map<string, CacheEntry<any>>();
   private sweepThreshold = 100;
+  private maxSize = 100;
 
-  // Remove entradas expiradas quando o store cresce demais
+  // Remove entradas expiradas e, se ainda exceder o limite, as mais antigas
+  // (sem TTL) usando a ordem de inserção do Map — evita memory leak.
   private sweepExpired() {
     const now = Date.now();
     for (const [key, entry] of this.store) {
       if (entry.expiresAt !== null && entry.expiresAt <= now) {
         this.store.delete(key);
       }
+    }
+    // Excedeu mesmo após o sweep: remove as entradas mais antigas primeiro (first keys first)
+    while (this.store.size > this.maxSize) {
+      const oldestKey = this.store.keys().next().value as string | undefined;
+      if (oldestKey === undefined) break;
+      this.store.delete(oldestKey);
     }
   }
 
@@ -62,11 +70,24 @@ class TrackedCacheClient {
   }
 
   /**
-   * Armazena um valor no cache com TTL opcional em segundos
+   * Armazena um valor no cache com TTL opcional em segundos.
+   * ttlSeconds === 0 significa "não cachear" (não grava no Map).
    */
   public async set<T>(key: string, value: T, ttlSeconds?: number, requestId?: string): Promise<void> {
     const startTime = performance.now();
-    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
+
+    // TTL 0 (ou negativo) desativa o cache desta chamada
+    if (ttlSeconds != null && ttlSeconds <= 0) {
+      logger.info(`[CACHE SKIP] Chave '${key}' não armazenada (TTL 0 desativa o cache)`, {
+        event: 'CACHE_SKIP',
+        key,
+        ttlSeconds,
+        durationMs: Number((performance.now() - startTime).toFixed(2)),
+      }, requestId);
+      return;
+    }
+
+    const expiresAt = ttlSeconds != null && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null;
 
     this.store.set(key, { value, expiresAt });
     if (this.store.size > this.sweepThreshold) {

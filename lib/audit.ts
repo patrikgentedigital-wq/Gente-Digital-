@@ -1,6 +1,3 @@
-import { supabase } from './supabase';
-import { supabaseAdmin } from './supabase-admin';
-
 export interface AuditLog {
   id?: number | string;
   action: string;
@@ -9,33 +6,35 @@ export interface AuditLog {
   created_at?: string;
 }
 
+/**
+ * Registra evento de auditoria de forma segura para uso em cliente e servidor.
+ * O insert no banco é feito via endpoint server-side /api/audit para que este
+ * módulo NUNCA importe supabase-admin no bundle do cliente.
+ * Mantém fallback em localStorage para resposta instantânea na UI.
+ */
 export async function logAuditEvent(action: string, details: string, user_email = 'Admin') {
   try {
-    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-    const isConfigured = !!rawUrl && !rawUrl.includes('placeholder');
+    const endpoint = '/api/audit';
+    let delivered = false;
 
-    if (isConfigured) {
-      try {
-        const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
-        const { error } = await client.from('audit_logs').insert([{
-          action,
-          details,
-          user_email,
-          created_at: new Date().toISOString()
-        }]);
-        if (error) {
-          console.warn('Supabase audit insert warning (usando fallback local):', error.message);
-        }
-      } catch (e: any) {
-        console.warn('Falha na requisição de auditoria para o Supabase (usando fallback local):', e?.message || e);
-      }
+    // 1. Enviar para o endpoint server-side (keepalive para tentar concluir mesmo no unload da página)
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, details, user_email }),
+        keepalive: true,
+      });
+      delivered = res.ok || res.status === 204;
+    } catch (e: any) {
+      console.warn('Falha ao enviar auditoria para /api/audit (usando fallback local):', e?.message || e);
     }
 
-    // Save to local storage as fallback for instant UI response
-    if (typeof window !== 'undefined') {
+    // Fallback: se o endpoint falhou, grava localmente para posterior sincronização
+    if (!delivered && typeof window !== 'undefined') {
       const existingLogsRaw = localStorage.getItem('gente_digital_audit_logs');
       const existingLogs: AuditLog[] = existingLogsRaw ? JSON.parse(existingLogsRaw) : [];
-      
+
       const newLog: AuditLog = {
         id: Date.now(),
         action,

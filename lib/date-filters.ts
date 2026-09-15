@@ -21,6 +21,23 @@ export const MONTH_NAMES_BR = [
 ];
 
 /**
+ * Converte strings ISO date-only (YYYY-MM-DD) como data LOCAL em vez de UTC.
+ * new Date('2026-09-05') é interpretado como UTC e pode cair no dia anterior
+ * em fusos negativos (ex: America/Sao_Paulo). Aqui extraímos os componentes
+ * e construímos a data no fuso local do runtime.
+ */
+export function parseAsLocalDate(iso: string): Date {
+  const dateOnlyMatch = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const year = parseInt(dateOnlyMatch[1], 10);
+    const month = parseInt(dateOnlyMatch[2], 10) - 1; // 0-indexed
+    const day = parseInt(dateOnlyMatch[3], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(iso);
+}
+
+/**
  * Converte de forma resiliente qualquer formato de data (ISO 8601, pt-BR DD/MM/YYYY, timestamp ou Date)
  * para um objeto Date válido. Retorna null se a data for inválida ou inexistente.
  */
@@ -49,7 +66,8 @@ export function parseFlexibleDate(dateInput?: string | number | Date | null): Da
   }
 
   // Formato ISO (ex: "2026-09-05T12:00:00Z", "2025-02-15 14:30:00+00", "2026-09-05")
-  const isoDate = new Date(str);
+  // Date-only é parseado como data local para não deslocar o dia por fuso horário
+  const isoDate = parseAsLocalDate(str);
   if (!isNaN(isoDate.getTime())) return isoDate;
 
   return null;

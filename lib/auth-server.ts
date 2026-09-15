@@ -2,15 +2,38 @@ import { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+// Cache em memória de userIds já sincronizados em user_roles (TTL de 5 minutos)
+// para evitar upsert redundante a cada consulta de role do mesmo usuário.
+const roleSyncCache = new Map<string, number>();
+const ROLE_SYNC_TTL_MS = 5 * 60 * 1000;
+
+function shouldSyncUserRole(userId: string): boolean {
+  const now = Date.now();
+  const lastSync = roleSyncCache.get(userId);
+  if (lastSync && now - lastSync < ROLE_SYNC_TTL_MS) {
+    return false;
+  }
+  // Limpeza oportunista de entradas expiradas
+  if (roleSyncCache.size > 100) {
+    for (const [id, ts] of roleSyncCache) {
+      if (now - ts >= ROLE_SYNC_TTL_MS) roleSyncCache.delete(id);
+    }
+  }
+  return true;
+}
+
 function createSupabaseServerClient(req: NextRequest) {
   const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
   const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     ? rawUrl.replace(/\/+$/, '')
     : 'https://placeholder.supabase.co';
-  const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+  // Fallback para evitar crash do createServerClient com key vazia (o cliente não fará auth real)
+  const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim() || 'placeholder_key';
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() { return req.cookies.getAll(); },
+      // setAll vazio de propósito: em Route Handlers a renovação dos cookies de sessão
+      // acontece no middleware (padrão recomendado pelo @supabase/ssr).
       setAll() {},
     },
   });
@@ -27,12 +50,13 @@ export async function getAuthenticatedUser(req: NextRequest) {
     : '';
 
   if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('ALERTA DE SEGURANÇA: NEXT_PUBLIC_SUPABASE_URL ausente em produção.');
-      return null;
+    // Admin implícito em dev APENAS se não estivermos em produção e a URL do Supabase estiver ausente
+    if (process.env.NODE_ENV !== 'production' && !rawUrl) {
+      // Dev local sem Supabase: simula usuário admin
+      return { id: 'dev-local', email: 'dev@local' };
     }
-    // Dev local sem Supabase: simula usuário admin
-    return { id: 'dev-local', email: 'dev@local' };
+    console.error('ALERTA DE SEGURANÇA: NEXT_PUBLIC_SUPABASE_URL ausente ou placeholder.');
+    return null;
   }
 
   const client = createSupabaseServerClient(req);
@@ -73,10 +97,15 @@ export async function getUserRole(
   if (emailLower && allAdminEmails.includes(emailLower)) {
     // Sincronizar na tabela user_roles e nos metadados do Supabase Auth para que as policies RLS (public.is_admin) funcionem no banco de dados
     try {
-      if (userId && userId !== 'dev-local') {
-        await supabaseAdmin
+      if (userId && userId !== 'dev-local' && shouldSyncUserRole(userId)) {
+        const { error: upsertError } = await supabaseAdmin
           .from('user_roles')
           .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id' });
+        if (upsertError) {
+          console.warn('Falha ao sincronizar user_roles para admin:', upsertError.message || upsertError);
+        } else {
+          roleSyncCache.set(userId, Date.now());
+        }
       }
     } catch (err) {
       console.warn('Erro ao sincronizar user_roles para admin:', err);
@@ -109,7 +138,8 @@ export async function getUserRole(
     try {
       const orParts: string[] = [];
       if (userId) orParts.push(`user_id.eq.${userId}`);
-      if (emailLower) orParts.push(`email.ilike."${emailLower.replace(/"/g, '""')}"`);
+      // eq em vez de ilike: o ilike trataria '_' como curinga (falso positivo em e-mails)
+      if (emailLower) orParts.push(`email.eq."${emailLower.replace(/"/g, '""')}"`);
 
       const { data: colab } = await supabaseAdmin
         .from('colaboradores')

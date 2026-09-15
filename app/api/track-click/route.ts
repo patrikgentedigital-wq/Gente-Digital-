@@ -78,6 +78,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, tracked: false });
     }
 
+    // Valida que a ref corresponde a um colaborador existente para não inflar métricas
+    // com refs arbitrárias enviadas por terceiros
+    const { data: colabByRef, error: colabRefError } = await supabase
+      .from('colaboradores')
+      .select('id')
+      .eq('id', ref)
+      .limit(1);
+
+    let refExists = !!colabByRef && colabByRef.length > 0;
+
+    if (colabRefError) {
+      console.warn('Erro ao validar ref de colaborador no track-click:', colabRefError.message);
+    } else if (!refExists) {
+      // Fallback: alguns fluxos (ex.: MS Forms) enviam o nome do colaborador como ref
+      const { data: colabByName, error: colabNameError } = await supabase
+        .from('colaboradores')
+        .select('id')
+        .eq('name', ref)
+        .limit(1);
+
+      if (colabNameError) {
+        console.warn('Erro ao validar ref por nome no track-click:', colabNameError.message);
+      } else {
+        refExists = !!colabByName && colabByName.length > 0;
+      }
+    }
+
+    if (!refExists) {
+      return NextResponse.json({ success: false, reason: 'ref_invalida' }, { status: 200 });
+    }
+
     const { error } = await supabase
       .from('link_clicks')
       .insert({ ref, created_at: new Date().toISOString() });
@@ -108,40 +139,53 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, clicks: [] });
     }
 
-    const cachedClicks = await cacheClient.get<{ ref: string; count: number }[]>('link_clicks_summary');
-    if (cachedClicks) {
+    const cached = await cacheClient.get<{ clicks: { ref: string; count: number }[]; clicksDaily: Record<string, number> }>('link_clicks_summary');
+    if (cached) {
       const monthCounts = await getMonthClickCounts();
-      return NextResponse.json({ success: true, clicks: cachedClicks, cached: true, ...monthCounts });
+      return NextResponse.json({ success: true, clicks: cached.clicks, clicksDaily: cached.clicksDaily, cached: true, ...monthCounts });
     }
 
     // Limita a contagem a uma janela temporal recente (últimos 90 dias) e teto seguro
     // para prevenir consumo excessivo de memória em bases de cliques volumosas
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+    const MAX_CLICKS = 50000;
     const { data, error } = await supabase
       .from('link_clicks')
-      .select('ref')
+      .select('ref, created_at')
       .gte('created_at', ninetyDaysAgo)
-      .limit(20000);
+      .limit(MAX_CLICKS);
 
     if (error) {
       console.error('Erro ao buscar cliques:', error.message);
       return NextResponse.json({ success: false, error: 'Erro ao buscar cliques.' }, { status: 500 });
     }
 
+    if ((data || []).length >= MAX_CLICKS) {
+      console.warn(`Limite de ${MAX_CLICKS} cliques atingido na consulta de resumo; a contagem pode estar subestimada.`);
+    }
+
     const clickCounts: Record<string, number> = {};
+    // Agregação diária (data local do clique) para permitir filtros de período no frontend
+    const clicksDaily: Record<string, number> = {};
     (data || []).forEach(row => {
       if (!row.ref) return;
       clickCounts[row.ref] = (clickCounts[row.ref] || 0) + 1;
+      if (row.created_at) {
+        const d = new Date(row.created_at);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const localDay = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        clicksDaily[localDay] = (clicksDaily[localDay] || 0) + 1;
+      }
     });
 
     const clicks = Object.entries(clickCounts).map(([ref, count]) => ({ ref, count }));
-    
+
     // Cache por 30 segundos
-    await cacheClient.set('link_clicks_summary', clicks, 30);
+    await cacheClient.set('link_clicks_summary', { clicks, clicksDaily }, 30);
 
     const monthCounts = await getMonthClickCounts();
 
-    return NextResponse.json({ success: true, clicks, ...monthCounts });
+    return NextResponse.json({ success: true, clicks, clicksDaily, ...monthCounts });
   } catch (err: any) {
     console.error('Exceção ao buscar cliques:', err);
     return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 });

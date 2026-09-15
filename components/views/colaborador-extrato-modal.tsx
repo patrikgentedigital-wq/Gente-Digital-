@@ -56,13 +56,78 @@ export function ColaboradorExtratoModal({
   const emAndamento = filteredLeads.filter(l => ['Pendente', 'Contato inicial', 'Em negociação'].includes(l.status)).length;
   const erros = filteredLeads.filter(l => l.status === 'Errado').length;
 
-  // Cálculo de comissão
-  const taxaPorVenda = vendasGanhas >= PROGRAM_RULES.colaborador.volumeThreshold
-    ? PROGRAM_RULES.colaborador.taxaVolume
-    : PROGRAM_RULES.colaborador.taxaPorVenda;
+  // Contagem de indicações por mês (QUALQUER status) — mesma base de regra da taxa usada em comissoes.tsx
+  const monthlyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    colabLeads.forEach(lead => {
+      const d = lead.created_at ? new Date(lead.created_at) : new Date();
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [colabLeads]);
 
-  const totalComissao = vendasGanhas * taxaPorVenda;
-  const atingiuMetaBonus = vendasGanhas >= PROGRAM_RULES.bonusTop.minimoIndicacoes;
+  // Taxa por venda derivada do volume de indicações no mês de criação de cada lead
+  const taxaParaLead = (createdAt?: string) => {
+    const d = createdAt ? new Date(createdAt) : new Date();
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const monthCount = monthlyCounts[key] || 1;
+    return monthCount >= PROGRAM_RULES.colaborador.volumeThreshold
+      ? PROGRAM_RULES.colaborador.taxaVolume
+      : PROGRAM_RULES.colaborador.taxaPorVenda;
+  };
+
+  // Taxas distintas aplicadas às vendas ganhas do período (podem variar por mês)
+  const taxasAplicadas = useMemo(() => {
+    return Array.from(new Set(
+      filteredLeads
+        .filter(l => l.status === 'Ganho')
+        .map(l => taxaParaLead(l.created_at))
+    ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredLeads, monthlyCounts]);
+  const taxaPorVenda = taxasAplicadas.length === 1 ? taxasAplicadas[0] : Math.min(...(taxasAplicadas.length > 0 ? taxasAplicadas : [PROGRAM_RULES.colaborador.taxaPorVenda]));
+
+  const totalComissao = filteredLeads
+    .filter(l => l.status === 'Ganho')
+    .reduce((acc, l) => acc + taxaParaLead(l.created_at), 0);
+
+  // O bônus é EXCLUSIVO do top indicador do mês (mesma lógica de comissoes.tsx).
+  // Derivamos daqui quem é o top do mês atual a partir de allLeads.
+  const isTopColaboradorDoMes = useMemo(() => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${now.getMonth()}`;
+    const countsByRef: Record<string, number> = {};
+    allLeads.forEach(lead => {
+      if (lead.status !== 'Ganho') return;
+      const d = lead.created_at ? new Date(lead.created_at) : new Date();
+      const mk = `${d.getFullYear()}-${d.getMonth()}`;
+      if (mk !== currentKey) return;
+      const refNorm = normalizeStr(lead.ref);
+      if (!refNorm || refNorm === 'organico' || refNorm === 'manual' || refNorm === 'nao especificado') return;
+      countsByRef[refNorm] = (countsByRef[refNorm] || 0) + 1;
+    });
+    const ownCount = (countsByRef[colabIdNorm] || 0) + (countsByRef[colabNameNorm] || 0);
+    if (ownCount === 0) return false;
+    const maxOthers = Object.entries(countsByRef).reduce((max, [ref, count]) => {
+      if (ref === colabIdNorm || ref === colabNameNorm) return max;
+      return Math.max(max, count);
+    }, 0);
+    return ownCount >= maxOthers;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allLeads, colabIdNorm, colabNameNorm]);
+
+  // Vendas ganhas deste colaborador no mês corrente (base do bônus Top)
+  const vendasGanhasMesAtual = useMemo(() => {
+    const now = new Date();
+    return colabLeads.filter(lead => {
+      if (lead.status !== 'Ganho') return false;
+      const d = lead.created_at ? new Date(lead.created_at) : new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+  }, [colabLeads]);
+
+  const atingiuMetaBonus = isTopColaboradorDoMes && vendasGanhasMesAtual >= PROGRAM_RULES.bonusTop.minimoIndicacoes;
 
   const handleExportCSV = () => {
     const headers = [
@@ -86,7 +151,7 @@ export function ColaboradorExtratoModal({
       sanitizeCsvField(l.value || 0),
       sanitizeCsvField(l.source || 'link_indicacao'),
       sanitizeCsvField(l.loss_reason || '-'),
-      sanitizeCsvField(l.status === 'Ganho' ? taxaPorVenda : 0)
+      sanitizeCsvField(l.status === 'Ganho' ? taxaParaLead(l.created_at) : 0)
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -196,7 +261,11 @@ export function ColaboradorExtratoModal({
               R$ {taxaPorVenda},00
             </span>
             <span className="text-[10px] text-zinc-400">
-              {vendasGanhas >= PROGRAM_RULES.colaborador.volumeThreshold ? 'Volume (10+ vendas)' : 'Padrão (1 a 9 vendas)'}
+              {taxasAplicadas.length > 1
+                ? 'Variável por mês de indicação'
+                : taxaPorVenda >= PROGRAM_RULES.colaborador.taxaVolume
+                ? `Volume (${PROGRAM_RULES.colaborador.volumeThreshold}+ indicações no mês)`
+                : 'Padrão (1 a 9 indicações no mês)'}
             </span>
           </div>
 
@@ -206,7 +275,9 @@ export function ColaboradorExtratoModal({
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalComissao)}
             </span>
             <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80">
-              {atingiuMetaBonus ? '🎉 Bônus Top Liberado!' : `Faltam ${Math.max(0, PROGRAM_RULES.bonusTop.minimoIndicacoes - vendasGanhas)} p/ bônus`}
+              {atingiuMetaBonus
+                ? '🎉 Bônus Top Liberado!'
+                : 'Bônus Top: concorra sendo o top indicador do mês'}
             </span>
           </div>
         </div>
@@ -286,7 +357,7 @@ export function ColaboradorExtratoModal({
                       <td className="px-4 py-3 text-right whitespace-nowrap font-bold">
                         {lead.status === 'Ganho' ? (
                           <span className="text-emerald-600 dark:text-emerald-400">
-                            R$ {taxaPorVenda},00
+                            R$ {taxaParaLead(lead.created_at)},00
                           </span>
                         ) : (
                           <span className="text-zinc-400 text-[11px] font-normal">Pendente venda</span>

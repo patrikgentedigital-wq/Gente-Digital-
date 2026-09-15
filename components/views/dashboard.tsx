@@ -44,7 +44,11 @@ export function DashboardView() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setIsLoading(true);
+        // Só ativa o spinner no primeiro carregamento (sem dados); refetches
+        // realtime mantêm os dados atuais na tela, evitando flash de loading.
+        if (leads.length === 0 && colaboradores.length === 0) {
+          setIsLoading(true);
+        }
         let leadsData: Lead[] = [];
         let colabsData: Colaborador[] = [];
         const clicksMap: Record<string, number> = {};

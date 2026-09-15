@@ -54,28 +54,37 @@ async function sendToIxc(leadId: number, name: string, phone: string, ref: strin
     if (ixcResponse.ok) {
       const ixcData = await ixcResponse.json();
       if (ixcData.type !== 'error') {
-        await supabase.from('lead_history').insert([{
+        const { error: historyOkError } = await supabase.from('lead_history').insert([{
           lead_id: leadId,
           date: nowStr,
           action: 'Sincronizado com IXC',
           note: `Prospect criado automaticamente no IXC com o ID: ${ixcData.id}`,
         }]);
+        if (historyOkError) {
+          console.warn('Falha ao registrar histórico de sincronização IXC (ok):', historyOkError.message);
+        }
       } else {
-        await supabase.from('lead_history').insert([{
+        const { error: historyIxcError } = await supabase.from('lead_history').insert([{
           lead_id: leadId,
           date: nowStr,
           action: 'Falha na Sincronização IXC',
           note: `Erro retornado pelo IXC: ${ixcData.message}`,
         }]);
+        if (historyIxcError) {
+          console.warn('Falha ao registrar histórico de erro do IXC:', historyIxcError.message);
+        }
       }
     } else {
       const errorText = await ixcResponse.text().catch(() => '');
-      await supabase.from('lead_history').insert([{
+      const { error: historyHttpError } = await supabase.from('lead_history').insert([{
         lead_id: leadId,
         date: nowStr,
         action: 'Falha na Sincronização IXC',
         note: `Servidor IXC respondeu com código ${ixcResponse.status}: ${errorText.slice(0, 200)}`,
       }]);
+      if (historyHttpError) {
+        console.warn('Falha ao registrar histórico de falha HTTP do IXC:', historyHttpError.message);
+      }
     }
   } catch (err: any) {
     console.error('Erro ao enviar prospect ao IXC (landing):', err.message || err);
@@ -122,6 +131,20 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'O cadastro está temporariamente indisponível.' },
         { status: 503 },
       );
+    }
+
+    // Verifica se o ref corresponde a um colaborador existente (apenas diagnóstico:
+    // a indicação é aceita de qualquer forma e o ref é gravado como veio)
+    const { data: colabByRef, error: colabRefError } = await supabase
+      .from('colaboradores')
+      .select('id, name')
+      .eq('name', ref)
+      .limit(1);
+
+    if (colabRefError) {
+      console.warn('Erro ao validar ref de colaborador na indicação:', colabRefError.message);
+    } else if (!colabByRef || colabByRef.length === 0) {
+      console.warn(`Indicação aceita com ref sem colaborador correspondente: "${ref}" (gravada como recebida).`);
     }
 
     // Evita duplicar o mesmo contato e preserva a primeira atribuição recebida.
@@ -180,8 +203,12 @@ export async function POST(req: NextRequest) {
       console.warn('Lead criado, mas o histórico não foi registrado:', historyError.message);
     }
 
-    // Enviar prospect ao IXC em background (não bloqueia a resposta ao usuário)
-    sendToIxc(lead.id, parsed.data.name, phone, ref).catch(() => {});
+    // Envia prospect ao IXC: aguarda até 8s para dar chance de executar em ambientes
+    // serverless, sem travar a resposta se o IXC estiver lento
+    await Promise.race([
+      sendToIxc(lead.id, parsed.data.name, phone, ref),
+      new Promise<void>(resolve => setTimeout(resolve, 8000)),
+    ]).catch(() => {});
 
     return NextResponse.json({ success: true, duplicate: false, leadId: lead.id }, { status: 201 });
   } catch (error) {

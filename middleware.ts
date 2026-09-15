@@ -30,8 +30,9 @@ export async function middleware(request: NextRequest) {
   const isPasswordResetRoute = request.nextUrl.pathname.startsWith('/redefinir-senha')
   const isAuthRoute = isLoginRoute || isPasswordResetRoute
   const isPublicLanding = request.nextUrl.pathname.startsWith('/indicar')
-  const isPublicApi = 
-    request.nextUrl.pathname.startsWith('/api/referrals') ||
+  const isPublicApi =
+    (request.nextUrl.pathname.startsWith('/api/referrals') &&
+      ['GET', 'POST'].includes(request.method)) ||
     request.nextUrl.pathname.startsWith('/api/track-click') ||
     (request.nextUrl.pathname === '/api/settings/base-link' && request.method === 'GET')
   const isWebhookRoute = 
@@ -48,6 +49,17 @@ export async function middleware(request: NextRequest) {
   if (isMutation && request.nextUrl.pathname.startsWith('/api') && !isWebhookRoute) {
     const origin = request.headers.get('origin');
     const host = request.headers.get('host');
+    // Cookies de sessão do Supabase (sb-*): se presentes, o request carrega
+    // credenciais e exigimos Origin válido (presente e igual ao host).
+    const hasSessionCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
+    if (!origin && hasSessionCookie) {
+      const forbiddenRes = NextResponse.json(
+        { error: 'Acesso negado: Origem ausente (CSRF Protection).' },
+        { status: 403 }
+      );
+      forbiddenRes.headers.set('x-request-id', requestId);
+      return forbiddenRes;
+    }
     if (origin && host) {
       try {
         const originHost = new URL(origin).host;
@@ -115,7 +127,8 @@ export async function middleware(request: NextRequest) {
 
   // Proteger rotas da aplicação e APIs restantes.
   // Permite acesso a /login e /redefinir-senha para usuários não autenticados.
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  // (isPublicRoute já retornou antes, então não precisa ser checado aqui.)
+  if (!user && !isAuthRoute) {
     if (request.nextUrl.pathname.startsWith('/api')) {
       const unauthRes = NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
       unauthRes.headers.set('x-request-id', requestId);
@@ -143,6 +156,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Exclui assets estáticos do Next e arquivos raiz de servir como páginas.
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|sw.js|manifest.webmanifest|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

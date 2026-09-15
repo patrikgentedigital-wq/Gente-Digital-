@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao buscar colaboradores no servidor:', error.message);
+      // Apenas log de aviso; resposta permanece inalterada para não quebrar o front
+      console.warn('Erro ao buscar colaboradores no servidor:', error.message);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 

@@ -63,7 +63,8 @@ export function ReferralLanding() {
         `expires=${expiresAt.toUTCString()}`,
         'path=/',
         'SameSite=Lax',
-        'Secure',
+        // Sem a flag Secure: cookies sem Secure também funcionam em HTTPS, mas
+        // com Secure o cookie é rejeitado em dev/HTTP e o rastreio quebra.
       ].join('; ');
     } catch (e) {
       console.error('Erro ao gravar cookie de indicação:', e);

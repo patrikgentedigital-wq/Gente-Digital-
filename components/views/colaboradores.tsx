@@ -94,6 +94,7 @@ export function ColaboradoresView() {
         setIsModalOpen(false);
         setEditingColab(null);
         setSelectedColabForQr(null);
+        setSelectedColabForExtrato(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -173,7 +174,14 @@ export function ColaboradoresView() {
       const res = await fetch('/api/settings/base-link');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.base_link) {
+        const isFormsDefault = !!data?.base_link?.includes('forms.cloud.microsoft');
+        if (!data?.base_link || isFormsDefault) {
+          // Link não configurado (vazio ou herdado do default do Forms):
+          // usa a landing local /indicar como base dos links/QR.
+          if (typeof window !== 'undefined') {
+            setBaseLink(`${window.location.origin}/indicar`);
+          }
+        } else {
           setBaseLink(data.base_link);
         }
       }
@@ -357,10 +365,13 @@ export function ColaboradoresView() {
   const handleAdd = async (data: ColaboradorFormData) => {
     if (editingColab) {
       const previousColabs = [...colaboradores];
+      // Recalcula as iniciais a partir do nome atualizado para manter consistência com o cadastro
+      const newInitials = data.name.substring(0, 2).toUpperCase();
       const updated: Colaborador = {
         ...editingColab,
         name: data.name,
         email: data.email,
+        initials: newInitials,
         photo_url: data.photo_url || undefined,
       };
       setColaboradores(prev => prev.map(c => c.id === editingColab.id ? updated : c));
@@ -370,6 +381,7 @@ export function ColaboradoresView() {
           const { error } = await supabase.from('colaboradores').update({
             name: data.name,
             email: data.email,
+            initials: newInitials,
             photo_url: data.photo_url || null,
           }).eq('id', editingColab.id);
 
@@ -410,20 +422,48 @@ export function ColaboradoresView() {
 
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await supabase.from('colaboradores').insert([{
-          id: newColab.id,
-          name: newColab.name,
-          email: newColab.email,
-          initials: newColab.initials,
-          count: 0,
-          photo_url: newColab.photo_url || null
-        }]);
+        // Race condition: dois dispositivos podem calcular o mesmo ID simultaneamente
+        // (violação unique → erro 23505). Em duplicidade, recalculamos o próximo ID
+        // com base no banco e tentamos novamente (até 2 retries).
+        let finalId = newColab.id;
+        let insertError: any = null;
+        const maxAttempts = 3;
 
-        if (error) {
-          console.error("Supabase insert error:", error);
-          toastError("Erro ao salvar no banco", error.message || "As alterações não puderam ser sincronizadas.");
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const { error } = await supabase.from('colaboradores').insert([{
+            id: finalId,
+            name: newColab.name,
+            email: newColab.email,
+            initials: newColab.initials,
+            count: 0,
+            photo_url: newColab.photo_url || null
+          }]);
+
+          if (!error) {
+            insertError = null;
+            break;
+          }
+
+          const isDuplicate = error.code === '23505' || /duplicate|unique/i.test(error.message || '');
+          if (isDuplicate && attempt < maxAttempts) {
+            finalId = await getNextColabId();
+            continue;
+          }
+
+          insertError = error;
+          break;
+        }
+
+        if (insertError) {
+          console.error("Supabase insert error:", insertError);
+          toastError("Erro ao salvar no banco", insertError.message || "As alterações não puderam ser sincronizadas.");
           fetchColaboradores();
         } else {
+          // Corrige o registro otimista local com o ID final (caso tenha havido retry)
+          setColaboradores(prev => [
+            { ...newColab, id: finalId },
+            ...prev.filter(c => c.id !== newColab.id),
+          ]);
           toastSuccess("Colaborador cadastrado!", "Disponível instantaneamente em todos os dispositivos.");
         }
       } catch (err: any) {

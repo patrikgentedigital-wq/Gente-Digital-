@@ -27,8 +27,11 @@ export function DateRangeFilter({
 
   const handleQuickPeriodSelect = (period: DatePeriodType) => {
     if (period === 'custom') {
-      const today = now.toISOString().slice(0, 10);
-      const past = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      // Formatação local (evita deslocamento de fuso do toISOString em UTC)
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const today = localDate(now);
+      const past = localDate(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
       onChange({
         period: 'custom',
         startDate: value.startDate || past,

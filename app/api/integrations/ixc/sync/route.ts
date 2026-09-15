@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { verifyAuthAny } from '@/lib/auth-server';
+import { verifyAuth } from '@/lib/auth-server';
 import { getIxcCredentials, fetchIxcWithTimeout } from '@/lib/ixc';
 
 export async function POST(req: NextRequest) {
   try {
-    const isAuthenticated = await verifyAuthAny(req);
-    if (!isAuthenticated) {
+    // Sincronização em massa altera comissões de todos: restrita a administradores
+    const isAdmin = await verifyAuth(req);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -14,21 +15,43 @@ export async function POST(req: NextRequest) {
     const { cleanDomain, authHeader, hasCredentials } = await getIxcCredentials();
 
     if (!hasCredentials) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Domínio ou Token inválido.' 
+      return NextResponse.json({
+        success: false,
+        error: 'Domínio ou Token inválido.'
       }, { status: 400 });
     }
 
-    // 2. Fetch leads that are not installed/concluido
-    const { data: leads, error: leadsError } = await supabase
-      .from('leads')
-      .select('*')
-      .not('status', 'in', '(Ganho,Cancelado)');
+    // 2. Fetch leads that are not installed/concluido (paginado para bases grandes)
+    const allLeads: any[] = [];
+    const PAGE_SIZE = 1000;
+    let leadsError: string | null = null;
+    let page = 0;
+
+    while (true) {
+      const { data: pageLeads, error: pageError } = await supabase
+        .from('leads')
+        .select('*')
+        .not('status', 'in', '(Ganho,Cancelado,Perdido)')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (pageError) {
+        leadsError = pageError.message;
+        break;
+      }
+
+      if (pageLeads && pageLeads.length > 0) {
+        allLeads.push(...pageLeads);
+      }
+
+      if (!pageLeads || pageLeads.length < PAGE_SIZE) break;
+      page++;
+    }
 
     if (leadsError) {
-      return NextResponse.json({ success: false, error: leadsError.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: leadsError }, { status: 500 });
     }
+
+    const leads = allLeads;
 
     if (!leads || leads.length === 0) {
       return NextResponse.json({ 
@@ -82,7 +105,8 @@ export async function POST(req: NextRequest) {
         let activeContractId = null;
 
         const leadDate = lead.created_at ? new Date(lead.created_at) : new Date();
-        leadDate.setDate(leadDate.getDate() - 30);
+        // O contrato deve ser APÓS a criação do lead, com tolerância de 2 dias para antes
+        leadDate.setDate(leadDate.getDate() - 2);
 
         let activeContractValue = 0;
 
@@ -127,6 +151,11 @@ export async function POST(req: NextRequest) {
             for (const contract of contractData.registros) {
               if (contract.status === 'A') {
                 const contractDate = new Date(contract.data);
+                // Proteção contra datas inválidas vindas do IXC
+                if (isNaN(contractDate.getTime())) {
+                  console.warn(`Contrato ${contract.id} com data inválida ("${contract.data}"). Contrato ignorado.`);
+                  continue;
+                }
                 if (contractDate >= leadDate) {
                   foundValidContract = true;
                   matchedClient = client;
@@ -170,7 +199,10 @@ export async function POST(req: NextRequest) {
           note: `Contrato ativo localizado: ${matchedClient.razao} (Cliente ID: ${matchedClient.id}, Contrato: ${activeContractId}${valueText})`
         };
 
-        await supabase.from('lead_history').insert([historyData]);
+        const { error: historyError } = await supabase.from('lead_history').insert([historyData]);
+        if (historyError) {
+          console.warn(`Lead ${lead.id} sincronizado, mas o histórico não foi registrado:`, historyError.message);
+        }
 
         return {
           leadId: lead.id,

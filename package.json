@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test tests/regression/*.test.ts",
-    "clean": "next clean"
+    "test": "tsx --test tests/regression/*.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
