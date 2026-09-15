@@ -69,18 +69,19 @@ export async function POST(req: NextRequest) {
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`IXC test connection returned status ${response.status}: ${errorText}`);
-        
+
+        // Falha na comunicação com o servidor IXC: 502 (Bad Gateway)
         if (response.status === 401 || response.status === 403) {
-          return NextResponse.json({ 
-            success: false, 
-            error: 'Credenciais inválidas (Token inválido ou não autorizado no IXC).' 
-          });
+          return NextResponse.json({
+            success: false,
+            error: 'Credenciais inválidas (Token inválido ou não autorizado no IXC).'
+          }, { status: 502 });
         }
-        
-        return NextResponse.json({ 
-          success: false, 
-          error: `Servidor IXC respondeu com código de erro ${response.status}.` 
-        });
+
+        return NextResponse.json({
+          success: false,
+          error: `Servidor IXC respondeu com código de erro ${response.status}.`
+        }, { status: 502 });
       }
 
       const data = await response.json();
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: false,
           error: 'Tempo limite esgotado ao conectar ao IXC Soft (Timeout de 10s). Verifique se o IP deste servidor está liberado no firewall do IXC.'
-        });
+        }, { status: 502 });
       }
       throw fetchError;
     }
@@ -106,6 +107,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: false,
       error: `Não foi possível conectar ao servidor IXC: ${error.message || 'Verifique se o domínio está correto e se o servidor está online.'}`
-    });
+    }, { status: 502 });
   }
 }

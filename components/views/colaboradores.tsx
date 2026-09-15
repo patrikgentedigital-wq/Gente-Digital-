@@ -94,6 +94,7 @@ export function ColaboradoresView() {
         setIsModalOpen(false);
         setEditingColab(null);
         setSelectedColabForQr(null);
+        setSelectedColabForExtrato(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -173,8 +174,12 @@ export function ColaboradoresView() {
       const res = await fetch('/api/settings/base-link');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.base_link) {
-          setBaseLink(data.base_link);
+        // base_link configurado no painel tem prioridade; sem configuração,
+        // usa o link base do Microsoft Forms (PROGRAM_RULES.linkBasePadrao).
+        if (data?.base_link && typeof data.base_link === 'string' && data.base_link.trim()) {
+          setBaseLink(data.base_link.trim());
+        } else {
+          setBaseLink(PROGRAM_RULES.linkBasePadrao);
         }
       }
     } catch (err) {
@@ -215,9 +220,19 @@ export function ColaboradoresView() {
       if (isSupabaseConfigured()) {
         try {
           const { data, error } = await supabase.from('colaboradores').select('*').order('created_at', { ascending: false });
-          if (!error && data) {
+          if (!error && data && data.length > 0) {
             baseColabs = data;
             loadedFromSupabase = true;
+          } else {
+            // Fallback via API server-side
+            const apiRes = await fetch('/api/colaboradores');
+            if (apiRes.ok) {
+              const apiData = await apiRes.json();
+              if (apiData.success && Array.isArray(apiData.colaboradores) && apiData.colaboradores.length > 0) {
+                baseColabs = apiData.colaboradores;
+                loadedFromSupabase = true;
+              }
+            }
           }
         } catch (e) {
           console.error("Supabase fetch error:", e);
@@ -231,20 +246,32 @@ export function ColaboradoresView() {
       let leadsData: Lead[] = [];
       if (isSupabaseConfigured()) {
         try {
-          // Busca resiliente: carrega os leads ordenados por created_at
-          const { data: lData, error: lError } = await supabase
-            .from('leads')
-            .select('*')
-            .order('created_at', { ascending: false });
+          // Busca resiliente: tenta primeiro API server-side
+          try {
+            const apiLRes = await fetch('/api/leads');
+            if (apiLRes.ok) {
+              const apiLData = await apiLRes.json();
+              if (apiLData.success && Array.isArray(apiLData.leads) && apiLData.leads.length > 0) {
+                leadsData = apiLData.leads;
+              }
+            }
+          } catch (apiErr) {}
 
-          if (!lError && lData) {
-            leadsData = lData as Lead[];
-          } else {
-            if (lError) console.warn("Aviso ao buscar leads (tentando fallback de colunas canônicas):", lError.message);
-            const { data: fallbackData } = await supabase
+          if (leadsData.length === 0) {
+            const { data: lData, error: lError } = await supabase
               .from('leads')
-              .select('id, name, phone, ref, status, value, source, created_at');
-            if (fallbackData) leadsData = fallbackData as Lead[];
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            if (!lError && lData) {
+              leadsData = lData as Lead[];
+            } else {
+              if (lError) console.warn("Aviso ao buscar leads (tentando fallback de colunas canônicas):", lError.message);
+              const { data: fallbackData } = await supabase
+                .from('leads')
+                .select('id, name, phone, ref, status, value, source, created_at');
+              if (fallbackData) leadsData = fallbackData as Lead[];
+            }
           }
         } catch (e) {
           console.error("Erro ao buscar leads em colaboradores:", e);
@@ -335,10 +362,13 @@ export function ColaboradoresView() {
   const handleAdd = async (data: ColaboradorFormData) => {
     if (editingColab) {
       const previousColabs = [...colaboradores];
+      // Recalcula as iniciais a partir do nome atualizado para manter consistência com o cadastro
+      const newInitials = data.name.substring(0, 2).toUpperCase();
       const updated: Colaborador = {
         ...editingColab,
         name: data.name,
         email: data.email,
+        initials: newInitials,
         photo_url: data.photo_url || undefined,
       };
       setColaboradores(prev => prev.map(c => c.id === editingColab.id ? updated : c));
@@ -348,6 +378,7 @@ export function ColaboradoresView() {
           const { error } = await supabase.from('colaboradores').update({
             name: data.name,
             email: data.email,
+            initials: newInitials,
             photo_url: data.photo_url || null,
           }).eq('id', editingColab.id);
 
@@ -388,20 +419,48 @@ export function ColaboradoresView() {
 
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await supabase.from('colaboradores').insert([{
-          id: newColab.id,
-          name: newColab.name,
-          email: newColab.email,
-          initials: newColab.initials,
-          count: 0,
-          photo_url: newColab.photo_url || null
-        }]);
+        // Race condition: dois dispositivos podem calcular o mesmo ID simultaneamente
+        // (violação unique → erro 23505). Em duplicidade, recalculamos o próximo ID
+        // com base no banco e tentamos novamente (até 2 retries).
+        let finalId = newColab.id;
+        let insertError: any = null;
+        const maxAttempts = 3;
 
-        if (error) {
-          console.error("Supabase insert error:", error);
-          toastError("Erro ao salvar no banco", error.message || "As alterações não puderam ser sincronizadas.");
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const { error } = await supabase.from('colaboradores').insert([{
+            id: finalId,
+            name: newColab.name,
+            email: newColab.email,
+            initials: newColab.initials,
+            count: 0,
+            photo_url: newColab.photo_url || null
+          }]);
+
+          if (!error) {
+            insertError = null;
+            break;
+          }
+
+          const isDuplicate = error.code === '23505' || /duplicate|unique/i.test(error.message || '');
+          if (isDuplicate && attempt < maxAttempts) {
+            finalId = await getNextColabId();
+            continue;
+          }
+
+          insertError = error;
+          break;
+        }
+
+        if (insertError) {
+          console.error("Supabase insert error:", insertError);
+          toastError("Erro ao salvar no banco", insertError.message || "As alterações não puderam ser sincronizadas.");
           fetchColaboradores();
         } else {
+          // Corrige o registro otimista local com o ID final (caso tenha havido retry)
+          setColaboradores(prev => [
+            { ...newColab, id: finalId },
+            ...prev.filter(c => c.id !== newColab.id),
+          ]);
           toastSuccess("Colaborador cadastrado!", "Disponível instantaneamente em todos os dispositivos.");
         }
       } catch (err: any) {

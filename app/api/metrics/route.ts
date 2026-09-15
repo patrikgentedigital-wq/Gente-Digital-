@@ -27,7 +27,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (!hasValidBearer && !(await verifyAuth(request))) {
+  let authorized: boolean;
+  if (metricsSecret) {
+    // METRICS_SECRET configurado: o header Bearer é obrigatório (sem fallback para admin)
+    authorized = hasValidBearer;
+  } else {
+    // Sem secret configurado: exige sessão de admin autenticada
+    authorized = await verifyAuth(request);
+  }
+
+  if (!authorized) {
     logger.warn('[METRICS DENIED] Tentativa de scrape não autorizado', undefined, requestId);
     return NextResponse.json(
       { error: 'Não autorizado' },

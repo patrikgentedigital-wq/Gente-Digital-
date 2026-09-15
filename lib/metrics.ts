@@ -3,6 +3,11 @@
  * 
  * Regra 7: Medição contínua de Tempo de resposta, Memória e CPU.
  * Permite expor métricas agregadas em JSON e formato Prometheus.
+ * 
+ * ATENÇÃO: estas métricas são POR-INSTÂNCIA. Em ambientes serverless (ex: Vercel),
+ * cada função/instância mantém seu próprio registro — os valores NÃO são globais
+ * nem agregados entre instâncias. Use-os para diagnóstico local/por-invocação;
+ * para visão agregada, integre um backend externo de métricas.
  */
 
 export interface SystemMetricsSnapshot {

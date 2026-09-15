@@ -5,8 +5,11 @@ import { getUserRole } from '@/lib/auth-server';
 // GET /api/users/me — retorna o role do usuário autenticado
 export async function GET(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    const supabaseUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+      ? rawUrl.replace(/\/+$/, '')
+      : '';
+    const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
       if (process.env.NODE_ENV === 'production') {
@@ -15,10 +18,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ role: 'admin' }); // dev local
     }
 
+    // Cookies renovados pelo Supabase (refresh de token) são capturados e aplicados
+    // na resposta final (padrão @supabase/ssr para App Router)
+    let cookiesToSet: Array<{ name: string; value: string; options?: any }> = [];
+
     const client = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() { return req.cookies.getAll(); },
-        setAll() {},
+        setAll(set) { cookiesToSet = set; },
       },
     });
 
@@ -29,11 +36,17 @@ export async function GET(req: NextRequest) {
 
     const role = await getUserRole(user.id, user.email, (user as any).user_metadata);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       id: user.id,
       email: user.email,
       role: role ?? 'vendedor',
     });
+
+    for (const { name, value, options } of cookiesToSet) {
+      response.cookies.set(name, value, options);
+    }
+
+    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -42,6 +42,7 @@ export function VendasRastreamentoView() {
   const [leadHistories, setLeadHistories] = useState<Record<number, LeadHistory[]>>({});
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [clicks, setClicks] = useState<Record<string, number>>({});
+  const [clicksDaily, setClicksDaily] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Filtros
@@ -55,6 +56,7 @@ export function VendasRastreamentoView() {
 
   const fetchData = useCallback(async () => {
     try {
+      setIsLoading(true);
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
       const historyMap: Record<number, LeadHistory[]> = {};
@@ -66,13 +68,37 @@ export function VendasRastreamentoView() {
           supabase.from('lead_history').select('*').order('created_at', { ascending: false }).limit(2000),
         ]);
 
-        if (lData) leadsData = lData as Lead[];
-        if (cData) colabsData = cData as Colaborador[];
+        if (lData && lData.length > 0) leadsData = lData as Lead[];
+        if (cData && cData.length > 0) colabsData = cData as Colaborador[];
         if (hData) {
           hData.forEach((h: LeadHistory) => {
             if (!historyMap[h.lead_id]) historyMap[h.lead_id] = [];
             historyMap[h.lead_id].push(h);
           });
+        }
+
+        // Fallback via API se Supabase client retornar vazio
+        if (leadsData.length === 0 || colabsData.length === 0) {
+          try {
+            const [lRes, cRes] = await Promise.all([fetch('/api/leads'), fetch('/api/colaboradores')]);
+            if (lRes.ok) {
+              const lJson = await lRes.json();
+              if (lJson.success && Array.isArray(lJson.leads) && lJson.leads.length > 0) {
+                leadsData = lJson.leads;
+                leadsData.forEach((lead: any) => {
+                  if (lead.history && Array.isArray(lead.history)) {
+                    historyMap[lead.id] = lead.history;
+                  }
+                });
+              }
+            }
+            if (cRes.ok) {
+              const cJson = await cRes.json();
+              if (cJson.success && Array.isArray(cJson.colaboradores) && cJson.colaboradores.length > 0) {
+                colabsData = cJson.colaboradores;
+              }
+            }
+          } catch (e) {}
         }
       } else {
         leadsData = (initialLeads as any[]) as Lead[];
@@ -90,6 +116,9 @@ export function VendasRastreamentoView() {
               map[normalizeStr(c.ref)] = (map[normalizeStr(c.ref)] || 0) + c.count;
             });
             setClicks(map);
+          }
+          if (cData.success && cData.clicksDaily && typeof cData.clicksDaily === 'object') {
+            setClicksDaily(cData.clicksDaily as Record<string, number>);
           }
         }
       } catch (e) {
@@ -206,9 +235,19 @@ export function VendasRastreamentoView() {
     return Math.round((leadsErrados.length / filteredLeads.length) * 100);
   }, [filteredLeads.length, leadsErrados.length]);
 
+  // Cliques do período: a API expõe a agregação diária (clicksDaily),
+  // então o mesmo matchesDateFilter aplicado às vendas é usado aqui
   const totalCliquesPeriodo = useMemo(() => {
+    const hasDaily = Object.keys(clicksDaily).length > 0;
+    if (hasDaily) {
+      return Object.entries(clicksDaily).reduce((acc, [day, count]) => {
+        return matchesDateFilter(day, dateFilter) ? acc + count : acc;
+      }, 0);
+    }
+    // Fallback: se a API não devolveu a agregação diária (deploy antigo/erro),
+    // usa o total sem filtro para não exibir conversão zerada
     return Object.values(clicks).reduce((acc, val) => acc + val, 0);
-  }, [clicks]);
+  }, [clicks, clicksDaily, dateFilter]);
 
   const taxaConversaoCliquesParaVendas = useMemo(() => {
     if (totalCliquesPeriodo === 0) return 0;

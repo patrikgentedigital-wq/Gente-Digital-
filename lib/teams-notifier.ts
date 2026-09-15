@@ -4,6 +4,25 @@
 
 import { StructuredLogPayload } from './logger';
 
+// Chaves sensíveis que não devem ser enviadas para o Teams
+const SENSITIVE_KEY_PATTERN = /(token|authorization|password|secret|key)/i;
+const METADATA_MAX_LENGTH = 1000;
+
+/**
+ * Serializa os metadados removendo chaves sensíveis e truncando o resultado
+ * para não expor credenciais nem estourar o payload do webhook.
+ */
+function sanitizeMetadata(metadata: Record<string, any>): string {
+  try {
+    const safeEntries = Object.entries(metadata).filter(([k]) => !SENSITIVE_KEY_PATTERN.test(k));
+    const safeObj = Object.fromEntries(safeEntries);
+    const json = JSON.stringify(safeObj, null, 2);
+    return json.length > METADATA_MAX_LENGTH ? json.slice(0, METADATA_MAX_LENGTH) + '…' : json;
+  } catch {
+    return '[metadados não serializáveis]';
+  }
+}
+
 export async function sendTeamsAlert(payload: StructuredLogPayload): Promise<boolean> {
   const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
   if (!webhookUrl || webhookUrl.includes('placeholder')) {
@@ -28,7 +47,7 @@ export async function sendTeamsAlert(payload: StructuredLogPayload): Promise<boo
           { name: 'Mensagem:', value: payload.message },
           { name: 'Timestamp:', value: payload.timestamp },
           { name: 'Request ID:', value: payload.requestId || 'N/A' },
-          ...(payload.metadata ? [{ name: 'Metadados:', value: JSON.stringify(payload.metadata, null, 2) }] : []),
+          ...(payload.metadata ? [{ name: 'Metadados:', value: sanitizeMetadata(payload.metadata) }] : []),
           ...(payload.error ? [{ name: 'Erro:', value: `**${payload.error.name}**: ${payload.error.message}` }] : []),
         ],
         text: payload.error?.stack 
@@ -39,12 +58,22 @@ export async function sendTeamsAlert(payload: StructuredLogPayload): Promise<boo
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cardPayload),
-    });
-    return response.ok;
+    // Timeout de 5s para não travar o fluxo de erro caso o Teams esteja lento/indisponível
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    let ok = false;
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cardPayload),
+        signal: controller.signal,
+      });
+      ok = response.ok;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    return ok;
   } catch (err) {
     console.error('Falha ao enviar notificação para o Microsoft Teams:', err);
     return false;

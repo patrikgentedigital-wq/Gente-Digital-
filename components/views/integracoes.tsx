@@ -6,7 +6,7 @@ import { useToast } from '@/components/providers/toast-context';
 import { supabase } from '@/lib/supabase';
 
 export function IntegracoesView() {
-  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [ixcSaved, setIxcSaved] = useState(false);
   const [formsSaved, setFormsSaved] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -18,7 +18,7 @@ export function IntegracoesView() {
     () => window.location.origin,
     () => '',
   );
-  
+
   const [ixcDomain, setIxcDomain] = useState('');
   const [ixcToken, setIxcToken] = useState('');
   const [ixcLoading, setIxcLoading] = useState(false);
@@ -39,13 +39,18 @@ export function IntegracoesView() {
     }
 
     async function checkAdmin() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        setIsAdmin(true);
-        const data = await res.json();
-        setUsers(data.users || []);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          setIsAdmin(true);
+          const data = await res.json();
+          setUsers(data.users || []);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar admin:', err);
+        setIsAdmin(false);
       }
     }
 
@@ -277,11 +282,16 @@ export function IntegracoesView() {
                 className="w-full bg-white dark:bg-[#27272a] px-4 py-3 border border-brand-border dark:border-gray-700 rounded-xl text-sm text-brand-charcoal dark:text-gray-200 outline-none font-mono" 
               />
               <button 
-                onClick={() => {
-                  navigator.clipboard.writeText(`${webhookUrl}?secret=SEU_WEBHOOK_SECRET`);
-                  setFormsSaved(true);
-                  toastSuccess('Copiado!', 'URL do Webhook copiada com o parâmetro de autenticação.');
-                  setTimeout(() => setFormsSaved(false), 2000);
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${webhookUrl}?secret=SEU_WEBHOOK_SECRET`);
+                    setFormsSaved(true);
+                    toastSuccess('Copiado!', 'URL do Webhook copiada com o parâmetro de autenticação.');
+                    setTimeout(() => setFormsSaved(false), 2000);
+                  } catch (err) {
+                    console.error('Erro ao copiar URL do webhook:', err);
+                    toastError('Erro ao Copiar', 'Não foi possível copiar a URL do Webhook. Copie manualmente.');
+                  }
                 }}
                 className="px-6 py-3 border border-brand-border dark:border-gray-700 bg-brand-yellow hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl transition-colors shrink-0 shadow-sm"
               >

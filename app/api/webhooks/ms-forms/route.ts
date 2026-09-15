@@ -66,11 +66,14 @@ async function createIxcProspect(name: string, phone: string, ref: string) {
       nome: name,
       razao: name, // Necessário para salvar como Lead no IXC
       fone_celular: phone,
-      id_filial: '1',
+      id_filial: 1,
       data_cadastro: formatIxcDate(),
       lead: 'S',
       tipo_pessoa: 'F',
       origem: 'outros',
+      id_candidato_tipo: 22,
+      id_canal_origem: 22,
+      id_canal_venda: 22,
       obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`
     };
 
@@ -161,7 +164,9 @@ export async function POST(req: NextRequest) {
     
     const rawPhone = findField(body, ['telefone', 'celular', 'whatsapp', 'phone', 'whats', 'fone', 'contato'], '');
     
-    const externalRef = findField(body, ['responseid', 'id', 'response_id', 'submission_id', 'submissionid'], '');
+    // NOTA: 'id' genérico foi removido para não capturar campos alheios
+    // (ex.: "id do produto"); use identificadores específicos do envio.
+    const externalRef = findField(body, ['responseid', 'response_id', 'submission_id', 'submissionid', 'external_id', 'id_lead'], '');
 
     let ref = findField(body, ['colaborador', 'indicador', 'indicacao', 'ref', 'quem', 'vendedor', 'codigo', 'cod'], '');
     if (!ref && queryRef) {
@@ -205,9 +210,8 @@ export async function POST(req: NextRequest) {
     const normalizedPhone = normalizePhone(validData.phone);
 
     // Check if Supabase is configured (avoid crashing on local mock state)
-    const isSupabaseConfigured = 
-      process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+    const rawSbUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+    const isSupabaseConfigured = rawSbUrl && !rawSbUrl.includes('placeholder');
 
     let insertedLead = null;
 
@@ -271,9 +275,10 @@ export async function POST(req: NextRequest) {
       }
 
       // 5. Insert Lead into Supabase
+      // Telefone vazio após normalização é gravado como null para não colidir no índice único
       const insertPayload: Record<string, any> = {
         name: validData.name,
-        phone: normalizedPhone || validData.phone,
+        phone: normalizedPhone || null,
         ref: validData.ref,
         status: 'Pendente',
         value: validData.value,
@@ -290,6 +295,55 @@ export async function POST(req: NextRequest) {
         .select();
 
       if (leadError) {
+        // Violação de unique (ex.: índice idx_leads_phone): outra requisição inseriu o
+        // mesmo telefone primeiro (23505 / duplicate key). Rebusca o lead existente e
+        // o atualiza em vez de inserir um novo registro.
+        if (
+          (leadError as any).code === '23505' ||
+          /duplicate key|idx_leads_phone/i.test(leadError.message || '')
+        ) {
+          const { data: dupMatches, error: dupFetchError } = await supabase
+            .from('leads')
+            .select('id, external_ref')
+            .eq('phone', normalizedPhone)
+            .limit(1);
+
+          if (!dupFetchError && dupMatches && dupMatches[0]) {
+            const dupLead = dupMatches[0];
+            const updateFields: Record<string, any> = {};
+            if (externalRef && !dupLead.external_ref) {
+              updateFields.external_ref = externalRef;
+            }
+
+            if (Object.keys(updateFields).length > 0) {
+              const { error: dupUpdateError } = await supabase
+                .from('leads')
+                .update(updateFields)
+                .eq('id', dupLead.id);
+              if (dupUpdateError) {
+                console.warn('Falha ao atualizar lead duplicado do MS Forms:', dupUpdateError.message);
+              }
+            }
+
+            // Retorna 200 para o Power Automate não reterar a entrega indefinidamente
+            return NextResponse.json(
+              {
+                success: true,
+                deduplicated: true,
+                leadId: dupLead.id,
+                message: 'Telefone já cadastrado: registro existente mantido (idempotente).'
+              },
+              { status: 200 }
+            );
+          }
+
+          // Sem lead recuperável: responde com sucesso para evitar retry infinito
+          logger.warn('Falha de telefone duplicado sem lead recuperável no webhook MS Forms', {
+            error: leadError.message,
+          });
+          return NextResponse.json({ success: true, deduplicated: true }, { status: 200 });
+        }
+
         throw leadError;
       }
 
@@ -312,7 +366,7 @@ export async function POST(req: NextRequest) {
           console.error('Error inserting webhook history:', historyError);
         }
 
-        // Enviar para o IXC Soft como prospect
+        // Enviar para o IXC Soft como prospect (mantém o telefone original para contato)
         const ixcResult = await createIxcProspect(validData.name, normalizedPhone || validData.phone, validData.ref);
         if (ixcResult.success) {
           await supabase

@@ -44,7 +44,11 @@ export function DashboardView() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setIsLoading(true);
+        // Só ativa o spinner no primeiro carregamento (sem dados); refetches
+        // realtime mantêm os dados atuais na tela, evitando flash de loading.
+        if (leads.length === 0 && colaboradores.length === 0) {
+          setIsLoading(true);
+        }
         let leadsData: Lead[] = [];
         let colabsData: Colaborador[] = [];
         const clicksMap: Record<string, number> = {};
@@ -69,8 +73,32 @@ export function DashboardView() {
               supabase.from('leads').select('*'),
               supabase.from('colaboradores').select('*'),
             ]);
-            if (lData) leadsData = lData;
-            if (cData) colabsData = cData;
+            if (lData && lData.length > 0) leadsData = lData;
+            if (cData && cData.length > 0) colabsData = cData;
+
+            // Se Supabase client retornou vazio (possível restrição de RLS ou sessão do navegador), busca via API server-side
+            if (leadsData.length === 0 || colabsData.length === 0) {
+              try {
+                const [lRes, cRes] = await Promise.all([
+                  fetch('/api/leads'),
+                  fetch('/api/colaboradores'),
+                ]);
+                if (lRes.ok) {
+                  const lJson = await lRes.json();
+                  if (lJson.success && Array.isArray(lJson.leads) && lJson.leads.length > 0) {
+                    leadsData = lJson.leads;
+                  }
+                }
+                if (cRes.ok) {
+                  const cJson = await cRes.json();
+                  if (cJson.success && Array.isArray(cJson.colaboradores) && cJson.colaboradores.length > 0) {
+                    colabsData = cJson.colaboradores;
+                  }
+                }
+              } catch (apiErr) {
+                console.warn('Erro ao carregar dados do dashboard via API:', apiErr);
+              }
+            }
           } else {
             leadsData = initialLeads as Lead[];
             colabsData = initialColaboradores;

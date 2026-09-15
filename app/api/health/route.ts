@@ -4,27 +4,68 @@ import { metricsRegistry } from '@/lib/metrics';
 import { cacheClient } from '@/lib/cache-client';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { executeDbQuery } from '@/lib/db-client';
-import { verifyAuth } from '@/lib/auth-server';
+import { verifyAuth, getAuthenticatedUser } from '@/lib/auth-server';
 
 /**
  * Health Check Detalhado (DevOps Regra 4)
- * 
+ *
  * Regra 4: Todo serviço deve ter Health Check com status detalhado dos componentes.
+ * Requisições sem sessão válida recebem apenas o payload mínimo público.
  */
 export async function GET(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
   const startTime = performance.now();
+
+  // Autenticação obrigatória: sem sessão válida, responde apenas o mínimo
+  // (sem dados internos), mantendo monitoramento básico de uptime funcionando
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return NextResponse.json(
+      { status: 'ok', timestamp: new Date().toISOString() },
+      {
+        status: 200,
+        headers: {
+          'x-request-id': requestId,
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+  }
+
+  const isAdmin = await verifyAuth(request);
+  if (!isAdmin) {
+    // Autenticado sem role admin: também apenas o payload mínimo público
+    return NextResponse.json(
+      { status: 'ok', timestamp: new Date().toISOString() },
+      {
+        status: 200,
+        headers: {
+          'x-request-id': requestId,
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+  }
 
   // 1. Diagnóstico do Banco de Dados
   let dbStatus: 'UP' | 'DOWN' | 'DEGRADED' = 'UP';
   let dbLatencyMs = 0;
   let dbErrorDetails: string | null = null;
 
+  let leadsCount: number | null = null;
+  let colabsCount: number | null = null;
+
   try {
     const dbCheck = await executeDbQuery(
       'health_check_ping',
       async () => {
         const { data, error } = await supabaseAdmin.from('audit_logs').select('id').limit(1);
+        const [leadsRes, colabsRes] = await Promise.all([
+          supabaseAdmin.from('leads').select('*', { count: 'exact', head: true }),
+          supabaseAdmin.from('colaboradores').select('*', { count: 'exact', head: true }),
+        ]);
+        leadsCount = leadsRes.count ?? 0;
+        colabsCount = colabsRes.count ?? 0;
         return { data, error };
       },
       requestId
@@ -68,8 +109,6 @@ export async function GET(request: NextRequest) {
   const isHealthy = dbStatus !== 'DOWN' && cacheStatus !== 'DOWN';
   const statusCode = isHealthy ? 200 : 503;
 
-  const isAdmin = await verifyAuth(request);
-
   const healthPayload: Record<string, any> = {
     status: isHealthy ? 'healthy' : 'unhealthy',
     timestamp: new Date().toISOString(),
@@ -80,6 +119,8 @@ export async function GET(request: NextRequest) {
       database: {
         status: dbStatus,
         latencyMs: dbLatencyMs,
+        leadsCount,
+        colabsCount,
         error: dbErrorDetails,
       },
       cache: {

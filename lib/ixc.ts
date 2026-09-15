@@ -9,11 +9,17 @@ export interface IxcConfig {
 }
 
 /**
- * Limpa e formata o domínio do IXC (remove http://, https://, www. e barras finais).
+ * Limpa e formata o domínio do IXC (remove http://, https://, www., barras finais,
+ * porta e qualquer path após o host).
  */
 export function cleanIxcDomain(domain: string): string {
   if (!domain) return '';
-  return domain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '').trim();
+  return domain
+    .replace(/^(https?:\/\/)?(www\.)?/, '')
+    .replace(/\/$/, '')
+    .trim()
+    .split('/')[0]   // remove path
+    .split(':')[0];  // remove porta (ex: :8080)
 }
 
 /**
@@ -34,11 +40,25 @@ export function maskIxcToken(token: string): string {
 }
 
 /**
- * Formata a data no padrão esperado pelo IXC Soft (YYYY-MM-DD HH:MM:SS) em horário local.
+ * Formata a data no padrão esperado pelo IXC Soft (YYYY-MM-DD HH:MM:SS) no fuso
+ * de São Paulo, independente do fuso do servidor (ex: UTC em serverless).
  */
 export function formatIxcDate(date: Date = new Date()): string {
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 19).replace('T', ' ');
+  // Extrai os componentes locais de São Paulo via Intl (evita depender do TZ do processo)
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '00';
+  const hour = get('hour') === '24' ? '00' : get('hour'); // en-CA pode emitir 24h no midnight
+  return `${get('year')}-${get('month')}-${get('day')} ${hour}:${get('minute')}:${get('second')}`;
 }
 
 /**

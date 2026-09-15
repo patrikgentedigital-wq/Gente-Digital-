@@ -109,6 +109,8 @@ export function LeadsView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Não fechar outros modais/painéis enquanto o ConfirmModal de exclusão estiver aberto
+      if (confirmDelete?.isOpen) return;
       if (isModalOpen) {
         setIsModalOpen(false);
         setEditingLead(null);
@@ -116,7 +118,7 @@ export function LeadsView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isModalOpen, selectedLead]);
+  }, [isModalOpen, selectedLead, confirmDelete]);
 
   const selectLead = (lead: UILead | null) => {
     setSelectedLead(lead);
@@ -198,7 +200,6 @@ export function LeadsView() {
     if (minValueFilter !== '') count++;
     if (maxValueFilter !== '') count++;
     if (dateFilter !== 'all') count++;
-    if (dateFilter === 'custom' && (customStartDate || customEndDate)) count++;
     return count;
   }, [selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, customStartDate, customEndDate]);
 
@@ -451,6 +452,20 @@ export function LeadsView() {
     try {
       setIsLoading(true);
       if (isSupabaseConfigured()) {
+        // Tenta buscar via API server-side primeiro (garante bypass de RLS e integridade de sessão)
+        try {
+          const apiRes = await fetch('/api/leads');
+          if (apiRes.ok) {
+            const apiData = await apiRes.json();
+            if (apiData.success && Array.isArray(apiData.leads) && apiData.leads.length > 0) {
+              setLeads(apiData.leads);
+              return;
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Fallback para query direta do Supabase:', apiErr);
+        }
+
         // Carrega TODOS os leads para busca, filtros e exportação operarem no dataset completo.
         // (No dataset atual, a paginação é feita no cliente.)
         const { data: leadsData, error: leadsError } = await supabase
@@ -496,10 +511,25 @@ export function LeadsView() {
 
       if (isSupabaseConfigured()) {
         const { data, error } = await supabase.from('colaboradores').select('id, name');
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           data.forEach(c => {
             map.set(c.id, { id: c.id, name: c.name });
           });
+        } else {
+          // Fallback via API server-side
+          try {
+            const apiRes = await fetch('/api/colaboradores');
+            if (apiRes.ok) {
+              const apiData = await apiRes.json();
+              if (apiData.success && Array.isArray(apiData.colaboradores)) {
+                apiData.colaboradores.forEach((c: any) => {
+                  map.set(c.id, { id: c.id, name: c.name });
+                });
+              }
+            }
+          } catch (apiErr) {
+            console.warn('Erro no fallback de colaboradores:', apiErr);
+          }
         }
       } else {
         initialColaboradores.forEach(c => {
@@ -585,17 +615,17 @@ export function LeadsView() {
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({ name: newLeadData.name, phone: newLeadData.phone, ref: newLeadData.ref })
        }).catch(err => console.error('Failed to send prospect to IXC:', err));
-    } catch (error: any) {
-      console.error("Error creating lead", error);
-      if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('idx_leads_phone')) {
-        toastError('Telefone Duplicado', 'Este número de telefone já está cadastrado para outro lead no sistema.');
-      } else {
-        toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
-      }
-    }
 
-    closeModal();
-  }
+       closeModal();
+     } catch (error: any) {
+       console.error("Error creating lead", error);
+       if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('idx_leads_phone')) {
+         toastError('Telefone Duplicado', 'Este número de telefone já está cadastrado para outro lead no sistema.');
+       } else {
+         toastError('Erro ao Cadastrar', 'Não foi possível cadastrar o lead. Tente novamente.');
+       }
+     }
+   }
 
   const handleEditSubmit = async (data: LeadFormData) => {
     if (!editingLead) return;
@@ -610,6 +640,9 @@ export function LeadsView() {
       name: data.name,
       phone: phoneDigits,
       value: data.value ? parseFloat(data.value) : 0,
+      ref: data.ref === 'Outro'
+        ? (data.customRef?.trim() || editingLead.ref || 'Manual')
+        : (data.ref || editingLead.ref || 'Manual'),
     };
 
     const nowStr = new Date().toLocaleString('pt-BR').substring(0, 16);
@@ -782,6 +815,14 @@ export function LeadsView() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedColabFilter, minValueFilter, maxValueFilter, dateFilter, specificMonth, specificYear, customStartDate, customEndDate]);
+
+  // Se a lista filtrada encolher (ex.: exclusões/refetch), evita página órfã além de totalPages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  // Deriva o lead exibido na sidebar a partir da lista atual, evitando dados obsoletos após edições/refetch
+  const currentLead = selectedLead ? leads.find(l => l.id === selectedLead.id) || selectedLead : null;
 
   return (
     <div className="w-full max-w-full mx-auto space-y-5 animate-in fade-in duration-300 flex flex-col relative pb-20">
@@ -1418,7 +1459,7 @@ export function LeadsView() {
       )}
 
       {/* Lead History Sidebar Panel */}
-      {selectedLead && (
+      {currentLead && (
         <>
           <div 
             className="fixed inset-0 bg-brand-charcoal/20 backdrop-blur-[2px] z-[50] transition-opacity" 
@@ -1428,22 +1469,22 @@ export function LeadsView() {
             {/* Sidebar Header */}
             <div className="flex items-start justify-between p-6 border-b border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-zinc-800/50">
               <div className="flex items-center gap-4">
-                <Avatar size={48} name={selectedLead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
                 <div>
-                  <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{selectedLead.name}</h3>
+                  <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{currentLead.name}</h3>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(selectedLead.status)}`}>{selectedLead.status}</span>
-                    <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {selectedLead.phone}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(currentLead.status)}`}>{currentLead.status}</span>
+                    <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {currentLead.phone}</span>
                     <span className="text-xs font-semibold text-brand-charcoal dark:text-white flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full">
-                      <Avatar size={14} name={selectedLead.responsible || selectedLead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} />
-                      {selectedLead.responsible || selectedLead.ref || 'Admin'}
+                      <Avatar size={14} name={currentLead.responsible || currentLead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} />
+                      {currentLead.responsible || currentLead.ref || 'Admin'}
                     </span>
                     <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full">
-                      {selectedLead.source === 'ms_forms' ? 'MS Forms' : selectedLead.source === 'landing' ? 'Landing' : 'Manual'}
+                      {currentLead.source === 'ms_forms' ? 'MS Forms' : currentLead.source === 'landing' ? 'Landing' : 'Manual'}
                     </span>
-                    {selectedLead.history && selectedLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length > 0 && (
+                    {currentLead.history && currentLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length > 0 && (
                       <span className="text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 px-3 py-1 rounded-full">
-                        Duplicata ignorada ({selectedLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length}x)
+                        Duplicata ignorada ({currentLead.history.filter(h => h.action && h.action.includes('MS Forms detectado e ignorado')).length}x)
                       </span>
                     )}
                   </div>
@@ -1451,16 +1492,16 @@ export function LeadsView() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => openEditModal(selectedLead)}
-                  aria-label={`Editar lead ${selectedLead.name}`}
+                  onClick={() => openEditModal(currentLead)}
+                  aria-label={`Editar lead ${currentLead.name}`}
                   className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full transition-colors shrink-0 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 shadow-sm"
                   title="Editar Lead"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleDeleteLead(selectedLead.id)}
-                  aria-label={`Excluir lead ${selectedLead.name}`}
+                  onClick={() => handleDeleteLead(currentLead.id)}
+                  aria-label={`Excluir lead ${currentLead.name}`}
                   className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full transition-colors shrink-0 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 shadow-sm"
                   title="Excluir Lead"
                 >
@@ -1479,7 +1520,7 @@ export function LeadsView() {
               </h4>
               
               <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:ml-[1.3rem] md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-brand-yellow/80 before:to-transparent">
-                {selectedLead.history.map((h, i) => (
+                {currentLead.history.map((h, i) => (
                   <div key={i} className="relative flex gap-4 group items-start">
                     <div className="flex flex-col items-center">
                       <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-all z-10 shadow-sm border-2 ${
@@ -1558,17 +1599,26 @@ export function LeadsView() {
                         <p className="text-xs text-brand-charcoal dark:text-gray-300 bg-white dark:bg-[#18181b] p-3 rounded-lg border border-gray-100 dark:border-gray-800 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap select-all">{aiResult.message}</p>
                         <div className="flex gap-2">
                           <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(aiResult.message || '');
-                              setCopiedMessage(true);
-                              setTimeout(() => setCopiedMessage(false), 2000);
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(aiResult.message || '');
+                                setCopiedMessage(true);
+                                setTimeout(() => setCopiedMessage(false), 2000);
+                              } catch (err) {
+                                console.error('Erro ao copiar mensagem:', err);
+                                toastError('Erro ao Copiar', 'Não foi possível copiar a mensagem para a área de transferência.');
+                              }
                             }}
                             className="flex-1 py-2 bg-gray-100 dark:bg-[#27272a] hover:bg-gray-200 dark:hover:bg-[#3f3f46] text-brand-charcoal dark:text-white font-semibold text-[11px] rounded-lg transition-colors border border-brand-border dark:border-gray-700"
                           >
                             {copiedMessage ? 'Copiado!' : 'Copiar Texto'}
                           </button>
                           <a 
-                            href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(aiResult.message || '')}`}
+                            href={`https://wa.me/${(() => {
+                              const digits = (currentLead.phone || '').replace(/\D/g, '');
+                              // Prefixa o DDI 55 quando o número nacional (10-11 dígitos) não inclui o código do país
+                              return digits.startsWith('55') || digits.length < 10 || digits.length > 11 ? digits : `55${digits}`;
+                            })()}?text=${encodeURIComponent(aiResult.message || '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"

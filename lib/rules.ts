@@ -17,6 +17,8 @@ export const PROGRAM_RULES = {
   },
   prazoPagamento: 'em até 7 dias úteis após a instalação do cliente',
   cookieDuracaoDias: 30,
+  // Link base do programa: o Microsoft Forms que coleta a indicação.
+  // Pode ser sobrescrito no painel admin (settings -> base_link).
   linkBasePadrao: 'https://forms.cloud.microsoft/r/xwCZ3REw80',
 } as const;
 

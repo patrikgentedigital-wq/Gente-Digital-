@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
-import { verifyAuthAny } from '@/lib/auth-server';
+import { getAuthenticatedUser } from '@/lib/auth-server';
 
 // Inicializa Rate Limiter (evita crash se Redis não estiver configurado)
 const redis = (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) 
@@ -66,16 +66,21 @@ function generateDynamicSummary(metrics: any): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Mantidos fora do try para o fallback do catch-all saber qual action falhou
+  let action = '';
+  let safeLead = { name: 'Cliente', status: 'Pendente', value: 0, history: [] as any[] };
+
   try {
-    const isAuthenticated = await verifyAuthAny(req);
-    if (!isAuthenticated) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado. Faça login para continuar.' }, { status: 401 });
     }
 
-    // 1. Rate Limiting
+    // 1. Rate Limiting (por usuário autenticado; fallback para IP)
     if (ratelimit) {
       const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';
-      const { success } = await ratelimit.limit(`ai_endpoint_${ip}`);
+      const identifier = user?.id ? `user_${user.id}` : `ip_${ip}`;
+      const { success } = await ratelimit.limit(`ai_endpoint_${identifier}`);
       if (!success) {
         return NextResponse.json({ error: 'Muitas requisições. Tente novamente em um minuto.' }, { status: 429 });
       }
@@ -92,13 +97,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payload inválido', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { action, lead, metrics } = parsed.data;
+    const { lead, metrics } = parsed.data;
+    action = parsed.data.action;
 
     if (!action) {
       return NextResponse.json({ error: 'Parâmetros inválidos. É necessário informar a action.' }, { status: 400 });
     }
 
-    const safeLead = {
+    safeLead = {
       name: sanitizeString(lead?.name, 100) || 'Cliente',
       status: sanitizeString(lead?.status, 50) || 'Pendente',
       value: typeof lead?.value === 'number' ? lead.value : 0,
@@ -217,7 +223,8 @@ Retorne estritamente um JSON limpo com as chaves "qualification" ("Quente", "Mor
         });
       } catch (err) {
         const val = safeLead.value;
-        const isHot = val > 1000 || safeLead.status === 'Em negociação';
+        // "negocia" cobre "Em Negociação" e variações de caixa
+        const isHot = val > 1000 || safeLead.status.toLowerCase().includes('negocia');
         return NextResponse.json({
           status: 'success',
           isFallback: true,
@@ -257,10 +264,22 @@ Seja direto, amigável, inclua emojis moderados e convide para o próximo passo.
 
   } catch (error: any) {
     console.error('Error in AI Route Handler:', error);
-    return NextResponse.json({ 
+    // Fallback no catch-all deve retornar o campo correto conforme a action
+    const fallbackPayload: Record<string, any> = {
       status: 'success',
       isFallback: true,
-      summary: 'Resumo gerado: Suas métricas de conversão e indicações estão sendo processadas normalmente.'
-    });
+    };
+
+    if (action === 'qualify') {
+      fallbackPayload.qualification = 'Morno';
+      fallbackPayload.reason = 'Não foi possível qualificar o lead neste momento.';
+      fallbackPayload.nextSteps = 'Entrar em contato via WhatsApp e apresentar plano personalizado.';
+    } else if (action === 'generate-message') {
+      fallbackPayload.message = `Olá, ${safeLead.name}! Tudo bem?\n\nNotamos seu interesse em nossos planos no Gente Digital. Gostaria de tirar algumas dúvidas rápidas para te ajudar a escolher a melhor opção?\n\nPodemos conversar agora por aqui?`;
+    } else {
+      fallbackPayload.summary = 'Resumo gerado: Suas métricas de conversão e indicações estão sendo processadas normalmente.';
+    }
+
+    return NextResponse.json(fallbackPayload);
   }
 }

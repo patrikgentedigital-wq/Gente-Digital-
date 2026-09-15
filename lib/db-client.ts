@@ -72,8 +72,9 @@ export async function executeDbQuery<T>(
     }
   }
 
+  // Em caso de erro não retornar data parcial: os callers devem checar `error` primeiro
   return {
-    data: result.data,
+    data: result.error ? null : result.data,
     error: result.error,
     durationMs,
   };

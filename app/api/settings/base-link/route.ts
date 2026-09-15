@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { PROGRAM_RULES } from '@/lib/rules';
-import { verifyAuth } from '@/lib/auth-server';
+import { verifyAuth, getAuthenticatedUser } from '@/lib/auth-server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Autenticação obrigatória: sem sessão válida, usa apenas o link padrão
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const { data, error } = await supabase
       .from('settings')
       .select('value')
@@ -31,7 +37,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { value } = await req.json();
+    const body = await req.json().catch(() => null);
+    const value = (body as any)?.value;
     if (!value || typeof value !== 'string') {
       return NextResponse.json({ error: 'Link base inválido.' }, { status: 400 });
     }

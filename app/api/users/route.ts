@@ -49,7 +49,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { userId, role } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { success: false, error: 'Payload inválido: corpo da requisição não é um JSON válido.' },
+        { status: 400 }
+      );
+    }
+
+    const { userId, role } = body;
 
     if (!userId || !['admin', 'vendedor'].includes(role)) {
       return NextResponse.json(
@@ -67,12 +75,21 @@ export async function PATCH(req: NextRequest) {
         .maybeSingle();
 
       if (currentRole?.role === 'admin') {
-        const { count } = await supabaseAdmin
+        // Mitigação de race do último admin: reconta os admins buscando a lista completa
+        // imediatamente antes do upsert. Sem uma transação/RPC no banco, não há garantia
+        // total de atomicidade — esta checagem apenas reduz a janela de corrida.
+        const { data: adminList, error: adminListError } = await supabaseAdmin
           .from('user_roles')
-          .select('user_id', { count: 'exact', head: true })
+          .select('user_id')
           .eq('role', 'admin');
 
-        if ((count ?? 0) <= 1) {
+        if (adminListError) {
+          return NextResponse.json({ success: false, error: adminListError.message }, { status: 500 });
+        }
+
+        const adminIds = (adminList || []).map((r: any) => r.user_id);
+
+        if (adminIds.length <= 1 || !adminIds.includes(userId)) {
           return NextResponse.json(
             { success: false, error: 'Não é possível rebaixar o último administrador do sistema.' },
             { status: 400 }

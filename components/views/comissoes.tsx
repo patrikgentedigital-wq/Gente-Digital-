@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2, Calendar } from 'lucide-react';
-import { supabase, Lead, Colaborador } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, Lead, Colaborador } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import { logAuditEvent } from '@/lib/audit';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -45,11 +45,16 @@ export function ComissoesView() {
   const [isPaying, setIsPaying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [colabEmails, setColabEmails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch('/api/users/me')
       .then(res => res.json())
-      .then(data => setUserRole(data.role || 'admin'))
+      .then(data => {
+        setUserRole(data.role || 'admin');
+        setUserEmail(data.email || null);
+      })
       .catch(() => setUserRole('admin'));
   }, []);
 
@@ -107,9 +112,7 @@ export function ComissoesView() {
       setIsLoading(true);
       setLoadError(null);
 
-      const isConfigured = typeof window !== 'undefined' &&
-        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const isConfigured = isSupabaseConfigured();
 
       let leadsData: Lead[] = [];
       let colabsData: Colaborador[] = [];
@@ -119,10 +122,28 @@ export function ComissoesView() {
 
       if (isConfigured) {
         const { data: lData } = await supabase.from('leads').select('*').eq('status', 'Ganho');
-        if (lData) leadsData = lData;
+        if (lData && lData.length > 0) leadsData = lData;
 
         const { data: cData } = await supabase.from('colaboradores').select('*');
-        if (cData) colabsData = cData;
+        if (cData && cData.length > 0) colabsData = cData;
+
+        if (leadsData.length === 0 || colabsData.length === 0) {
+          try {
+            const [lRes, cRes] = await Promise.all([fetch('/api/leads'), fetch('/api/colaboradores')]);
+            if (lRes.ok) {
+              const lJson = await lRes.json();
+              if (lJson.success && Array.isArray(lJson.leads) && lJson.leads.length > 0) {
+                leadsData = lJson.leads.filter((l: Lead) => l.status === 'Ganho');
+              }
+            }
+            if (cRes.ok) {
+              const cJson = await cRes.json();
+              if (cJson.success && Array.isArray(cJson.colaboradores) && cJson.colaboradores.length > 0) {
+                colabsData = cJson.colaboradores;
+              }
+            }
+          } catch (e) {}
+        }
       } else {
         // Modo demo: simula leads ganhos e colaboradores para o painel não ficar vazio
         colabsData = initialColaboradores;
@@ -256,6 +277,13 @@ export function ComissoesView() {
         });
       }
 
+      // Índice de e-mails por nome do colaborador (usado na permissão de dar baixa)
+      const emailMap: Record<string, string> = {};
+      colabsData.forEach(c => {
+        if (c.email) emailMap[normalizeStr(c.name)] = c.email.toLowerCase();
+      });
+      setColabEmails(emailMap);
+
       setCommissions(items);
     } catch (err) {
       console.error('Error fetching commissions:', err);
@@ -387,6 +415,18 @@ export function ComissoesView() {
   const totalPendente = filteredCommissions.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + c.commission_amount, 0);
   const totalPago = filteredCommissions.filter(c => c.status === 'Paga').reduce((acc, c) => acc + c.commission_amount, 0);
   const totalConversoes = filteredCommissions.filter(c => !c.isBonus).length;
+
+  // Contadores derivados da lista COMPLETA (não filtrada por status) para os botões de status
+  const pendingCount = commissions.filter(c => c.status === 'Pendente').length;
+  const paidCount = commissions.filter(c => c.status === 'Paga').length;
+
+  // Somente admin, ou o próprio colaborador da comissão (e-mail do cadastro = e-mail logado), pode dar baixa
+  const canPayCommission = (comm: CommissionItem) => {
+    if (userRole === 'admin') return true;
+    if (!userEmail) return false;
+    const ownEmail = colabEmails[normalizeStr(comm.colaborador_name)];
+    return !!ownEmail && ownEmail === userEmail.trim().toLowerCase();
+  };
 
   return (
     <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
@@ -552,7 +592,7 @@ export function ComissoesView() {
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
-                Todas ({filteredCommissions.length})
+                Todas ({commissions.length})
               </button>
               <button
                 onClick={() => setFilterStatus('Pendente')}
@@ -562,7 +602,7 @@ export function ComissoesView() {
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
-                Pendentes ({filteredCommissions.filter(c => c.status === 'Pendente').length})
+                Pendentes ({pendingCount})
               </button>
               <button
                 onClick={() => setFilterStatus('Paga')}
@@ -572,7 +612,7 @@ export function ComissoesView() {
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
-                Pagas/Baixadas ({filteredCommissions.filter(c => c.status === 'Paga').length})
+                Pagas/Baixadas ({paidCount})
               </button>
             </div>
 
@@ -717,17 +757,27 @@ export function ComissoesView() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {comm.status === 'Pendente' ? (
-                      <button
-                        onClick={() => handlePayCommission(comm)}
-                        className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto cursor-pointer ${
-                          comm.type === 'desconto_cliente'
-                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                            : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                      >
-                        <DollarSign className="w-3.5 h-3.5" />
-                        {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
-                      </button>
+                      canPayCommission(comm) ? (
+                        <button
+                          onClick={() => handlePayCommission(comm)}
+                          className={`px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 ml-auto cursor-pointer ${
+                            comm.type === 'desconto_cliente'
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
+                        >
+                          <DollarSign className="w-3.5 h-3.5" />
+                          {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
+                        </button>
+                      ) : (
+                        <span
+                          title="Somente a administração ou o próprio colaborador pode dar baixa nesta comissão."
+                          className="px-4 py-2 font-bold text-xs rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 flex items-center justify-center gap-1.5 ml-auto cursor-not-allowed opacity-70"
+                        >
+                          <DollarSign className="w-3.5 h-3.5" />
+                          {comm.type === 'desconto_cliente' ? 'Aplicar Desconto' : 'Dar Baixa (PIX)'}
+                        </span>
+                      )
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
                         {comm.paid_at || comm.date}

@@ -11,8 +11,12 @@ test('clientes administrativos e repositório declaram fronteira server-only', (
 
 test('módulo de auditoria alcançado por Client Components não importa supabase-admin', () => {
   const audit = read('lib/audit.ts');
+  const auditRoute = read('app/api/audit/route.ts');
+
   assert.doesNotMatch(audit, /supabase-admin/);
-  assert.match(audit, /from ['"]\.\/supabase['"]/);
+  assert.doesNotMatch(audit, /from ['"]\.\/supabase['"]/);
+  assert.match(audit, /['"]\/api\/audit['"]/);
+  assert.match(auditRoute, /from ['"]@\/lib\/supabase-admin['"]/);
 });
 
 test('Client Components de leads e comissões não alcançam supabase-admin', () => {
