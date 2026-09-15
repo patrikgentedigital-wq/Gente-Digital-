@@ -77,6 +77,7 @@ function serializeAttendanceSummary(value: unknown): AttendanceSummary {
     ambiguous: nonNegativeIntegerOrNull(candidate.ambiguous),
     notApplicable: nonNegativeIntegerOrNull(candidate.notApplicable),
     protocolConflicts: nonNegativeIntegerOrNull(candidate.protocolConflicts),
+    linkMetricsAvailable: candidate.linkMetricsAvailable === true,
     byChannel: safeDimensionList(candidate.byChannel),
     byStatus: safeDimensionList(candidate.byStatus),
   };

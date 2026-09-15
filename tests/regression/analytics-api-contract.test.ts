@@ -18,6 +18,7 @@ const overview: AnalyticsOverviewResponse = {
       ambiguous: 0,
       notApplicable: 0,
       protocolConflicts: 0,
+      linkMetricsAvailable: true,
       byChannel: [{ key: 'whatsapp', count: 2 }],
       byStatus: [{ key: 'finalizado', count: 2 }],
     },

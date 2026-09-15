@@ -19,6 +19,7 @@ export interface AttendanceSummary {
   ambiguous: number | null;
   notApplicable: number | null;
   protocolConflicts: number | null;
+  linkMetricsAvailable: boolean;
   byChannel: Array<{ key: string; count: number }>;
   byStatus: Array<{ key: string; count: number }>;
 }
@@ -112,15 +113,29 @@ function deduplicateAttendance(records: readonly OpaAttendanceRecord[]): {
 export function summarizeAttendance(records: readonly OpaAttendanceRecord[], window: MetricWindow): AttendanceSummary {
   const filtered = records.filter((record) => inWindow(record.data_referencia, window));
   const { total, dimensional, protocolConflicts } = deduplicateAttendance(filtered);
-  const linked = dimensional.filter((record) => record.status_vinculo === 'vinculado').length;
-  const unlinked = dimensional.filter((record) => record.status_vinculo === 'nao_vinculado').length;
+  // Um registro `nao_aplicavel` representa uma carga que ainda não calculou o
+  // vínculo. Não expor os demais estados como se fossem uma classificação
+  // completa evita que a interface transforme ausência de resolução em zero.
+  const linkMetricsAvailable = total === 0
+    || (protocolConflicts === 0
+      && dimensional.length === total
+      && dimensional.every((record) => record.status_vinculo !== 'nao_aplicavel'));
+  const linked = linkMetricsAvailable
+    ? dimensional.filter((record) => record.status_vinculo === 'vinculado').length
+    : null;
+  const unlinked = linkMetricsAvailable
+    ? dimensional.filter((record) => record.status_vinculo === 'nao_vinculado').length
+    : null;
   return {
     total,
     linked,
     unlinked,
-    ambiguous: dimensional.filter((record) => record.status_vinculo === 'ambiguo').length,
+    ambiguous: linkMetricsAvailable
+      ? dimensional.filter((record) => record.status_vinculo === 'ambiguo').length
+      : null,
     notApplicable: dimensional.filter((record) => record.status_vinculo === 'nao_aplicavel').length,
     protocolConflicts,
+    linkMetricsAvailable,
     byChannel: grouped(dimensional.flatMap((record) => record.canal ? [record.canal] : [])),
     byStatus: grouped(dimensional.flatMap((record) => record.status ? [record.status] : [])),
   };

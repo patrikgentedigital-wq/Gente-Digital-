@@ -38,6 +38,8 @@ export function AtendimentoView({ overview }: { overview: AnalyticsOverviewRespo
           icon={CheckCircle2}
           tone="emerald"
           canShowValues={canShowValues}
+          valueAvailable={atendimento.linkMetricsAvailable}
+          unavailableDetail="Vínculo ainda não calculado para esta carga."
         />
         <AnalyticsMetricCard
           label="Não vinculados"
@@ -46,6 +48,8 @@ export function AtendimentoView({ overview }: { overview: AnalyticsOverviewRespo
           icon={UserRoundX}
           tone="rose"
           canShowValues={canShowValues}
+          valueAvailable={atendimento.linkMetricsAvailable}
+          unavailableDetail="Vínculo ainda não calculado para esta carga."
         />
         <AnalyticsMetricCard
           label="Ambíguos"
@@ -54,6 +58,8 @@ export function AtendimentoView({ overview }: { overview: AnalyticsOverviewRespo
           icon={CircleHelp}
           tone="blue"
           canShowValues={canShowValues}
+          valueAvailable={atendimento.linkMetricsAvailable}
+          unavailableDetail="Vínculo ainda não calculado para esta carga."
         />
         <AnalyticsMetricCard
           label="Conflitos"

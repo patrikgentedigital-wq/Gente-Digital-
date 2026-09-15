@@ -67,6 +67,7 @@ function emptyAttendance(): AttendanceSummary {
     ambiguous: null,
     notApplicable: null,
     protocolConflicts: null,
+    linkMetricsAvailable: false,
     byChannel: [],
     byStatus: [],
   };
@@ -275,6 +276,50 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+export interface AnalyticsPageQueryOptions {
+  pageSize?: number;
+  maxPages?: number;
+}
+
+export type AnalyticsPageQuery<T> = (
+  from: number,
+  to: number,
+) => PromiseLike<{ data: T[] | null; error: unknown | null }>;
+
+/**
+ * Reads a Supabase result set page by page. PostgREST commonly caps an
+ * unbounded select at 1,000 rows, so a successful first response is not proof
+ * that the full analytical window was read.
+ */
+export async function fetchAllPages<T>(
+  fetchPage: AnalyticsPageQuery<T>,
+  options: AnalyticsPageQueryOptions = {},
+): Promise<T[]> {
+  const pageSize = options.pageSize ?? 1000;
+  const maxPages = options.maxPages ?? 100;
+
+  if (!Number.isSafeInteger(pageSize) || pageSize <= 0) {
+    throw new Error('Tamanho de página analítica inválido.');
+  }
+  if (!Number.isSafeInteger(maxPages) || maxPages <= 0) {
+    throw new Error('Limite de páginas analíticas inválido.');
+  }
+
+  const rows: T[] = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await fetchPage(from, to);
+    if (error !== null) throw error;
+
+    const pageRows = Array.isArray(data) ? data : [];
+    rows.push(...pageRows);
+    if (pageRows.length < pageSize) return rows;
+  }
+
+  throw new Error('A fonte excedeu o limite de páginas analíticas.');
+}
+
 function latestTimestamp(values: readonly unknown[]): string | null {
   return values.reduce<string | null>((latest, value) => {
     const normalized = normalizeSourceTimestamp(value);
@@ -293,13 +338,12 @@ async function selectRows(
   // realmente consulta o banco. O módulo supabase-admin mantém a barreira
   // server-only sem tornar o parser puro impossível de testar em Node.
   const { supabaseAdmin } = await import('../supabase-admin');
-  let query = supabaseAdmin.from(table).select(columns);
-  if (window.from) query = query.gte(dateColumn, window.from);
-  if (window.to) query = query.lte(dateColumn, window.to);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  return fetchAllPages(async (from, to) => {
+    let query = supabaseAdmin.from(table).select(columns);
+    if (window.from) query = query.gte(dateColumn, window.from);
+    if (window.to) query = query.lte(dateColumn, window.to);
+    return query.range(from, to);
+  });
 }
 
 function mapDateStampedRows(rows: readonly unknown[], dateField: string): DateStampedMetricRecord[] {
@@ -343,7 +387,7 @@ function mapAttendanceRows(rows: readonly unknown[]): OpaAttendanceRecord[] {
         || row.status_vinculo === 'ambiguo'
         || row.status_vinculo === 'nao_aplicavel'
         ? row.status_vinculo
-        : 'nao_vinculado',
+        : 'nao_aplicavel',
       data_referencia: stringOrNull(row.data_abertura),
       data_abertura: stringOrNull(row.data_abertura),
       data_finalizacao: stringOrNull(row.data_finalizacao),

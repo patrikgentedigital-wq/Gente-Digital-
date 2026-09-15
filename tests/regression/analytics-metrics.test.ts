@@ -26,7 +26,7 @@ test('summarizeAttendance conta protocolos únicos e separa vínculo', () => {
   assert.deepEqual(result.byChannel, [{ key: 'telefone', count: 1 }, { key: 'whatsapp', count: 1 }]);
 });
 
-test('summarizeAttendance separa os quatro estados de vínculo', () => {
+test('summarizeAttendance preserva o estado não aplicável e bloqueia contagens incompletas', () => {
   const result = summarizeAttendance([
     { source_id: 'linked', protocolo: 'linked', contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'vinculado', canal: 'a', status: 'ok', data_referencia: '2026-09-10T12:00:00Z' },
     { source_id: 'unlinked', protocolo: 'unlinked', contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'nao_vinculado', canal: 'b', status: 'ok', data_referencia: '2026-09-10T12:00:00Z' },
@@ -35,9 +35,10 @@ test('summarizeAttendance separa os quatro estados de vínculo', () => {
   ], window);
 
   assert.equal(result.total, 4);
-  assert.equal(result.linked, 1);
-  assert.equal(result.unlinked, 1);
-  assert.equal(result.ambiguous, 1);
+  assert.equal(result.linkMetricsAvailable, false);
+  assert.equal(result.linked, null);
+  assert.equal(result.unlinked, null);
+  assert.equal(result.ambiguous, null);
   assert.equal(result.notApplicable, 1);
 });
 
@@ -52,9 +53,10 @@ test('summarizeAttendance trata duplicatas divergentes de modo determinístico e
   assert.deepEqual(forward, reverse);
   assert.equal(forward.total, 1);
   assert.equal(forward.protocolConflicts, 1);
-  assert.equal(forward.linked, 0);
-  assert.equal(forward.unlinked, 0);
-  assert.equal(forward.ambiguous, 0);
+  assert.equal(forward.linkMetricsAvailable, false);
+  assert.equal(forward.linked, null);
+  assert.equal(forward.unlinked, null);
+  assert.equal(forward.ambiguous, null);
   assert.equal(forward.notApplicable, 0);
   assert.deepEqual(forward.byChannel, []);
   assert.deepEqual(forward.byStatus, []);
@@ -68,7 +70,10 @@ test('summarizeAttendance separa namespaces de protocolo e source_id', () => {
 
   assert.equal(result.total, 2);
   assert.equal(result.protocolConflicts, 0);
-  assert.equal(result.linked, 1);
+  assert.equal(result.linkMetricsAvailable, false);
+  assert.equal(result.linked, null);
+  assert.equal(result.unlinked, null);
+  assert.equal(result.ambiguous, null);
   assert.equal(result.notApplicable, 1);
   assert.deepEqual(result.byChannel, [{ key: 'protocolo', count: 1 }, { key: 'source:y', count: 1 }]);
   assert.deepEqual(result.byStatus, [{ key: 'aberto', count: 2 }]);
@@ -134,7 +139,20 @@ test('summarizeAttendance inclui os limites, ignora datas inválidas e ordena em
     { source_id: 'invalid', protocolo: 'invalid', contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'vinculado', canal: 'a', status: 'aberto', data_referencia: 'sem-data' },
   ], window);
 
-  assert.deepEqual(result, { total: 1, linked: 0, unlinked: 1, ambiguous: 0, notApplicable: 0, protocolConflicts: 0, byChannel: [{ key: 'z', count: 1 }], byStatus: [{ key: 'aberto', count: 1 }] });
+  assert.deepEqual(result, { total: 1, linked: 0, unlinked: 1, ambiguous: 0, notApplicable: 0, protocolConflicts: 0, linkMetricsAvailable: true, byChannel: [{ key: 'z', count: 1 }], byStatus: [{ key: 'aberto', count: 1 }] });
+});
+
+test('summarizeAttendance não transforma vínculo não calculado em zeros', () => {
+  const result = summarizeAttendance([
+    { source_id: 'opa-1', protocolo: 'opa-1', contato_bruto: '12345', tipo_identificador: 'client_id', status_vinculo: 'nao_aplicavel', canal: 'whatsapp', status: 'F', data_referencia: '2026-09-10T12:00:00Z' },
+    { source_id: 'opa-2', protocolo: 'opa-2', contato_bruto: null, tipo_identificador: 'unknown', status_vinculo: 'nao_aplicavel', canal: 'whatsapp', status: 'F', data_referencia: '2026-09-10T12:01:00Z' },
+  ], window);
+
+  assert.equal(result.linkMetricsAvailable, false);
+  assert.equal(result.linked, null);
+  assert.equal(result.unlinked, null);
+  assert.equal(result.ambiguous, null);
+  assert.equal(result.notApplicable, 2);
 });
 
 test('summarizeCancellations filtra a janela, deduplica source_id e conta tipos', () => {

@@ -11,6 +11,8 @@ interface AnalyticsMetricCardProps {
   icon: LucideIcon;
   tone?: 'amber' | 'blue' | 'emerald' | 'slate' | 'rose';
   canShowValues: boolean;
+  valueAvailable?: boolean;
+  unavailableDetail?: string;
 }
 
 const toneClasses: Record<NonNullable<AnalyticsMetricCardProps['tone']>, string> = {
@@ -28,8 +30,10 @@ export function AnalyticsMetricCard({
   icon: Icon,
   tone = 'slate',
   canShowValues,
+  valueAvailable = true,
+  unavailableDetail,
 }: AnalyticsMetricCardProps) {
-  const showValue = canShowValues && value !== null;
+  const showValue = canShowValues && valueAvailable && value !== null;
 
   return (
     <article className="group rounded-2xl border border-zinc-800/80 bg-zinc-950/80 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.16)] transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none">
@@ -47,9 +51,13 @@ export function AnalyticsMetricCard({
       <p className="mt-4 text-xs leading-5 text-zinc-500">
         {showValue
           ? detail
-          : value === null
-            ? 'Fonte ainda não confirmada.'
-            : 'Aguardando cobertura da fonte.'}
+          : !canShowValues
+            ? 'Aguardando cobertura da fonte.'
+            : !valueAvailable
+              ? unavailableDetail ?? 'Indicador ainda não calculado.'
+              : value === null
+              ? unavailableDetail ?? 'Fonte ainda não confirmada.'
+              : 'Aguardando cobertura da fonte.'}
       </p>
     </article>
   );
