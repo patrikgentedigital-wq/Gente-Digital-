@@ -82,20 +82,24 @@ CREATE POLICY "settings_service_role_all"
   WITH CHECK (true);
 
 -- Remove policies antigas/permissivas com outros nomes que permitiriam
--- authenticated/anon lerem settings (o token IXC fica aqui).
+-- authenticated/anon lerem settings (o token IXC fica aqui). Policies
+-- "TO public" valem para anon E authenticated — também devem cair.
 DO $$
 DECLARE
   pol record;
 BEGIN
   FOR pol IN
-    SELECT policyname, roles
+    SELECT tablename, policyname, roles
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename = 'settings'
-      AND policyname NOT IN ('settings_admin_all', 'settings_service_role_all')
+      AND tablename IN ('settings', 'user_roles')
+      AND policyname NOT IN (
+        'settings_admin_all', 'settings_service_role_all',
+        'user_roles_select_own', 'user_roles_service_role_all'
+      )
   LOOP
-    IF 'authenticated' = ANY (pol.roles) OR 'anon' = ANY (pol.roles) THEN
-      EXECUTE format('DROP POLICY IF EXISTS %I ON public.settings', pol.policyname);
+    IF 'authenticated' = ANY (pol.roles) OR 'anon' = ANY (pol.roles) OR 'public' = ANY (pol.roles) THEN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
     END IF;
   END LOOP;
 END
