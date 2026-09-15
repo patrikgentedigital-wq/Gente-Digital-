@@ -81,6 +81,26 @@ CREATE POLICY "settings_service_role_all"
   USING (true)
   WITH CHECK (true);
 
+-- Remove policies antigas/permissivas com outros nomes que permitiriam
+-- authenticated/anon lerem settings (o token IXC fica aqui).
+DO $$
+DECLARE
+  pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname, roles
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'settings'
+      AND policyname NOT IN ('settings_admin_all', 'settings_service_role_all')
+  LOOP
+    IF 'authenticated' = ANY (pol.roles) OR 'anon' = ANY (pol.roles) THEN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.settings', pol.policyname);
+    END IF;
+  END LOOP;
+END
+$$;
+
 -- ---------------------------------------------------------------------
 -- (d) RLS em leads:
 --     SELECT para autenticados (compatibilidade com o painel atual),
@@ -133,9 +153,13 @@ BEGIN
   ) THEN
     ALTER TABLE public.commission_payments
       DROP CONSTRAINT IF EXISTS commission_payments_type_check;
-    ALTER TABLE public.commission_payments
-      ADD CONSTRAINT commission_payments_type_check
-      CHECK (type IN ('pix_colaborador', 'desconto_cliente', 'bonus_top'));
+    BEGIN
+      ALTER TABLE public.commission_payments
+        ADD CONSTRAINT commission_payments_type_check
+        CHECK (type IN ('pix_colaborador', 'desconto_cliente', 'bonus_top'));
+    EXCEPTION WHEN check_violation THEN
+      RAISE NOTICE 'AVISO: commission_payments possui linhas com type fora dos valores esperados; constraint nao aplicada. Verifique os dados.';
+    END;
   END IF;
 END
 $$;
@@ -157,12 +181,16 @@ BEGIN
   ) THEN
     DROP INDEX public.idx_leads_phone;
   END IF;
+
+  BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_phone
+      ON public.leads (phone)
+      WHERE phone IS NOT NULL AND phone <> '';
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'AVISO: existem telefones duplicados em leads (formatos diferentes do mesmo numero); o indice unico partial NAO foi criado. Normalizar telefone antes de tentar novamente.';
+  END;
 END
 $$;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_phone
-  ON public.leads (phone)
-  WHERE phone IS NOT NULL AND phone <> '';
 
 -- ---------------------------------------------------------------------
 -- (g) Garantir coluna user_id em redemptions (antes das policies que
