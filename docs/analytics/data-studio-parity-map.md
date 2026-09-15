@@ -116,3 +116,19 @@ A configuração foi corrigida para substituir o objeto `options` inteiro a cada
 | Persistência | `status: blocked`; migration analítica do Supabase não aplicada | não houve escrita |
 
 O teste confirma a paginação técnica e elimina a duplicação causada pela configuração anterior. Ele não transforma `2.003` em paridade com o total `1.918` do Data Studio. A diferença de `85` ainda exige comparação da mesma métrica, campo temporal, corte horário e regra de deduplicação. O workflow continua sem publicação, agenda ou conexão com o Supabase.
+
+## Estado após a correção de 15/09/2026
+
+Os gates técnicos que estavam abertos foram fechados em uma rodada manual controlada. O estado abaixo substitui somente o diagnóstico operacional anterior; os snapshots históricos continuam preservados para auditoria.
+
+| Área | Estado atual | Limite que permanece |
+| --- | --- | --- |
+| `ATENDIMENTO` | Opa! paginado e persistido com `2.003` linhas na janela técnica, sem duplicidade observada; canais brutos disponíveis para o painel | o Data Studio mostrou `1.918` na janela explícita, portanto a diferença de `85` ainda não é paridade |
+| Vínculo no `ATENDIMENTO` | o painel não exibe zero quando a classificação está indisponível; a carga preserva `id_cliente` bruto quando recebido | falta comprovar a chave entre Opa! e IXC e carregar a dimensão de clientes do IXC |
+| `CANCELAMENTOS` | IXC persistido com `12` registros e janela final inclusiva correta | o total coincide com a leitura explícita, mas motivos e cartões de alteração ainda não têm regra fechada |
+| `GERAL` | métricas sem origem confirmada permanecem indisponíveis | leads, vendas e contratos exigem fontes e semântica próprias |
+| Aplicação | pagina a leitura da tabela analítica e diferencia `indisponível` de `zero` | o commit local ainda precisa ser promovido para a Vercel para alterar o domínio de produção |
+
+### Decisão de reconciliação
+
+Não ajustar os `2.003` para `1.918` por meio de um corte inventado, nem usar `id_cliente` bruto como vínculo confirmado. A origem correta para o próximo teste é repetir a extração Opa! com o mesmo campo temporal e limite efetivo do relatório, depois carregar clientes e contratos do IXC por uma rota autorizada e comparar chaves estáveis. Até isso acontecer, `ATENDIMENTO` permanece `partial` e os cartões de vínculo permanecem `unavailable`, enquanto o total e as dimensões efetivamente persistidos continuam utilizáveis.

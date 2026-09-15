@@ -327,6 +327,21 @@ O node `OPA - Lista atendimentos período` ficou com a paginação nativa `Updat
 
 Esta rodada corrige a paginação técnica e o consumo de múltiplas páginas no resumo. Ela ainda não autoriza carga de produção, não prova paridade de negócio e não substitui a validação do corte efetivo do Data Studio.
 
+## Correção de persistência e contrato do painel em 15/09/2026
+
+Após a aplicação da migration analítica, foi executada uma nova rodada manual do workflow remoto, ainda sem publicação ou agenda. O node `FN - Preparar persistência` passou a usar `period_start_ts` e `period_end_ts` na persistência, preservando o limite final inclusivo de `2026-09-10T23:59:59-03:00`. O identificador bruto `id_cliente` do Opa! é mantido em `contato_bruto` com `tipo_identificador: client_id` quando existe. Isso preserva a informação recebida sem afirmar que ela já é uma chave de relacionamento com o IXC.
+
+### Evidência remota da rodada
+
+- `Confirmado`: o último estado persistido do Opa! terminou com `success`, `received: 2.003` e `inserted: 2.003`.
+- `Confirmado`: o último estado persistido do IXC terminou com `success`, `received: 12` e `inserted: 12`.
+- `Confirmado`: a janela persistida usa `2026-09-01T00:00:00-03:00` até `2026-09-10T23:59:59-03:00`. Os estados anteriores com limite final incorreto foram mantidos como histórico e não vencem o estado mais recente.
+- `Confirmado`: a tabela analítica do Opa! contém `2.003` atendimentos na carga atual; `1.677` têm `id_cliente` bruto preservado.
+- `Confirmado`: a aplicação agora pagina a leitura do Supabase e não converte vínculo não calculado em zero. Quando a classificação não pode ser comprovada para toda a carga, os cartões de vínculo ficam indisponíveis.
+- `Bloqueado`: a relação entre o `id_cliente` bruto do Opa! e um cliente ou contrato do IXC ainda não foi comprovada. A carga atual do IXC não contém a lista de clientes necessária para essa validação.
+
+Essa rodada corrige a perda de páginas, o limite temporal persistido e a apresentação enganosa de métricas de vínculo. Ela não transforma a leitura Opa! em paridade automática com o Data Studio, porque a diferença de métrica e de fonte continua sem prova.
+
 ## Estado atual da implementação em 15/09/2026
 
 - `Confirmado`: a migration `create_analytics_sources` está aplicada no projeto Supabase alvo. A verificação remota encontrou as 10 tabelas novas com RLS habilitado; o piloto persistiu `2.003` registros Opa!, `12` registros IXC e `2` estados de sincronização.
