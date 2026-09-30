@@ -1,8 +1,7 @@
 'use client';
 
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, BarChart2, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
+import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase, Colaborador, Lead, isSupabaseConfigured } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
 import Avatar from 'boring-avatars';
@@ -30,7 +29,6 @@ const normalizeRef = (str: string) =>
 
 
 export function ColaboradoresView() {
-  const router = useRouter();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>(isSupabaseConfigured() ? [] : initialColaboradores);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
@@ -713,14 +711,6 @@ export function ColaboradoresView() {
                         title="Ver Extrato de Indicações (Comissão)"
                       >
                         <FileText className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => router.push('/?tab=dashboard')}
-                        aria-label={`Ver analytics de ${colab.name}`}
-                        className="p-2 text-brand-muted hover:text-brand-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-                        title="Ver Analytics"
-                      >
-                        <BarChart2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openEditModal(colab)}

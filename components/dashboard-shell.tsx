@@ -7,6 +7,10 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import {
+  isTemporarilyHiddenDashboardTab,
+  resolveDashboardNavigation,
+} from '@/lib/dashboard-navigation';
 
 const DashboardView = dynamic(
   () => import('@/components/views/dashboard').then((module) => module.DashboardView),
@@ -58,8 +62,17 @@ export function DashboardShell() {
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const tabParam = searchParams.get('tab');
-  const activeTab: TabId = isTabId(tabParam) ? tabParam : 'dashboard';
+  const navigation = resolveDashboardNavigation(tabParam);
+  const activeTab: TabId = navigation.activeTab;
   const refParam = searchParams.get('ref');
+
+  useEffect(() => {
+    if (!navigation.redirectHiddenTab) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'dashboard');
+    router.replace(`?${params.toString()}`);
+  }, [navigation.redirectHiddenTab, router, searchParams]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -91,7 +104,7 @@ export function DashboardShell() {
   }, [refParam]);
 
   const handleTabChange = (tab: string) => {
-    if (!isTabId(tab)) return;
+    if (!isTabId(tab) || isTemporarilyHiddenDashboardTab(tab)) return;
 
     setIsSidebarOpen(false);
     const params = new URLSearchParams(searchParams.toString());

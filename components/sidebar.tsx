@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UsersRound, Network, LogOut, X, Wallet, ShieldCheck, User as UserIcon, TrendingUp, BarChart3, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Avatar from 'boring-avatars';
 import { motion } from 'motion/react';
+import { SIDEBAR_NAV_ITEMS, type SidebarTabId } from '@/lib/dashboard-navigation';
 
 interface SidebarProps {
   activeTab: string;
@@ -13,6 +14,13 @@ interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }
+
+const NAV_ICONS: Record<SidebarTabId, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  leads: Users,
+  colaboradores: UsersRound,
+  comissoes: Wallet,
+};
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
   const router = useRouter();
@@ -105,13 +113,16 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
 
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto relative">
-          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavItem id="indicadores" icon={BarChart3} label="Indicadores" active={activeTab === 'indicadores'} onClick={() => setActiveTab('indicadores')} />
-          <NavItem id="leads" icon={Users} label="Leads & Funil" active={activeTab === 'leads'} onClick={() => setActiveTab('leads')} />
-          <NavItem id="vendas" icon={TrendingUp} label="Vendas & Rastreamento" active={activeTab === 'vendas'} onClick={() => setActiveTab('vendas')} />
-          <NavItem id="colaboradores" icon={UsersRound} label="Colaboradores" active={activeTab === 'colaboradores'} onClick={() => setActiveTab('colaboradores')} />
-          <NavItem id="comissoes" icon={Wallet} label="Comissões & PIX" active={activeTab === 'comissoes'} onClick={() => setActiveTab('comissoes')} />
-          <NavItem id="integracoes" icon={Network} label="Integrações (IXC & MS)" active={activeTab === 'integracoes'} onClick={() => setActiveTab('integracoes')} />
+          {SIDEBAR_NAV_ITEMS.map(({ id, label }) => (
+            <NavItem
+              key={id}
+              id={id}
+              icon={NAV_ICONS[id]}
+              label={label}
+              active={activeTab === id}
+              onClick={() => setActiveTab(id)}
+            />
+          ))}
         </nav>
 
         {/* User Profile Card */}
