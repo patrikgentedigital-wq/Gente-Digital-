@@ -429,19 +429,20 @@ export function ComissoesView() {
   };
 
   return (
-    <div className="w-full max-w-full mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
+    <div className="workspace-page commissions-page w-full max-w-full space-y-6 animate-in fade-in duration-300 pb-16">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border dark:border-gray-800 pb-5">
+      <div className="workspace-page-heading">
         <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Comissões & Recompensas</h2>
-          <p className="text-brand-muted dark:text-gray-400 mt-1">Acompanhamento diferenciado para Colaboradores (PIX) e Clientes Indicadores (Desconto na Mensalidade).</p>
+          <p className="workspace-eyebrow">Fechamento do programa</p>
+          <h2 className="workspace-title mt-1">Comissões & recompensas</h2>
+          <p className="workspace-description">Acompanhe os valores devidos, baixados e as regras de pagamento.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="workspace-page-actions">
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 border border-brand-border dark:border-gray-700 bg-white dark:bg-zinc-800 text-brand-charcoal dark:text-gray-200 font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+            className="gd-button gd-button--secondary"
           >
             <Download className="w-4 h-4" />
             Exportar Extrato (CSV)
@@ -457,44 +458,44 @@ export function ComissoesView() {
         )}
 
         {/* Regras Comerciais Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-500/30">
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-[var(--app-border)] border-l-4 border-l-[var(--app-accent)] bg-[var(--app-panel)] p-5 shadow-level-1 md:grid-cols-2 xl:grid-cols-4">
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-panel-muted)] text-[var(--app-muted)]">
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Colaborador (1 a 9 vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.colaborador.taxaPorVenda},00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
+            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Colaborador (1 a 9 vendas)</h4>
+            <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.colaborador.taxaPorVenda},00 <span className="text-xs font-normal text-[var(--app-muted)]">no PIX / venda</span></p>
           </div>
         </div>
 
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-emerald-500 text-white font-bold shrink-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-panel-muted)] text-[var(--app-muted)]">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Colaborador (10+ vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.colaborador.taxaVolume},00 <span className="text-xs font-normal text-slate-500">no PIX / venda</span></p>
+            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Colaborador (10+ vendas)</h4>
+            <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.colaborador.taxaVolume},00 <span className="text-xs font-normal text-[var(--app-muted)]">no PIX / venda</span></p>
           </div>
         </div>
 
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-purple-600 text-white font-bold shrink-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-panel-muted)] text-[var(--app-muted)]">
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Top Colaborador ({PROGRAM_RULES.bonusTop.minimoIndicacoes}+ vendas)</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">+ R$ {PROGRAM_RULES.bonusTop.valor},00 <span className="text-xs font-normal text-slate-500">bônus PIX (mín. {PROGRAM_RULES.bonusTop.minimoIndicacoes} vendas no mês)</span></p>
+            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Top colaborador ({PROGRAM_RULES.bonusTop.minimoIndicacoes}+ vendas)</h4>
+            <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">+ R$ {PROGRAM_RULES.bonusTop.valor},00 <span className="text-xs font-normal text-[var(--app-muted)]">bônus PIX (mín. {PROGRAM_RULES.bonusTop.minimoIndicacoes} vendas no mês)</span></p>
           </div>
         </div>
 
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-blue-500 text-white font-bold shrink-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-panel-muted)] text-[var(--app-muted)]">
             <Tag className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Cliente Indicador</h4>
-            <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">R$ {PROGRAM_RULES.clienteIndicador.descontoMensalidade},00 <span className="text-xs font-normal text-slate-500">desconto na mensalidade</span></p>
+            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Cliente indicador</h4>
+            <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.clienteIndicador.descontoMensalidade},00 <span className="text-xs font-normal text-[var(--app-muted)]">desconto na mensalidade</span></p>
           </div>
         </div>
       </div>
@@ -510,48 +511,48 @@ export function ComissoesView() {
       )}
 
       {/* Prazo de pagamento */}
-      <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60">
-        <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium leading-relaxed">
+      <div className="workspace-note flex items-start gap-3 rounded-2xl p-4">
+        <Clock className="mt-0.5 h-5 w-5 shrink-0 text-[var(--app-muted)]" />
+        <p className="text-sm font-medium leading-relaxed text-[var(--app-muted)]">
           {RULES_COPY.prazoPagamento} O desconto do cliente indicador é aplicado na primeira fatura após a instalação.
           O bônus de top indicador é calculado sobre as vendas do mês atual.
         </p>
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="workspace-metric">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl">
+            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
               <Clock className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Total Pendente</span>
+             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Total pendente</span>
           </div>
-          <p className="font-display text-3xl font-extrabold text-amber-600 dark:text-amber-400">
+          <p className="font-display text-3xl font-extrabold text-[var(--app-ink)]">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPendente)}
           </p>
           <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Aguardando baixa / desconto</p>
         </div>
 
-        <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm">
+        <div className="workspace-metric">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl">
+            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Total Baixado</span>
+             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Total baixado</span>
           </div>
-          <p className="font-display text-3xl font-extrabold text-green-600 dark:text-green-400">
+          <p className="font-display text-3xl font-extrabold text-[var(--app-ink)]">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPago)}
           </p>
           <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">PIX e descontos aplicados</p>
         </div>
 
-        <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm">
+        <div className="workspace-metric">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
+            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
               <Wallet className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wider">Contratos Instalados</span>
+             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Contratos instalados</span>
           </div>
           <p className="font-display text-3xl font-extrabold text-brand-charcoal dark:text-white">
             {totalConversoes}
@@ -559,16 +560,16 @@ export function ComissoesView() {
           <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Leads no status &quot;Ganho&quot;</p>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/20 p-6 rounded-2xl border border-amber-400/30 shadow-sm flex flex-col justify-between">
+        <div className="workspace-metric workspace-metric--highlight flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">🏆 Top Colaborador do Mês</span>
-            <Award className="w-5 h-5 text-amber-500" />
+            <span className="text-xs font-semibold text-[var(--app-muted)]">Top colaborador do mês</span>
+            <Award className="h-5 w-5 text-[#9b8200]" />
           </div>
           <div className="mt-2">
             <p className="font-display text-lg font-bold text-slate-900 dark:text-white truncate">
               {topColaborador ? topColaborador.name : 'Nenhum líder'}
             </p>
-            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+            <p className="mt-0.5 text-xs font-semibold text-[var(--app-muted)]">
               {topColaborador ? (
                 topColaborador.count >= PROGRAM_RULES.bonusTop.minimoIndicacoes
                   ? `${topColaborador.count} instalações (Bônus R$ ${PROGRAM_RULES.bonusTop.valor} Liberado! 🎉)`
@@ -580,7 +581,7 @@ export function ComissoesView() {
       </div>
 
       {/* Filter and Table Container */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="workspace-panel overflow-hidden">
         <div className="p-6 border-b border-brand-border dark:border-gray-800 flex flex-col gap-4">
           <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
             <div className="flex flex-wrap gap-2">
@@ -588,7 +589,7 @@ export function ComissoesView() {
                 onClick={() => setFilterStatus('all')}
                 className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
                   filterStatus === 'all'
-                    ? 'bg-brand-charcoal dark:bg-zinc-700 text-white shadow-sm'
+                    ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
@@ -598,7 +599,7 @@ export function ComissoesView() {
                 onClick={() => setFilterStatus('Pendente')}
                 className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
                   filterStatus === 'Pendente'
-                    ? 'bg-amber-500 text-white shadow-sm'
+                    ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
@@ -608,7 +609,7 @@ export function ComissoesView() {
                 onClick={() => setFilterStatus('Paga')}
                 className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
                   filterStatus === 'Paga'
-                    ? 'bg-green-600 text-white shadow-sm'
+                    ? 'bg-brand-yellow text-brand-charcoal shadow-sm'
                     : 'bg-gray-100 dark:bg-zinc-800 text-brand-muted dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
                 }`}
               >
@@ -656,7 +657,7 @@ export function ComissoesView() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-brand-border dark:border-gray-700 text-xs text-brand-muted dark:text-gray-400 uppercase">
               <tr>
@@ -788,6 +789,52 @@ export function ComissoesView() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="divide-y divide-[var(--app-border)] md:hidden">
+          {isLoading ? (
+            <div className="p-8 text-center text-sm text-[var(--app-muted)]">Carregando comissões...</div>
+          ) : filteredCommissions.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-sm font-semibold text-[var(--app-ink)]">Nenhuma comissão localizada.</p>
+              <p className="mt-1 text-xs text-[var(--app-muted)]">Ajuste os filtros para consultar outro período.</p>
+            </div>
+          ) : (
+            filteredCommissions.map((comm) => (
+              <article key={comm.id} className={`space-y-3 p-4 ${comm.isBonus ? 'bg-amber-500/10' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-[var(--app-ink)]">{comm.lead_name}</p>
+                    <p className="mt-0.5 break-words text-xs text-[var(--app-muted)]">{comm.colaborador_name} · {comm.date}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold ${comm.status === 'Paga' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                    {comm.status === 'Paga' ? 'Pago' : 'Pendente'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-end justify-between gap-3 border-t border-[var(--app-border)] pt-3">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[var(--app-muted)]">Recompensa</p>
+                    <p className="mt-0.5 text-lg font-extrabold text-[var(--app-ink)]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.commission_amount)}</p>
+                    <p className="text-xs text-[var(--app-muted)]">{comm.type === 'desconto_cliente' ? 'Desconto na mensalidade' : comm.type === 'bonus_top' ? 'Bônus de liderança' : 'Pagamento PIX'}</p>
+                  </div>
+                  {comm.status === 'Pendente' && canPayCommission(comm) ? (
+                    <button
+                      type="button"
+                      onClick={() => handlePayCommission(comm)}
+                      className="gd-button gd-button--primary min-h-10"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      {comm.type === 'desconto_cliente' ? 'Aplicar desconto' : 'Dar baixa'}
+                    </button>
+                  ) : comm.status === 'Paga' ? (
+                    <span className="text-xs font-medium text-[var(--app-muted)]">{comm.paid_at || comm.date}</span>
+                  ) : (
+                    <span className="text-xs font-medium text-[var(--app-muted)]">Ação restrita</span>
+                  )}
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </div>
 

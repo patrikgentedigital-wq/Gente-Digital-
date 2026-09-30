@@ -536,14 +536,15 @@ export function ColaboradoresView() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="workspace-page collaborators-page space-y-8 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="workspace-page-heading">
         <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Gestão de Links & Técnicos</h2>
-          <p className="text-brand-muted dark:text-gray-400 mt-1">Configure os links e monitore as indicações por período para pagamento de comissões.</p>
+          <p className="workspace-eyebrow">Programa de indicação</p>
+          <h2 className="workspace-title mt-1">Colaboradores</h2>
+          <p className="workspace-description">Gerencie acessos, links de indicação e atividade por período.</p>
         </div>
-        <button onClick={openCreateModal} className="px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center gap-2">
+        <button onClick={openCreateModal} className="gd-button gd-button--primary shrink-0">
           <UserPlus className="w-5 h-5" />
           Novo Colaborador
         </button>
@@ -551,7 +552,7 @@ export function ColaboradoresView() {
 
       {/* Grid Info Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 p-6 transition-colors">
+        <div className="workspace-panel p-5 transition-colors sm:p-6 lg:col-span-2">
           <div className="flex items-center gap-2 mb-4 text-brand-charcoal dark:text-white">
             <LinkIcon className="w-5 h-5" />
             <h3 className="font-bold text-lg">Link Base Principal</h3>
@@ -563,19 +564,19 @@ export function ColaboradoresView() {
                   type="text"
                   value={tempBaseLink}
                   onChange={(e) => setTempBaseLink(e.target.value)}
-                  className="w-full bg-white dark:bg-[#27272a] border border-brand-yellow rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-yellow/20"
+                  className="workspace-control w-full px-4 py-3 font-mono text-sm"
                   autoFocus
                 />
                 <button
                   onClick={handleSaveBaseLink}
-                  className="w-full sm:w-auto px-6 py-3 bg-brand-yellow text-brand-charcoal font-bold text-sm rounded-xl hover:shadow-level-2 transition-all flex items-center justify-center"
+                  className="gd-button gd-button--primary w-full sm:w-auto"
                 >
                   Salvar
                 </button>
               </div>
             ) : (
               <>
-                <div className="flex-1 w-full bg-gray-50 dark:bg-gray-800/60 border border-brand-border dark:border-gray-700 rounded-xl px-4 py-3 font-mono text-sm text-brand-charcoal dark:text-white">
+                <div className="min-w-0 flex-1 w-full break-all rounded-xl border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3 font-mono text-sm text-[var(--app-ink)]">
                   {baseLink}
                 </div>
                 <button 
@@ -583,7 +584,7 @@ export function ColaboradoresView() {
                     setTempBaseLink(baseLink);
                     setIsEditingBase(true);
                   }}
-                  className="w-full sm:w-auto px-6 py-3 border-2 border-brand-charcoal dark:border-gray-700 text-brand-charcoal dark:text-white font-bold text-sm rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                  className="gd-button gd-button--secondary w-full sm:w-auto"
                 >
                   <Edit2 className="w-4 h-4" />
                   Alterar Base
@@ -596,7 +597,7 @@ export function ColaboradoresView() {
           </p>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800/40 rounded-2xl border-l-4 border-brand-yellow p-6 shadow-sm">
+        <div className="workspace-note rounded-2xl p-5 sm:p-6">
           <div className="flex items-center gap-2 mb-3 text-brand-charcoal dark:text-white">
             <HelpCircle className="w-5 h-5" />
             <h4 className="font-bold">Apuração de Comissão</h4>
@@ -608,7 +609,7 @@ export function ColaboradoresView() {
       </div>
 
       {/* Table Section */}
-      <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 overflow-hidden transition-colors">
+      <div className="workspace-panel overflow-hidden transition-colors">
         <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           <div>
             <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Colaboradores & Técnicos</h3>
@@ -627,13 +628,13 @@ export function ColaboradoresView() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Filtrar por nome ou ID..."
-                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-800 border border-brand-border dark:border-zinc-700 rounded-xl text-xs text-brand-charcoal dark:text-white focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow transition-all"
+                className="workspace-control w-full py-2 pl-9 pr-4 text-xs"
               />
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800/40 border-b border-brand-border dark:border-gray-800">
@@ -670,14 +671,14 @@ export function ColaboradoresView() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-brand-link dark:text-blue-400 hover:underline cursor-pointer font-medium truncate max-w-[200px]" title={getFullReferralLink(baseLink, colab.id)}>
+                      <span className="min-w-0 max-w-[200px] break-all text-sm font-medium text-brand-link dark:text-blue-400 hover:underline" title={getFullReferralLink(baseLink, colab.id)}>
                         {getFullReferralLink(baseLink, colab.id)}
                       </span>
                       <button
                         type="button"
                         onClick={() => void handleCopyLink(getFullReferralLink(baseLink, colab.id), colab.name)}
                         aria-label={`Copiar link de ${colab.name}`}
-                        className="text-brand-muted hover:text-brand-charcoal focus-visible:opacity-100 dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-brand-muted hover:bg-[var(--app-panel-muted)] hover:text-brand-charcoal dark:hover:text-white"
                         title="Copiar link"
                       >
                         <Copy className="w-4 h-4" />
@@ -763,21 +764,85 @@ export function ColaboradoresView() {
             </tbody>
           </table>
         </div>
+
+        <div className="divide-y divide-[var(--app-border)] md:hidden">
+          {filteredColabs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
+              <Users className="mb-3 h-8 w-8 text-[var(--app-muted)]" />
+              <h4 className="font-bold text-[var(--app-ink)]">Nenhum colaborador</h4>
+              <p className="mt-1 max-w-[260px] text-sm text-[var(--app-muted)]">Adicione colaboradores para gerar links e trazer novos leads.</p>
+              <button type="button" onClick={openCreateModal} className="gd-button gd-button--secondary mt-5">
+                <UserPlus className="h-4 w-4" /> Novo colaborador
+              </button>
+            </div>
+          ) : (
+            filteredColabs.map((colab) => {
+              const referralLink = getFullReferralLink(baseLink, colab.id);
+              return (
+                <article key={colab.id} className="space-y-4 p-4">
+                  <div className="flex items-start gap-3">
+                    {colab.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={colab.photo_url} alt={colab.name} className="h-10 w-10 shrink-0 rounded-full object-cover border border-[var(--app-border)]" />
+                    ) : (
+                      <Avatar size={40} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-semibold text-[var(--app-ink)]">{colab.name}</p>
+                      <p className="mt-0.5 break-all text-xs text-[var(--app-muted)]">{colab.email}</p>
+                    </div>
+                    <span className="shrink-0 rounded-md border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-1 font-mono text-xs text-[var(--app-ink)]">#{colab.id}</span>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel-muted)] p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-[var(--app-muted)]">Link único</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyLink(referralLink, colab.name)}
+                        aria-label={`Copiar link de ${colab.name}`}
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--app-muted)] hover:bg-[var(--app-panel)] hover:text-[var(--app-ink)]"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <span className="block break-all font-mono text-xs text-[var(--app-ink)]">{referralLink}</span>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold text-[var(--app-muted)]">Indicações no período</p>
+                      <p className="mt-0.5 text-xl font-bold text-[var(--app-ink)]">{(colab.count ?? 0).toString().padStart(2, '0')}</p>
+                      <p className="text-xs text-[var(--app-muted)]">{clickCounts[normalizeRef(colab.id)] ?? clickCounts[normalizeRef(colab.name)] ?? 0} cliques no link</p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <button type="button" onClick={() => setSelectedColabForExtrato(colab)} aria-label={`Ver extrato de ${colab.name}`} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2.5 text-xs font-semibold text-[var(--app-ink)] hover:bg-[var(--app-panel-muted)]"><FileText className="h-3.5 w-3.5" /> Extrato</button>
+                      <button type="button" onClick={() => openEditModal(colab)} aria-label={`Editar colaborador ${colab.name}`} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2.5 text-xs font-semibold text-[var(--app-ink)] hover:bg-[var(--app-panel-muted)]"><Edit2 className="h-3.5 w-3.5" /> Editar</button>
+                      <button type="button" onClick={() => { setSelectedColabForQr(colab); setCopiedLink(false); }} aria-label={`Gerar QR Code para ${colab.name}`} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2.5 text-xs font-semibold text-[var(--app-ink)] hover:bg-[var(--app-panel-muted)]"><QrCode className="h-3.5 w-3.5" /> QR</button>
+                      <button type="button" onClick={() => handleDelete(colab.id)} aria-label={`Excluir colaborador ${colab.name}`} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-rose-200 px-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Modal Novo Colaborador */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="new-colaborator-title">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 border border-brand-border dark:border-gray-800">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="new-colaborator-title">
+          <div className="h-full w-full max-w-lg animate-in slide-in-from-right duration-200 overflow-y-auto border-l border-[var(--app-border)] bg-[var(--app-panel)] p-6 shadow-2xl sm:p-8">
             <div className="flex justify-between items-center mb-6">
               <h3 id="new-colaborator-title" className="font-display font-bold text-2xl text-brand-charcoal dark:text-white">{editingColab ? 'Editar Colaborador' : 'Novo Colaborador'}</h3>
               <button type="button" aria-label="Fechar cadastro de colaborador" onClick={closeModal} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5 text-brand-muted dark:text-gray-400" /></button>
             </div>
             <form onSubmit={handleSubmit(handleAdd)} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal mb-1">Nome Completo</label>
+                <label htmlFor="colaborador-name" className="block text-sm font-semibold text-brand-charcoal mb-1">Nome Completo</label>
                 <input 
-                  autoFocus 
+                  id="colaborador-name"
+                  autoFocus
                   {...register('name')} 
                   type="text" 
                   placeholder="Ex: Maria Joaquina" 
@@ -790,9 +855,10 @@ export function ColaboradoresView() {
                 {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal mb-1">E-mail Profissional</label>
+                <label htmlFor="colaborador-email" className="block text-sm font-semibold text-brand-charcoal mb-1">E-mail Profissional</label>
                 <input 
-                  {...register('email')} 
+                  id="colaborador-email"
+                  {...register('email')}
                   type="email" 
                   placeholder="maria@empresa.com" 
                   className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-brand-charcoal focus:outline-none focus:ring-1 transition-all ${
@@ -804,7 +870,7 @@ export function ColaboradoresView() {
                 {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-brand-charcoal mb-1">Foto (Opcional)</label>
+                <label htmlFor="colaborador-photo" className="block text-sm font-semibold text-brand-charcoal mb-1">Foto (Opcional)</label>
                 <div className="flex items-center gap-4">
                   {watchPhotoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -815,7 +881,8 @@ export function ColaboradoresView() {
                     </div>
                   )}
                   <input 
-                    type="file" 
+                    id="colaborador-photo"
+                    type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     className="text-sm text-brand-muted file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-brand-yellow/20 file:text-brand-charcoal hover:file:bg-brand-yellow/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"

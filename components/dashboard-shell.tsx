@@ -113,7 +113,7 @@ export function DashboardShell() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] text-slate-900 transition-colors dark:bg-[#09090B] dark:text-slate-100">
+    <div className="flex min-h-screen bg-[var(--app-canvas)] text-[var(--app-ink)] transition-colors">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={handleTabChange}
@@ -124,7 +124,7 @@ export function DashboardShell() {
       <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-64">
         <Header activeTabName={tabNames[activeTab]} onMenuClick={() => setIsSidebarOpen(true)} />
 
-        <main className="relative flex-1 overflow-x-hidden p-4 md:p-8">
+        <main className="relative flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8 xl:px-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

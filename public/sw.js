@@ -2,7 +2,7 @@
 // Estratégia cache-first apenas para assets imutáveis do Next (_next/static).
 // Demais requests passam direto para a rede.
 
-const STATIC_ASSETS_CACHE = 'gd-static-assets-v1';
+const STATIC_ASSETS_CACHE = 'gd-static-assets-v2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
