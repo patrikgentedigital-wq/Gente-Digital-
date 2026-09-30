@@ -202,6 +202,22 @@ test('admin recebe lista da equipe sem o cliente enviar IDs arbitrários no corp
   assert.deepEqual(payload.collaborators, [{ id: 'EMP-042', name: 'Vendedora' }]);
 });
 
+test('admin aplica coletor e períodos independentes ao relatório', async () => {
+  const admin = makeHandlers({ role: 'admin' });
+  const response = await admin.handlers.getCollections(request(
+    '/api/post-sale/collections?collectorId=EMP-007&collectionStart=2026-08-01&collectionEnd=2026-08-31&conversionStart=2026-09-01&conversionEnd=2026-09-30',
+  ));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(admin.calls.listDataset[0], {
+    collectorColaboradorId: 'EMP-007',
+    window: {
+      collection: { start: '2026-08-01', end: '2026-08-31' },
+      conversion: { start: '2026-09-01', end: '2026-09-30' },
+    },
+  });
+});
+
 test('reconciliação é restrita a admin e status Ganho sozinho não cria conversão', async () => {
   const denied = makeHandlers({ role: 'vendedor' });
   const deniedResponse = await denied.handlers.reconcile(request('/api/post-sale/reconcile', 'POST', {}));

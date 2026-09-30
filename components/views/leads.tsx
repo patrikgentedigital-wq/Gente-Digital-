@@ -13,6 +13,8 @@ import { initialColaboradores } from '@/lib/mock-data';
 import { ConfirmModal } from '@/components/providers/confirm-modal';
 import { sanitizeCsvField } from '@/lib/utils';
 import { DateFilterState, matchesDateFilter } from '@/lib/date-filters';
+import { PostSaleCollectionDialog } from '@/components/views/post-sale-collection-dialog';
+import { PostSalePanel } from '@/components/views/post-sale-panel';
 
 const normalizePhoneDigits = (phone: string) => phone.replace(/\D/g, '');
 
@@ -88,6 +90,8 @@ export function LeadsView() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+  const [activeSection, setActiveSection] = useState<'leads' | 'post-sale'>('leads');
+  const [isPostSaleCollectionOpen, setIsPostSaleCollectionOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<UILead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<UILead | null>(null);
@@ -452,47 +456,13 @@ export function LeadsView() {
     try {
       setIsLoading(true);
       if (isSupabaseConfigured()) {
-        // Tenta buscar via API server-side primeiro (garante bypass de RLS e integridade de sessão)
-        try {
-          const apiRes = await fetch('/api/leads');
-          if (apiRes.ok) {
-            const apiData = await apiRes.json();
-            if (apiData.success && Array.isArray(apiData.leads) && apiData.leads.length > 0) {
-              setLeads(apiData.leads);
-              return;
-            }
-          }
-        } catch (apiErr) {
-          console.warn('Fallback para query direta do Supabase:', apiErr);
+        const apiRes = await fetch('/api/leads', { cache: 'no-store' });
+        const apiData = await apiRes.json();
+        if (!apiRes.ok || !apiData.success || !Array.isArray(apiData.leads)) {
+          throw new Error(apiData.error || 'Não foi possível carregar os leads autorizados.');
         }
-
-        // Carrega TODOS os leads para busca, filtros e exportação operarem no dataset completo.
-        // (No dataset atual, a paginação é feita no cliente.)
-        const { data: leadsData, error: leadsError } = await supabase
-          .from('leads')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (leadsError) throw leadsError;
-
-        if (leadsData && leadsData.length > 0) {
-          const leadIds = leadsData.map(l => l.id);
-          const { data: historyData, error: historyError } = await supabase
-            .from('lead_history')
-            .select('*')
-            .in('lead_id', leadIds)
-            .order('created_at', { ascending: false });
-
-          if (historyError) console.error("Error fetching lead history:", historyError);
-
-          const uiLeads: UILead[] = leadsData.map(lead => ({
-            ...lead,
-            history: historyData ? historyData.filter(h => h.lead_id === lead.id) : []
-          }));
-          setLeads(uiLeads);
-        } else {
-          setLeads([]);
-        }
+        // Uma lista vazia autorizada é resultado válido; nunca buscar todos os leads no browser.
+        setLeads(apiData.leads);
       } else {
         setLeads(initialLeads);
       }
@@ -830,12 +800,37 @@ export function LeadsView() {
         <div className="text-xs text-brand-muted dark:text-gray-400 font-bold mb-1 flex items-center gap-1.5 uppercase tracking-wide">
           <span>Marketing de indicações</span>
           <span className="text-gray-300 text-sm">›</span>
-          <span className="text-brand-charcoal dark:text-gray-300 font-extrabold">Acompanhamento de leads</span>
+          <span className="text-brand-charcoal dark:text-gray-300 font-extrabold">{activeSection === 'post-sale' ? 'Indicadores de pós-venda' : 'Acompanhamento de leads'}</span>
         </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border pb-2 shrink-0">
-        <div className="flex gap-4">
+        <div className="flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setActiveSection('leads')}
+            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
+              activeSection === 'leads'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
+            }`}
+          >
+            Leads
+          </button>
+          <button
+            onClick={() => setActiveSection('post-sale')}
+            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
+              activeSection === 'post-sale'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
+            }`}
+          >
+            Pós-venda
+          </button>
+        </div>
+
+        {activeSection === 'leads' ? (
+          <>
+          <div className="flex gap-4">
           <button 
             onClick={() => setViewMode('kanban')} 
             className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
@@ -1037,10 +1032,24 @@ export function LeadsView() {
           >
             Exportar
           </button>
-        </div>
+          </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3 self-end md:self-auto">
+            <button
+              onClick={() => setIsPostSaleCollectionOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-charcoal dark:bg-brand-yellow text-white dark:text-brand-charcoal hover:bg-black dark:hover:bg-yellow-400 font-bold text-sm rounded-xl transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar coleta
+            </button>
+          </div>
+        )}
       </div>
 
-      {isLoading ? (
+      {activeSection === 'post-sale' ? (
+        <PostSalePanel onRequestCollection={() => setIsPostSaleCollectionOpen(true)} />
+      ) : isLoading ? (
         <LeadsSkeleton viewMode={viewMode} />
       ) : viewMode === 'list' ? (
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-brand-border dark:border-gray-800 shadow-level-1 overflow-hidden shrink-0 flex-1 flex flex-col">
@@ -1278,7 +1287,7 @@ export function LeadsView() {
       )}
 
       {/* Pagination Bar (aplicável apenas à visão em lista) */}
-      {viewMode === 'list' && (
+      {activeSection === 'leads' && viewMode === 'list' && (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-brand-border dark:border-gray-800 text-sm mt-2">
         <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">
           Mostrando <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a <span className="font-bold text-brand-charcoal dark:text-white">{pageLeads.length > 0 ? (currentPage - 1) * pageSize + pageLeads.length : 0}</span> de <span className="font-bold text-brand-charcoal dark:text-white">{filteredLeads.length}</span> leads
@@ -1308,24 +1317,26 @@ export function LeadsView() {
       </div>
       )}
 
-      {/* Floating Action Button for New Lead (bottom right) */}
-      <button
-        onClick={openCreateModal}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
-        title="Novo Lead"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {activeSection === 'leads' && <>
+        {/* Floating Action Button for New Lead (bottom right) */}
+        <button
+          onClick={openCreateModal}
+          className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40"
+          title="Novo Lead"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
 
-      {/* Floating Action Button for IXC Sync (bottom right next to New Lead) */}
-      <button 
-        onClick={handleSyncIxc} 
-        disabled={isSyncing}
-        className={`fixed bottom-8 right-24 w-14 h-14 bg-brand-yellow hover:bg-brand-yellow/80 text-brand-charcoal rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-        title="Sincronizar com IXC Soft"
-      >
-        <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
-      </button>
+        {/* Floating Action Button for IXC Sync (bottom right next to New Lead) */}
+        <button
+          onClick={handleSyncIxc}
+          disabled={isSyncing}
+          className={`fixed bottom-8 right-24 w-14 h-14 bg-brand-yellow hover:bg-brand-yellow/80 text-brand-charcoal rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-40 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+          title="Sincronizar com IXC Soft"
+        >
+          <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
+        </button>
+      </>}
 
       {/* New Lead Modal */}
       {isModalOpen && (
@@ -1760,6 +1771,16 @@ export function LeadsView() {
             </div>
           </div>
         </div>
+      )}
+
+      {isPostSaleCollectionOpen && (
+        <PostSaleCollectionDialog
+          onClose={() => setIsPostSaleCollectionOpen(false)}
+          onSaved={async () => {
+            toastSuccess('Coleta registrada', 'A coleta e os resultados dos contatos foram salvos.');
+            await fetchLeads();
+          }}
+        />
       )}
     </div>
   )

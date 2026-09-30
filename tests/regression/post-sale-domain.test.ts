@@ -178,6 +178,19 @@ test('gateway sanitiza erros HTTP sem incluir telefone, payload ou credencial', 
   });
 });
 
+test('gateway converte timeout do IXC em erro sanitizado', async () => {
+  const ixc = await createIxcGateway({
+    getCredentials: async () => ({ cleanDomain: 'ixc.example.test', authHeader: 'Basic test-only', hasCredentials: true }),
+    fetchWithTimeout: async () => { throw new Error('timeout token-super-secreto 91987654321'); },
+  });
+
+  await assert.rejects(ixc.getContractsById('0000042'), (error: Error) => {
+    assert.match(error.message, /consultar o IXC/i);
+    assert.doesNotMatch(error.message, /timeout|token-super-secreto|91987654321/);
+    return true;
+  });
+});
+
 test('reconcilia somente telefone único e preserva múltiplos contratos do mesmo contato', async () => {
   const contracts = [
     { id: '000456', clientId: 'client-9', status: 'A', activatedAt: '2026-09-11 09:30:00' },
