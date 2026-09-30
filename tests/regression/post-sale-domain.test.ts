@@ -222,11 +222,25 @@ test('não conta como conversão contrato ativo antes da venda de origem', async
   assert.deepEqual(await reconcileContractsForContacts([contact()], ixc), []);
 });
 
-test('data de venda limita a ambiguidade a coletas que já existiam na ativação', async () => {
+test('não conta conversão ativada antes de o contato ser coletado', async () => {
+  const activeBeforeCollection: IxcContractRecord = {
+    id: '000456', clientId: 'client-9', status: 'A', activatedAt: '2026-09-11 09:30:00',
+  };
+  const ixc = gateway({
+    listContractsByClientId: async () => [activeBeforeCollection],
+    getContractsById: async () => [activeBeforeCollection],
+  });
+  const collectedLater = contact({ createdAt: '2026-09-12T13:00:00.000Z' });
+
+  assert.deepEqual(await reconcileContractsForContacts([collectedLater], ixc), []);
+});
+
+test('data de venda e coleta limitam a ambiguidade a contatos existentes na ativação', async () => {
   const futureCollection = contact({
     id: 'contact-future',
     collectionId: 'collection-future',
     originSoldAt: '2026-09-12T12:00:00.000Z',
+    createdAt: '2026-09-12T13:00:00.000Z',
   });
   const confirmed = await reconcileContractsForContacts([contact(), futureCollection], gateway());
   assert.equal(confirmed.length, 1);
@@ -267,6 +281,7 @@ test('métricas incluem origem sem contatos e representam denominador zero sem p
       id: 'collection-1',
       originContractId: '0001',
       soldAt: '2026-09-01T03:00:00.000Z',
+      createdAt: '2026-09-01T03:05:00.000Z',
       collectorColaboradorId: 'EMP-042',
       outcome: 'no_referral',
     }],
@@ -286,6 +301,7 @@ test('métricas contam pendências sem transformar status Ganho em contrato conf
       id: 'collection-1',
       originContractId: '0001',
       soldAt: '2026-09-10T03:00:00.000Z',
+      createdAt: '2026-09-10T03:05:00.000Z',
       collectorColaboradorId: 'EMP-042',
       outcome: 'contacts_collected',
     }],
@@ -313,6 +329,7 @@ test('vários contratos confirmados contam um contato convertido e tempo até pr
       id: 'collection-1',
       originContractId: '0001',
       soldAt: '2026-09-10T03:00:00.000Z',
+      createdAt: '2026-09-10T03:05:00.000Z',
       collectorColaboradorId: 'EMP-042',
       outcome: 'contacts_collected',
     }],
@@ -339,12 +356,12 @@ test('períodos independentes filtram por dia local inclusivo de São Paulo', ()
   const result = buildPostSaleMetrics({
     collections: [
       {
-        id: 'collection-in', originContractId: '0001', soldAt: '2026-08-02T02:59:59.999Z',
-        collectorColaboradorId: 'EMP-042', outcome: 'contacts_collected',
+        id: 'collection-in', originContractId: '0001', soldAt: '2026-09-15T03:00:00.000Z',
+        createdAt: '2026-08-02T02:59:59.999Z', collectorColaboradorId: 'EMP-042', outcome: 'contacts_collected',
       },
       {
-        id: 'collection-out', originContractId: '0002', soldAt: '2026-08-02T03:00:00.000Z',
-        collectorColaboradorId: 'EMP-042', outcome: 'contacts_collected',
+        id: 'collection-out', originContractId: '0002', soldAt: '2026-07-15T03:00:00.000Z',
+        createdAt: '2026-08-02T03:00:00.000Z', collectorColaboradorId: 'EMP-042', outcome: 'contacts_collected',
       },
     ],
     contacts: [contact({ collectionId: 'collection-in' }), contact({ id: 'contact-out', collectionId: 'collection-out' })],
@@ -373,6 +390,7 @@ test('métricas ignoram períodos e tempos inválidos sem gerar duração negati
   const result = buildPostSaleMetrics({
     collections: [{
       id: 'collection-1', originContractId: '0001', soldAt: 'data inválida',
+      createdAt: 'data inválida',
       collectorColaboradorId: 'EMP-042', outcome: 'contacts_collected',
     }],
     contacts: [contact({

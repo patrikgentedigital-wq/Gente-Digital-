@@ -206,6 +206,7 @@ export async function reconcileContractsForContacts(
     contact.state === 'created_lead'
     && contact.leadId !== null
     && parseIxcDate(contact.originSoldAt)
+    && parseIxcDate(contact.createdAt)
     && isValidPhoneDigits(contact.phoneNormalized)
   ));
   const contactsByPhone = new Map<string, PostSaleContact[]>();
@@ -259,11 +260,17 @@ export async function reconcileContractsForContacts(
         const activatedAt = parseIxcDate(exactContracts[0].activatedAt);
         if (!activatedAt) continue;
         const originSoldAt = parseIxcDate(contact.originSoldAt);
-        if (!originSoldAt || Date.parse(activatedAt) < Date.parse(originSoldAt)) continue;
+        const collectedAt = parseIxcDate(contact.createdAt);
+        if (!originSoldAt || !collectedAt
+          || Date.parse(activatedAt) < Date.parse(originSoldAt)
+          || Date.parse(activatedAt) < Date.parse(collectedAt)) continue;
 
         const samePhoneContacts = (contactsByPhone.get(contact.phoneNormalized) ?? []).filter((match) => {
           const matchOriginSoldAt = parseIxcDate(match.originSoldAt);
-          return !!matchOriginSoldAt && Date.parse(matchOriginSoldAt) <= Date.parse(activatedAt);
+          const matchCollectedAt = parseIxcDate(match.createdAt);
+          return !!matchOriginSoldAt && !!matchCollectedAt
+            && Date.parse(matchOriginSoldAt) <= Date.parse(activatedAt)
+            && Date.parse(matchCollectedAt) <= Date.parse(activatedAt);
         });
 
         const ambiguousClient = exactPhoneClients.length !== 1;

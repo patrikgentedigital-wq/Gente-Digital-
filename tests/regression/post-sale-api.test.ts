@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { createPostSaleHandlers } from '@/lib/post-sale/handlers';
+import { filterLegacyRefLeads } from '@/lib/post-sale/lead-scope';
 import type { IxcGateway, PostSaleContact } from '@/lib/post-sale/contracts';
 
 const user = {
@@ -324,4 +325,25 @@ test('webhook sem contrato não cria conversões e rota Leads une ref com coleta
   assert.doesNotMatch(leadsRoute, /\.or\(/);
   assert.match(leadsRoute, /post_sale_collections/);
   assert.match(leadsRoute, /post_sale_collection_id/);
+  assert.match(leadsRoute, /filterLegacyRefLeads\(data \|\| \[\]\)/);
+});
+
+test('lead post_sale com ref igual ao vendedor não vaza por busca de ref legado', () => {
+  const legacyLead = { id: 101, source: 'indique-e-ganhe' };
+  const otherSellersPostSaleLead = { id: 202, source: 'post_sale', post_sale_collection_id: 'collection-other' };
+
+  assert.deepEqual(filterLegacyRefLeads([legacyLead, otherSellersPostSaleLead]), [legacyLead]);
+});
+
+test('relatório e reconciliação selecionam coletas pela data em que foram registradas', () => {
+  const source = readFileSync(new URL('../../lib/post-sale/handlers.ts', import.meta.url), 'utf8');
+  const listDataset = source.slice(source.indexOf('async listDataset(filter)'), source.indexOf('async createCollection(input)'));
+  const listReconciliation = source.slice(source.indexOf('async listReconciliationContacts(collectionRange)'), source.indexOf('async insertConversions(candidates, verifiedAt)'));
+
+  assert.match(listDataset, /\.gte\('created_at', collectionBounds\.start\)/);
+  assert.match(listDataset, /\.lt\('created_at', collectionBounds\.endExclusive\)/);
+  assert.doesNotMatch(listDataset, /\.gte\('sold_at', collectionBounds\.start\)/);
+  assert.match(listReconciliation, /\.gte\('created_at', bounds\.start\)/);
+  assert.match(listReconciliation, /\.lt\('created_at', bounds\.endExclusive\)/);
+  assert.match(listReconciliation, /\.select\('id,sold_at,created_at'\)/);
 });

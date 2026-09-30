@@ -73,7 +73,7 @@ export interface PostSaleCollectionMetricRow {
   collectorColaboradorId: string;
   outcome: PostSaleOutcome;
   originCustomerRef?: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
 export interface PostSaleMetricConversion {

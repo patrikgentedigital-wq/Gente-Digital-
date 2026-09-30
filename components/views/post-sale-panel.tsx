@@ -195,10 +195,11 @@ export function PostSalePanel({ onRequestCollection }: Props) {
   function exportCollections() {
     if (!data) return;
     const rows: Array<Array<string | number | null | undefined>> = [
-      ['Contrato de origem', 'Cliente de origem', 'Data da venda', 'Coletor', 'Resultado', 'Contatos'],
+      ['Contrato de origem', 'Cliente de origem', 'Data da coleta', 'Data da venda', 'Coletor', 'Resultado', 'Contatos'],
       ...data.collections.map((collection) => [
         collection.originContractId,
         collection.originCustomerRef || 'Não informado',
+        displayDate(collection.createdAt),
         displayDate(collection.soldAt),
         collaboratorNames.get(collection.collectorColaboradorId) || collection.collectorColaboradorId || 'Não informado',
         collection.outcome === 'no_referral' ? 'Não recebeu contatos' : 'Recebeu contatos',
@@ -255,11 +256,11 @@ export function PostSalePanel({ onRequestCollection }: Props) {
         <header className="flex flex-col gap-3 border-b border-brand-border px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><h2 className="text-base font-extrabold text-brand-charcoal dark:text-white">Coletas de pós-venda</h2><p className="mt-1 text-xs text-brand-muted dark:text-gray-400">Selecione uma linha para conferir os contatos recebidos.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={exportCollections} disabled={!data?.collections.length} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border px-3 py-2 text-xs font-bold text-brand-charcoal hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-zinc-800"><ArrowDownToLine className="h-3.5 w-3.5" />Exportar CSV</button></div></header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-brand-muted dark:bg-zinc-800/70 dark:text-gray-400"><tr><th className="px-4 py-3 font-extrabold sm:px-5">Contrato / cliente de origem</th><th className="px-4 py-3 font-extrabold">Data</th><th className="px-4 py-3 font-extrabold">Coletor</th><th className="px-4 py-3 font-extrabold">Resultado</th><th className="px-4 py-3 font-extrabold">Contatos</th><th className="px-4 py-3 font-extrabold">Ação</th></tr></thead>
+            <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-brand-muted dark:bg-zinc-800/70 dark:text-gray-400"><tr><th className="px-4 py-3 font-extrabold sm:px-5">Contrato / cliente de origem</th><th className="px-4 py-3 font-extrabold">Datas</th><th className="px-4 py-3 font-extrabold">Coletor</th><th className="px-4 py-3 font-extrabold">Resultado</th><th className="px-4 py-3 font-extrabold">Contatos</th><th className="px-4 py-3 font-extrabold">Ação</th></tr></thead>
             <tbody className="divide-y divide-brand-border dark:divide-gray-800">
               {(data?.collections || []).map((collection) => <tr key={collection.id} className={`cursor-pointer transition hover:bg-blue-50/50 dark:hover:bg-blue-950/10 ${selectedCollection === collection.id ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`} onClick={() => setSelectedCollection((current) => current === collection.id ? null : collection.id)}>
                 <td className="px-4 py-3 sm:px-5"><p className="font-bold text-brand-charcoal dark:text-gray-200">{collection.originContractId}</p><p className="mt-0.5 text-xs text-brand-muted dark:text-gray-400">{collection.originCustomerRef || 'Origem não informada'}</p></td>
-                <td className="px-4 py-3 text-xs text-brand-muted dark:text-gray-400">{displayDate(collection.soldAt)}</td>
+                <td className="px-4 py-3 text-xs text-brand-muted dark:text-gray-400"><span className="block">Coleta: {displayDate(collection.createdAt)}</span><span className="mt-0.5 block text-[11px] text-brand-muted/75 dark:text-gray-500">Venda: {displayDate(collection.soldAt)}</span></td>
                 <td className="px-4 py-3 text-xs text-brand-charcoal dark:text-gray-300">{collaboratorNames.get(collection.collectorColaboradorId) || collection.collectorColaboradorId || 'Não informado'}</td>
                 <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${collection.outcome === 'no_referral' ? 'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-300' : 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300'}`}>{collection.outcome === 'no_referral' ? 'Sem contatos' : 'Com contatos'}</span></td>
                 <td className="px-4 py-3 text-center font-bold tabular-nums text-brand-charcoal dark:text-gray-200">{contactCounts.get(collection.id) || 0}</td>

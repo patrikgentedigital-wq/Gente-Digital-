@@ -141,7 +141,7 @@ export function buildPostSaleMetrics(data: PostSaleDataset, window: PostSaleWind
   const collectionRange = validatedRange(window.collection);
   const conversionRange = validatedRange(window.conversion);
 
-  const selectedCollections = data.collections.filter((collection) => inRange(collection.soldAt, collectionRange));
+  const selectedCollections = data.collections.filter((collection) => inRange(collection.createdAt, collectionRange));
   const selectedCollectionIds = new Set(selectedCollections.map((collection) => collection.id));
   const selectedContacts = data.contacts.filter((contact) => selectedCollectionIds.has(contact.collectionId));
   const validContacts = selectedContacts.filter((contact) => (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
+import { filterLegacyRefLeads } from '@/lib/post-sale/lead-scope';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
           console.error('Erro ao buscar leads de indicação no servidor:', error.message);
           return NextResponse.json({ success: false, error: 'Não foi possível buscar leads.' }, { status: 500 });
         }
-        leadsData.push(...(data || []));
+        leadsData.push(...filterLegacyRefLeads(data || []));
       }
 
       if (colabRefs.id) {

@@ -351,9 +351,9 @@ function createSupabaseStore(): PostSaleStore {
         let query = supabaseAdmin
           .from('post_sale_collections')
           .select('id,origin_contract_id,origin_customer_ref,sold_at,collector_colaborador_id,outcome,created_at')
-          .gte('sold_at', collectionBounds.start)
-          .lt('sold_at', collectionBounds.endExclusive)
-          .order('sold_at', { ascending: false })
+          .gte('created_at', collectionBounds.start)
+          .lt('created_at', collectionBounds.endExclusive)
+          .order('created_at', { ascending: false })
           .range(from, to);
         if (filter.collectorColaboradorId) {
           query = query.eq('collector_colaborador_id', filter.collectorColaboradorId);
@@ -442,10 +442,10 @@ function createSupabaseStore(): PostSaleStore {
       const collectionRows = await pagination<Record<string, unknown>>((from, to) => (
         supabaseAdmin
           .from('post_sale_collections')
-          .select('id,sold_at')
-          .gte('sold_at', bounds.start)
-          .lt('sold_at', bounds.endExclusive)
-          .order('sold_at', { ascending: false })
+          .select('id,sold_at,created_at')
+          .gte('created_at', bounds.start)
+          .lt('created_at', bounds.endExclusive)
+          .order('created_at', { ascending: false })
           .range(from, to)
       ));
       const collectionIds = collectionRows.map((row) => stringValue(row.id)).filter(Boolean);
