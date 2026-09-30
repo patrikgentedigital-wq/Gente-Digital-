@@ -21,6 +21,9 @@ export interface IxcGatewayDependencies {
 
 interface IxcApiResponse {
   registros?: unknown;
+  total?: unknown;
+  type?: unknown;
+  error?: unknown;
 }
 
 function textualId(value: unknown): string {
@@ -100,18 +103,27 @@ export async function createIxcGateway(dependencies: IxcGatewayDependencies = {}
 
     let payload: IxcApiResponse;
     try {
-      payload = await response.json() as IxcApiResponse;
+      const value: unknown = await response.json();
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_shape');
+      payload = value as IxcApiResponse;
     } catch {
       console.warn('post_sale_ixc_query_failed', { table, reason: 'invalid_json' });
       throw new PostSaleDomainError('ixc_unavailable', 'O IXC retornou uma resposta inválida.');
     }
 
+    if (payload.type === 'error' || payload.error) {
+      console.warn('post_sale_ixc_query_failed', { table, reason: 'api_error' });
+      throw new PostSaleDomainError('ixc_unavailable', 'O IXC recusou a consulta.');
+    }
+
     if (!Array.isArray(payload.registros)) {
+      // O IXC omite registros quando a consulta válida tem total zero.
+      // Totais ausentes/positivos ou registros malformados continuam sendo falhas.
+      if (payload.registros == null && (payload.total === '0' || payload.total === 0)) return [];
       console.warn('post_sale_ixc_query_failed', {
         table,
         reason: 'missing_records_array',
-        declaredTotal: Number.isFinite(Number((payload as Record<string, unknown>).total))
-          ? Number((payload as Record<string, unknown>).total) : null,
+        declaredTotal: Number.isFinite(Number(payload.total)) ? Number(payload.total) : null,
       });
       throw new PostSaleDomainError('ixc_unavailable', 'O IXC retornou uma resposta inválida.');
     }

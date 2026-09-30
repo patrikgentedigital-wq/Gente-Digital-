@@ -205,6 +205,30 @@ test('validação preserva diagnóstico sanitizado do gateway sem propagar exce�
   });
 });
 
+test('gateway aceita total zero sem registros e distingue contrato ausente de falha IXC', async () => {
+  for (const total of ['0', 0]) {
+    const ixc = await createIxcGateway({
+      getCredentials: async () => ({ cleanDomain: 'ixc.example.test', authHeader: 'Basic test-only', hasCredentials: true }),
+      fetchWithTimeout: async () => Response.json({ page: '1', total }),
+    });
+    assert.deepEqual(await ixc.getContractsById('0000000000'), []);
+    assert.deepEqual(await ixc.getClientsById('0'), []);
+    assert.deepEqual(await ixc.findClientsByName('Pessoa inexistente'), []);
+    assert.deepEqual(await ixc.listContractsByClientId('0'), []);
+    await assert.rejects(validateOriginContract('0000000000', ixc), (error: PostSaleDomainError) => error.code === 'invalid_contract');
+  }
+});
+
+test('gateway não transforma resposta incompleta ou de erro em lista vazia', async () => {
+  for (const payload of [{ total: '1' }, {}, null, { total: '0', registros: {} }, { total: '0', type: 'error' }, { total: '0', error: 'denied' }]) {
+    const ixc = await createIxcGateway({
+      getCredentials: async () => ({ cleanDomain: 'ixc.example.test', authHeader: 'Basic test-only', hasCredentials: true }),
+      fetchWithTimeout: async () => Response.json(payload),
+    });
+    await assert.rejects(ixc.getContractsById('0'), (error: PostSaleDomainError) => error.code === 'ixc_unavailable');
+  }
+});
+
 test('reconcilia somente telefone único e preserva múltiplos contratos do mesmo contato', async () => {
   const contracts = [
     { id: '000456', clientId: 'client-9', status: 'A', activatedAt: '2026-09-11 09:30:00' },
