@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS public.post_sale_contacts (
 CREATE TABLE IF NOT EXISTS public.post_sale_conversions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ixc_contract_id text NOT NULL UNIQUE CHECK (btrim(ixc_contract_id) <> ''),
+  post_sale_collection_id uuid
+    REFERENCES public.post_sale_collections (id) ON DELETE SET NULL,
   post_sale_contact_id uuid
     REFERENCES public.post_sale_contacts (id) ON DELETE SET NULL,
   activated_at timestamptz NOT NULL,
@@ -109,6 +111,10 @@ CREATE INDEX IF NOT EXISTS post_sale_contacts_lead_id_idx
 CREATE INDEX IF NOT EXISTS post_sale_conversions_contact_activated_idx
   ON public.post_sale_conversions (post_sale_contact_id, activated_at DESC)
   WHERE post_sale_contact_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS post_sale_conversions_collection_activated_idx
+  ON public.post_sale_conversions (post_sale_collection_id, activated_at DESC)
+  WHERE post_sale_collection_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS post_sale_conversions_state_verified_idx
   ON public.post_sale_conversions (state, verified_at DESC);
@@ -330,14 +336,14 @@ BEGIN
       normalized_phone_value,
       contact_state,
       contact_reason,
-      lead_row_id
+      CASE WHEN contact_state = 'created_lead' THEN lead_row_id ELSE NULL END
     )
     RETURNING id INTO contact_id;
 
     contact_results := contact_results || jsonb_build_array(jsonb_build_object(
       'contactId', contact_id,
       'state', contact_state,
-      'leadId', lead_row_id,
+      'leadId', CASE WHEN contact_state = 'created_lead' THEN lead_row_id ELSE NULL END,
       'reason', contact_reason
     ));
   END LOOP;

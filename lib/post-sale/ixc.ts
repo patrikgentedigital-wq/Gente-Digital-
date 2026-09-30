@@ -205,6 +205,7 @@ export async function reconcileContractsForContacts(
   const eligibleContacts = contacts.filter((contact) => (
     contact.state === 'created_lead'
     && contact.leadId !== null
+    && parseIxcDate(contact.originSoldAt)
     && isValidPhoneDigits(contact.phoneNormalized)
   ));
   const contactsByPhone = new Map<string, PostSaleContact[]>();
@@ -257,30 +258,27 @@ export async function reconcileContractsForContacts(
 
         const activatedAt = parseIxcDate(exactContracts[0].activatedAt);
         if (!activatedAt) continue;
+        const originSoldAt = parseIxcDate(contact.originSoldAt);
+        if (!originSoldAt || Date.parse(activatedAt) < Date.parse(originSoldAt)) continue;
 
-        const samePhoneContacts = contactsByPhone.get(contact.phoneNormalized) ?? [];
-        const existingCandidate = candidates.get(contract.id);
-        if (existingCandidate && existingCandidate.contactId !== contact.id) {
-          candidates.set(contract.id, {
-            ...existingCandidate,
-            contactId: null,
-            state: 'pending_review',
-            reason: 'Associação ambígua: o contrato corresponde a mais de um contato da coleta.',
-          });
-          continue;
-        }
+        const samePhoneContacts = (contactsByPhone.get(contact.phoneNormalized) ?? []).filter((match) => {
+          const matchOriginSoldAt = parseIxcDate(match.originSoldAt);
+          return !!matchOriginSoldAt && Date.parse(matchOriginSoldAt) <= Date.parse(activatedAt);
+        });
 
         const ambiguousClient = exactPhoneClients.length !== 1;
         const ambiguousContact = samePhoneContacts.length !== 1;
+        const samePhoneCollectionIds = new Set(samePhoneContacts.map((match) => match.collectionId));
         candidates.set(contract.id, {
           contractId: contract.id,
           activatedAt,
+          collectionId: samePhoneCollectionIds.size === 1 ? Array.from(samePhoneCollectionIds)[0] || null : null,
           contactId: ambiguousClient || ambiguousContact ? null : contact.id,
           state: ambiguousClient || ambiguousContact ? 'pending_review' : 'confirmed',
           reason: ambiguousClient
-            ? 'O telefone corresponde a mais de um cliente no IXC.'
+            ? 'Associação ambígua: o telefone corresponde a mais de um cliente no IXC.'
             : ambiguousContact
-              ? 'O telefone corresponde a mais de um contato da coleta.'
+              ? 'Associação ambígua: o telefone corresponde a mais de um contato elegível da coleta.'
               : null,
         });
       }

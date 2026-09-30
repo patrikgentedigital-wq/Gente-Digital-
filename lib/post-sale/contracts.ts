@@ -4,6 +4,16 @@ export type PostSaleContactState = 'created_lead' | 'duplicate_existing' | 'inva
 
 export type PostSaleConversionState = 'confirmed' | 'pending_review';
 
+export interface PostSaleContactDraft {
+  name: string;
+  phone: string;
+}
+
+export interface PostSaleCollaborator {
+  id: string;
+  name: string;
+}
+
 export interface PostSaleContact {
   id: string;
   collectionId: string;
@@ -13,6 +23,7 @@ export interface PostSaleContact {
   state: PostSaleContactState;
   reason: string | null;
   leadId: number | null;
+  originSoldAt?: string;
   createdAt?: string;
   leadStatus?: string | null;
   firstAttendanceAt?: string | null;
@@ -49,6 +60,7 @@ export interface IxcGateway {
 export interface ConversionCandidate {
   contractId: string;
   activatedAt: string;
+  collectionId: string | null;
   contactId: string | null;
   state: PostSaleConversionState;
   reason: string | null;
@@ -60,11 +72,14 @@ export interface PostSaleCollectionMetricRow {
   soldAt: string;
   collectorColaboradorId: string;
   outcome: PostSaleOutcome;
+  originCustomerRef?: string;
+  createdAt?: string;
 }
 
 export interface PostSaleMetricConversion {
   id: string;
   ixcContractId: string;
+  collectionId?: string | null;
   contactId: string | null;
   activatedAt: string;
   verifiedAt: string;
@@ -99,6 +114,17 @@ export interface PostSaleMetrics {
   confirmedContracts: number;
   conversionRate: number | null;
   averageMinutesToFirstAttendance: number | null;
+}
+
+export interface PostSaleDashboardResponse {
+  basisLabel: 'vendas de origem registradas no painel';
+  viewerRole: 'admin' | 'vendedor';
+  viewerCollaborator: PostSaleCollaborator | null;
+  collaborators: PostSaleCollaborator[];
+  metrics: PostSaleMetrics;
+  collections: PostSaleCollectionMetricRow[];
+  contacts: PostSaleContact[];
+  conversions: PostSaleMetricConversion[];
 }
 
 export class PostSaleDomainError extends Error {

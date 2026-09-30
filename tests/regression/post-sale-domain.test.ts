@@ -36,6 +36,7 @@ function contact(overrides: Record<string, unknown> = {}) {
     state: 'created_lead' as const,
     reason: null,
     leadId: 101,
+    originSoldAt: '2026-09-10T12:00:00.000Z',
     createdAt: '2026-09-10T13:00:00.000Z',
     leadStatus: 'Pendente',
     firstAttendanceAt: '2026-09-10T13:15:00.000Z',
@@ -194,6 +195,38 @@ test('reconcilia somente telefone único e preserva múltiplos contratos do mesm
     { contractId: '000457', contactId: 'contact-1', state: 'confirmed' },
   ]);
   assert.equal(results[0].activatedAt, '2026-09-11T12:30:00.000Z');
+});
+
+test('não conta como conversão contrato ativo antes da venda de origem', async () => {
+  const priorContract: IxcContractRecord = {
+    id: '000455', clientId: 'client-9', status: 'A', activatedAt: '2026-09-09 09:30:00',
+  };
+  const ixc = gateway({
+    listContractsByClientId: async () => [priorContract],
+    getContractsById: async () => [priorContract],
+  });
+
+  assert.deepEqual(await reconcileContractsForContacts([contact()], ixc), []);
+});
+
+test('data de venda limita a ambiguidade a coletas que já existiam na ativação', async () => {
+  const futureCollection = contact({
+    id: 'contact-future',
+    collectionId: 'collection-future',
+    originSoldAt: '2026-09-12T12:00:00.000Z',
+  });
+  const confirmed = await reconcileContractsForContacts([contact(), futureCollection], gateway());
+  assert.equal(confirmed.length, 1);
+  assert.equal(confirmed[0].state, 'confirmed');
+  assert.equal(confirmed[0].contactId, 'contact-1');
+  assert.equal(confirmed[0].collectionId, 'collection-1');
+
+  const priorCollection = contact({ id: 'contact-prior', collectionId: 'collection-prior' });
+  const ambiguous = await reconcileContractsForContacts([contact(), priorCollection], gateway());
+  assert.equal(ambiguous.length, 1);
+  assert.equal(ambiguous[0].state, 'pending_review');
+  assert.equal(ambiguous[0].contactId, null);
+  assert.equal(ambiguous[0].collectionId, null);
 });
 
 test('reconciliação ambígua vai para revisão e data inválida não gera conversão', async () => {

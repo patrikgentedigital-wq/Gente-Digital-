@@ -31,9 +31,11 @@ test('migration de pós-venda cria o modelo mínimo e habilita RLS', () => {
   assert.match(sql, /add column(?: if not exists)? lead_id %s/i);
   assert.match(sql, /foreign key\s*\(lead_id\)\s*references\s+public\.leads\s*\(id\)\s+on delete set null/i);
   assert.match(sql, /ixc_contract_id\s+text\s+not null\s+unique/i);
+  assert.match(sql, /post_sale_collection_id\s+uuid\s+references\s+public\.post_sale_collections\s*\(id\)\s+on delete set null/i);
   assert.match(sql, /pending_review/i);
   assert.match(sql, /duplicate_existing/i);
   assert.match(sql, /no_referral/i);
+  assert.match(sql, /case when contact_state\s*=\s*'created_lead' then lead_row_id else null end/i, 'duplicidade não pode expor o ID ou o estado de um lead de outra atribuição');
 });
 
 test('RPC de coleta é transacional e não pode ser chamada por roles públicas', () => {
