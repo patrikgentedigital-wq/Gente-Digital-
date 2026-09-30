@@ -82,6 +82,7 @@ export async function getUserRole(
   // 2. Administradores fixos do sistema (garante que o proprietário nunca perca acesso)
   const defaultAdminEmails = [
     'patrikgentedigital@gmail.com',
+    'gentedigital2424@gmail.com',
     'patrick@gentedigital.com.br',
   ];
 

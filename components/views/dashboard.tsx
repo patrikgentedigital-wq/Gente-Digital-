@@ -466,18 +466,19 @@ export function DashboardView() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300 pb-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="workspace-page dashboard-page space-y-8 animate-in fade-in duration-300 pb-12">
+      <div className="workspace-page-heading">
         <div>
-          <h2 className="font-display text-3xl font-bold text-brand-charcoal dark:text-white">Dashboard</h2>
-          <p className="text-brand-muted dark:text-gray-400 mt-1">Visão geral do desempenho de indicações e leads em tempo real.</p>
+          <p className="workspace-eyebrow">Visão comercial</p>
+          <h2 className="workspace-title mt-1">Dashboard</h2>
+          <p className="workspace-description">Desempenho de indicações e leads no período selecionado.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+        <div className="workspace-page-actions">
           <button
             onClick={() => setShowExecutiveModal(true)}
             aria-label="Gerar Relatório PDF"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm cursor-pointer"
+            className="gd-button gd-button--secondary cursor-pointer"
           >
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Relatório PDF</span>
@@ -486,7 +487,7 @@ export function DashboardView() {
           <button
             onClick={handleGenerateAiSummary}
             aria-label="Gerar Resumo com IA"
-            className="flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-yellow hover:text-brand-charcoal transition-colors shadow-sm cursor-pointer"
+            className="gd-button gd-button--secondary cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden sm:inline">Resumo IA</span>
@@ -495,16 +496,17 @@ export function DashboardView() {
           <button
             onClick={handleExportReport}
             aria-label="Exportar relatório CSV"
-            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-sm cursor-pointer"
+            className="gd-button gd-button--secondary cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
           </button>
           
           <select 
+            aria-label="Filtrar dashboard por período"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
+            className="workspace-control cursor-pointer px-4 py-2.5 text-sm font-semibold"
           >
             <option value="all">Todo o Período</option>
             <option value="this_month">Este Mês</option>
@@ -515,9 +517,10 @@ export function DashboardView() {
           {dateFilter === 'specific_month' && (
             <div className="flex items-center gap-2">
               <select
+                aria-label="Selecionar mês do dashboard"
                 value={specificMonth}
                 onChange={(e) => setSpecificMonth(Number(e.target.value))}
-                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
+                className="workspace-control cursor-pointer px-3 py-2.5 text-sm font-semibold"
               >
                 <option value={0}>Jan</option>
                 <option value={1}>Fev</option>
@@ -533,9 +536,10 @@ export function DashboardView() {
                 <option value={11}>Dez</option>
               </select>
               <select
+                aria-label="Selecionar ano do dashboard"
                 value={specificYear}
                 onChange={(e) => setSpecificYear(Number(e.target.value))}
-                className="bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand-charcoal dark:text-white focus:ring-2 focus:ring-brand-yellow/50 outline-none shadow-sm cursor-pointer"
+                className="workspace-control cursor-pointer px-3 py-2.5 text-sm font-semibold"
               >
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
                   <option key={year} value={year}>{year}</option>
@@ -546,16 +550,16 @@ export function DashboardView() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
         <StatCard icon={Target} title="Conversões" value={conversoesCount.toString()} trend={trends.convsTrend} trendUp={trends.convsTrendUp} />
         <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
         <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
 
-      <div className="saas-card p-6 flex flex-col min-h-[420px] mb-6">
+      <div className="workspace-panel flex min-h-[420px] flex-col p-5 sm:p-6">
         <div className="mb-6">
-          <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
+          <h3 className="font-display text-lg font-bold tracking-tight text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
           <p className="text-sm text-brand-muted dark:text-gray-400">
             {dateFilter === 'all' ? 'Comparativo de status de conversão ao longo do tempo.' : 'Comparativo filtrado pelo período selecionado.'}
           </p>
@@ -583,7 +587,7 @@ export function DashboardView() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Leaderboard - Top Colaboradores */}
-        <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col h-[420px] transition-colors">
+        <div className="workspace-panel flex h-[420px] flex-col p-5 transition-colors sm:p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2.5 bg-brand-yellow/20 rounded-xl text-brand-charcoal dark:text-brand-yellow">
               <Trophy className="w-5 h-5" />
@@ -611,7 +615,7 @@ export function DashboardView() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-bold text-brand-charcoal dark:text-white text-sm">{colab.points}</p>
-                  <p className="text-[10px] text-brand-muted dark:text-gray-400 font-medium uppercase">Pts</p>
+                   <p className="text-[11px] text-brand-muted dark:text-gray-400 font-medium">pontos</p>
                 </div>
               </div>
             ))}
@@ -622,9 +626,9 @@ export function DashboardView() {
         </div>
 
         {/* Leaderboard - Top Clientes */}
-        <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-brand-border dark:border-gray-800 shadow-sm p-6 flex flex-col h-[420px] transition-colors">
+        <div className="workspace-panel flex h-[420px] flex-col p-5 transition-colors sm:p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2.5 bg-blue-500/20 rounded-xl text-brand-charcoal dark:text-blue-500">
+            <div className="workspace-metric-icon rounded-xl p-2.5 text-[var(--app-muted)]">
               <Medal className="w-5 h-5" />
             </div>
             <div>
@@ -650,7 +654,7 @@ export function DashboardView() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-bold text-brand-charcoal dark:text-white text-sm">{cliente.points}</p>
-                  <p className="text-[10px] text-brand-muted dark:text-gray-400 font-medium uppercase">Pts</p>
+                   <p className="text-[11px] text-brand-muted dark:text-gray-400 font-medium">pontos</p>
                 </div>
               </div>
             ))}
@@ -662,16 +666,16 @@ export function DashboardView() {
       </div>
 
       {showAiModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="ai-summary-title">
           <div className="bg-white dark:bg-[#18181b] w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-lg text-brand-charcoal dark:text-white">Análise Inteligente</h3>
+                <h3 id="ai-summary-title" className="font-bold text-lg text-brand-charcoal dark:text-white">Análise Inteligente</h3>
               </div>
-              <button onClick={() => setShowAiModal(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
+              <button type="button" aria-label="Fechar análise inteligente" onClick={() => setShowAiModal(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -724,10 +728,10 @@ function StatCard({ icon: Icon, title, value, trend, trendUp }: StatCardProps) {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="saas-card p-6 flex flex-col justify-between group transition-shadow hover:shadow-lg"
+      className="workspace-metric group flex min-h-[170px] flex-col justify-between transition-shadow hover:shadow-lg"
     >
       <div className="flex items-center justify-between mb-3">
-        <div className="p-2.5 bg-slate-100 dark:bg-zinc-800 rounded-xl text-slate-700 dark:text-slate-200 group-hover:bg-brand-yellow group-hover:text-slate-950 transition-colors">
+        <div className="workspace-metric-icon rounded-xl p-2.5 text-slate-700 transition-colors group-hover:bg-brand-yellow group-hover:text-slate-950 dark:text-slate-200">
           <Icon className="w-5 h-5" />
         </div>
         <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -739,8 +743,8 @@ function StatCard({ icon: Icon, title, value, trend, trendUp }: StatCardProps) {
         </span>
       </div>
       <div>
-        <h3 className="font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider mb-1">{title}</h3>
-        <p className="font-display text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{value}</p>
+         <h3 className="mb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{title}</h3>
+        <p className="font-display text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{value}</p>
       </div>
     </motion.div>
   );

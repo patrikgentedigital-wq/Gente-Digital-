@@ -7,6 +7,8 @@ const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta
 test('clientes administrativos e repositório declaram fronteira server-only', () => {
   assert.match(read('lib/supabase-admin.ts'), /import ['"]server-only['"]/);
   assert.match(read('lib/analytics/repository.ts'), /import ['"]server-only['"]/);
+  assert.match(read('lib/post-sale/ixc.ts'), /import ['"]server-only['"]/);
+  assert.match(read('lib/post-sale/handlers.ts'), /import ['"]server-only['"]/);
 });
 
 test('módulo de auditoria alcançado por Client Components não importa supabase-admin', () => {

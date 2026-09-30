@@ -1,31 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedUser, getUserRole } from '@/lib/auth-server';
+import { filterLegacyRefLeads } from '@/lib/post-sale/lead-scope';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Localiza o colaborador vinculado ao usuário autenticado.
- * Usa duas queries separadas com eq() (sem .or()) para evitar injeção de filtro.
+ * Usa duas queries separadas com eq() para evitar filtro textual composto.
  * Retorna '' se não houver colaborador vinculado.
  */
-async function getColabRefsForUser(userId: string, email?: string | null): Promise<{ name: string; id: string }> {
+async function getColabRefsForUser(userId: string, email?: string | null): Promise<{ name: string; id: string; unavailable: boolean }> {
   const userEmail = (email || '').trim().toLowerCase();
 
   const { data: byUserId, error: errUserId } = await supabaseAdmin
     .from('colaboradores')
     .select('name, id')
     .eq('user_id', userId)
-    .limit(1)
     .maybeSingle();
 
   if (errUserId) {
     console.warn('Erro ao consultar colaborador por user_id:', errUserId.message);
-    return { name: '', id: '' };
+    return { name: '', id: '', unavailable: true };
   }
 
   if (byUserId) {
-    return { name: byUserId.name || '', id: String(byUserId.id || '') };
+    return { name: byUserId.name || '', id: String(byUserId.id || ''), unavailable: false };
   }
 
   if (userEmail) {
@@ -33,27 +33,27 @@ async function getColabRefsForUser(userId: string, email?: string | null): Promi
       .from('colaboradores')
       .select('name, id')
       .eq('email', userEmail)
-      .limit(1)
       .maybeSingle();
 
     if (errEmail) {
       console.warn('Erro ao consultar colaborador por email:', errEmail.message);
-      return { name: '', id: '' };
+      return { name: '', id: '', unavailable: true };
     }
 
     if (byEmail) {
-      return { name: byEmail.name || '', id: String(byEmail.id || '') };
+      return { name: byEmail.name || '', id: String(byEmail.id || ''), unavailable: false };
     }
   }
 
-  return { name: '', id: '' };
+  return { name: '', id: '', unavailable: false };
 }
 
 /**
  * GET /api/leads
  * Rota resiliente para listar leads e histórico no servidor,
  * garantindo acesso aos dados para todos os usuários autenticados.
- * Não-admins (vendedores) veem apenas os leads vinculados à sua ref.
+ * Não-admins (vendedores) veem leads legados pela própria ref e leads
+ * vinculados às coletas que registraram.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -62,32 +62,77 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    const role = await getUserRole(user.id, user.email, (user as any).user_metadata);
+    const role = await getUserRole(user.id, user.email);
+    let leadsData: any[] = [];
 
-    let leadsQuery = supabaseAdmin
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    // Vendedor só visualiza os leads atribuídos à própria indicação
-    if (role !== 'admin') {
-      const colabRefs = await getColabRefsForUser(user.id, user.email);
-      const refs = Array.from(new Set([colabRefs.name, colabRefs.id].filter(Boolean)));
-      if (refs.length === 0) {
-        // Sem colaborador vinculado: nenhum lead é retornado (nunca todos)
-        return NextResponse.json({ success: true, leads: [] });
+    if (role === 'admin') {
+      const { data, error } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Erro ao buscar leads no servidor:', error.message);
+        return NextResponse.json({ success: false, error: 'Não foi possível buscar leads.' }, { status: 500 });
       }
-      leadsQuery = leadsQuery.in('ref', refs);
+      leadsData = data || [];
+    } else {
+      const colabRefs = await getColabRefsForUser(user.id, user.email);
+      if (colabRefs.unavailable) {
+        return NextResponse.json({ success: false, error: 'Não foi possível verificar o vínculo do colaborador.' }, { status: 503 });
+      }
+      const refs = Array.from(new Set([colabRefs.name, colabRefs.id].filter(Boolean)));
+
+      if (refs.length > 0) {
+        const { data, error } = await supabaseAdmin
+          .from('leads')
+          .select('*')
+          .in('ref', refs);
+        if (error) {
+          console.error('Erro ao buscar leads de indicação no servidor:', error.message);
+          return NextResponse.json({ success: false, error: 'Não foi possível buscar leads.' }, { status: 500 });
+        }
+        leadsData.push(...filterLegacyRefLeads(data || []));
+      }
+
+      if (colabRefs.id) {
+        const collectionIds: string[] = [];
+        const collectionPageSize = 1000;
+        for (let offset = 0; ; offset += collectionPageSize) {
+          const { data, error } = await supabaseAdmin
+            .from('post_sale_collections')
+            .select('id')
+            .eq('collector_colaborador_id', colabRefs.id)
+            .order('id', { ascending: true })
+            .range(offset, offset + collectionPageSize - 1);
+          if (error) {
+            console.error('Erro ao buscar coletas do vendedor:', error.message);
+            return NextResponse.json({ success: false, error: 'Não foi possível buscar leads.' }, { status: 500 });
+          }
+          const page = data || [];
+          collectionIds.push(...page.map((row: any) => String(row.id)).filter(Boolean));
+          if (page.length < collectionPageSize) break;
+        }
+
+        for (let index = 0; index < collectionIds.length; index += 250) {
+          const collectionChunk = collectionIds.slice(index, index + 250);
+          const { data, error } = await supabaseAdmin
+            .from('leads')
+            .select('*')
+            .in('post_sale_collection_id', collectionChunk);
+          if (error) {
+            console.error('Erro ao buscar leads de pós-venda no servidor:', error.message);
+            return NextResponse.json({ success: false, error: 'Não foi possível buscar leads.' }, { status: 500 });
+          }
+          leadsData.push(...(data || []));
+        }
+      }
+
+      // Uma indicação pode aparecer nos dois escopos; preserve um único registro.
+      leadsData = Array.from(new Map(leadsData.map((lead) => [String(lead.id), lead])).values());
+      leadsData.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
     }
 
-    const { data: leadsData, error: leadsError } = await leadsQuery;
-
-    if (leadsError) {
-      console.error('Erro ao buscar leads no servidor:', leadsError.message);
-      return NextResponse.json({ success: false, error: leadsError.message }, { status: 500 });
-    }
-
-    if (!leadsData || leadsData.length === 0) {
+    if (leadsData.length === 0) {
       return NextResponse.json({ success: true, leads: [] });
     }
 

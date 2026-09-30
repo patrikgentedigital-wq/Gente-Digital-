@@ -4,6 +4,7 @@ import { ChevronRight, Menu, Sun, Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 import { motion } from 'motion/react';
+import { BrandMark } from '@/components/brand-mark';
 
 interface HeaderProps {
   activeTabName: string;
@@ -21,20 +22,22 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
   );
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0f0f12]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-zinc-800/80 h-[68px] flex items-center justify-between px-4 md:px-8 transition-colors">
+    <header className="sticky top-0 z-40 h-[68px] border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-canvas)_92%,transparent)] px-4 backdrop-blur-xl transition-colors md:px-8 xl:px-10">
       <div className="flex items-center gap-3">
         <button 
           onClick={onMenuClick}
           type="button"
           aria-label="Abrir menu de navegação"
-          className="md:hidden p-2 -ml-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+          className="-ml-2 rounded-xl p-2 text-[var(--app-muted)] transition-colors hover:bg-black/5 hover:text-[var(--app-ink)] dark:hover:bg-white/5 md:hidden"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-sm font-medium">
-          <span className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors hidden sm:inline">Gente Digital</span>
-          <ChevronRight className="w-3.5 h-3.5 hidden sm:inline opacity-60" />
-          <span className="text-slate-900 dark:text-slate-100 font-bold text-sm tracking-tight">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--app-muted)]">
+          <span className="inline-flex shrink-0 items-center rounded-md bg-[#171717] px-2 py-1">
+            <BrandMark compact />
+          </span>
+          <ChevronRight className="hidden h-3.5 w-3.5 opacity-50 sm:inline" />
+          <span className="max-w-[45vw] truncate text-sm font-semibold tracking-tight text-[var(--app-ink)] sm:max-w-none">
             {activeTabName}
           </span>
         </div>
@@ -48,10 +51,10 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             type="button"
             aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-            className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/60 dark:border-zinc-700/50 transition-colors"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-2 text-[var(--app-muted)] shadow-sm transition-colors hover:text-[var(--app-ink)]"
             title="Alternar Tema"
           >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-[var(--app-muted)]" />}
           </motion.button>
         ) : (
           <div className="w-8 h-8 rounded-lg" />
