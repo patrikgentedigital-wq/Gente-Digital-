@@ -138,7 +138,7 @@ buildPostSaleMetrics(data: PostSaleDataset, window: PostSaleWindow): PostSaleMet
 
 - [x] Executar `npm test`, `npm run lint`, `npm run build` e `git diff --check`; corrigir falhas sem ampliar o escopo de comissão.
 - [x] Verificar nos testes e no diff que o status `Ganho` sozinho não vira conversão, que vários contratos não duplicam contato convertido e que nenhum código client-side importa `supabase-admin` ou recebe credenciais IXC.
-- [ ] Fazer uma revisão final dos escopos de admin/vendedor, idempotência, RLS/grants, resposta vazia de `/api/leads`, intervalos de data e conteúdo CSV.
+- [x] Fazer uma revisão final dos escopos de admin/vendedor, idempotência, RLS/grants, resposta vazia de `/api/leads`, intervalos de data e conteúdo CSV.
 - [x] Preservar o checkout atual e seus não rastreados; não executar migration remota, não usar vendas reais e não publicar/deployar nesta etapa.
 - [ ] Apresentar ao usuário o diff e qualquer limitação da verificação local do SQL antes de pedir autorização separada para aplicar a migration ou publicar.
 
