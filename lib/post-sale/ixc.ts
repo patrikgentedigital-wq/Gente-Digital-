@@ -89,10 +89,12 @@ export async function createIxcGateway(dependencies: IxcGatewayDependencies = {}
         10_000,
       );
     } catch {
+      console.warn('post_sale_ixc_query_failed', { table, reason: 'network_or_timeout' });
       throw new PostSaleDomainError('ixc_unavailable', 'Não foi possível consultar o IXC agora.');
     }
 
     if (!response.ok) {
+      console.warn('post_sale_ixc_query_failed', { table, reason: 'http_status', status: response.status });
       throw new PostSaleDomainError('ixc_unavailable', `Consulta ao IXC falhou (HTTP ${response.status}).`);
     }
 
@@ -100,10 +102,17 @@ export async function createIxcGateway(dependencies: IxcGatewayDependencies = {}
     try {
       payload = await response.json() as IxcApiResponse;
     } catch {
+      console.warn('post_sale_ixc_query_failed', { table, reason: 'invalid_json' });
       throw new PostSaleDomainError('ixc_unavailable', 'O IXC retornou uma resposta inválida.');
     }
 
     if (!Array.isArray(payload.registros)) {
+      console.warn('post_sale_ixc_query_failed', {
+        table,
+        reason: 'missing_records_array',
+        declaredTotal: Number.isFinite(Number((payload as Record<string, unknown>).total))
+          ? Number((payload as Record<string, unknown>).total) : null,
+      });
       throw new PostSaleDomainError('ixc_unavailable', 'O IXC retornou uma resposta inválida.');
     }
 
@@ -154,7 +163,8 @@ export async function validateOriginContract(
   let contracts: IxcContractRecord[];
   try {
     contracts = await ixc.getContractsById(exactContractId);
-  } catch {
+  } catch (error) {
+    if (error instanceof PostSaleDomainError) throw error;
     throw new PostSaleDomainError('ixc_unavailable', 'Não foi possível validar o contrato no IXC.');
   }
 
@@ -175,7 +185,8 @@ export async function validateOriginContract(
   let clients: IxcClientRecord[];
   try {
     clients = await ixc.getClientsById(contract.clientId);
-  } catch {
+  } catch (error) {
+    if (error instanceof PostSaleDomainError) throw error;
     throw new PostSaleDomainError('ixc_unavailable', 'Não foi possível confirmar o cliente do contrato no IXC.');
   }
 

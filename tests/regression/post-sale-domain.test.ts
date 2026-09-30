@@ -19,6 +19,7 @@ import type {
   IxcContractRecord,
   IxcGateway,
 } from '@/lib/post-sale/contracts';
+import { PostSaleDomainError } from '@/lib/post-sale/contracts';
 
 const phoneA = '91987654321';
 const window = {
@@ -187,6 +188,19 @@ test('gateway converte timeout do IXC em erro sanitizado', async () => {
   await assert.rejects(ixc.getContractsById('0000042'), (error: Error) => {
     assert.match(error.message, /consultar o IXC/i);
     assert.doesNotMatch(error.message, /timeout|token-super-secreto|91987654321/);
+    return true;
+  });
+});
+
+test('validação preserva diagnóstico sanitizado do gateway sem propagar exceções brutas', async () => {
+  const safeError = new PostSaleDomainError('ixc_unavailable', 'Consulta ao IXC falhou (HTTP 403).');
+  await assert.rejects(validateOriginContract('42', gateway({
+    getContractsById: async () => { throw safeError; },
+  })), (error: Error) => error === safeError);
+  await assert.rejects(validateOriginContract('42', gateway({
+    getContractsById: async () => { throw new Error('token-secreto telefone privado'); },
+  })), (error: Error) => {
+    assert.doesNotMatch(error.message, /token-secreto|telefone privado/);
     return true;
   });
 });
