@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Loader2, Plus, Trash2, X } from 'lucide-react';
 
 interface ContactDraft {
@@ -67,38 +67,56 @@ function readDraftSnapshot(): string | null {
   return typeof window === 'undefined' ? null : window.sessionStorage.getItem(DRAFT_KEY);
 }
 
-function writeDraftSnapshot(draft: { contractId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' } | null) {
+function writeDraftSnapshot(draft: { contractId: string; collectorColaboradorId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' } | null) {
   if (typeof window === 'undefined') return;
   if (draft) window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   else window.sessionStorage.removeItem(DRAFT_KEY);
   window.dispatchEvent(new Event(DRAFT_EVENT));
 }
 
-function parseDraftSnapshot(snapshot: string | null): { contractId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' } {
-  if (!snapshot) return { contractId: '', contacts: [{ name: '', phone: '' }], outcome: 'contacts_collected' };
+function parseDraftSnapshot(snapshot: string | null): { contractId: string; collectorColaboradorId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' } {
+  if (!snapshot) return { contractId: '', collectorColaboradorId: '', contacts: [{ name: '', phone: '' }], outcome: 'contacts_collected' };
   try {
-    const raw = JSON.parse(snapshot) as Partial<{ contractId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' }>;
+    const raw = JSON.parse(snapshot) as Partial<{ contractId: string; collectorColaboradorId: string; contacts: ContactDraft[]; outcome: 'contacts_collected' | 'no_referral' }>;
     return {
       contractId: typeof raw.contractId === 'string' ? raw.contractId : '',
+      collectorColaboradorId: typeof raw.collectorColaboradorId === 'string' ? raw.collectorColaboradorId : '',
       contacts: Array.isArray(raw.contacts) && raw.contacts.length <= 100
         ? raw.contacts.map((contact) => ({ name: String(contact.name ?? ''), phone: String(contact.phone ?? '') }))
         : [{ name: '', phone: '' }],
       outcome: raw.outcome === 'no_referral' ? 'no_referral' : 'contacts_collected',
     };
   } catch {
-    return { contractId: '', contacts: [{ name: '', phone: '' }], outcome: 'contacts_collected' };
+    return { contractId: '', collectorColaboradorId: '', contacts: [{ name: '', phone: '' }], outcome: 'contacts_collected' };
   }
 }
 
 export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectionDialogProps) {
   const draftSnapshot = useSyncExternalStore(subscribeDraft, readDraftSnapshot, () => null);
   const draft = useMemo(() => parseDraftSnapshot(draftSnapshot), [draftSnapshot]);
-  const { contractId, contacts, outcome } = draft;
+  const { contractId, collectorColaboradorId, contacts, outcome } = draft;
+  const [viewerRole, setViewerRole] = useState<'admin' | 'vendedor' | null>(null);
+  const [collaborators, setCollaborators] = useState<Array<{ id: string; name: string }>>([]);
   const [verifiedContract, setVerifiedContract] = useState<VerifiedContract | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedCollection | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/post-sale/collectors', { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.error || 'Não foi possível carregar os colaboradores.');
+        setViewerRole(payload.viewerRole);
+        setCollaborators(payload.collaborators);
+      })
+      .catch((caught) => {
+        if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Não foi possível carregar os colaboradores.');
+      });
+    return () => controller.abort();
+  }, []);
 
   function updateDraft(update: (current: typeof draft) => typeof draft) {
     writeDraftSnapshot(update(draft));
@@ -106,6 +124,12 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
 
   function setContractId(value: string) {
     updateDraft((current) => ({ ...current, contractId: value }));
+  }
+
+  function setCollectorId(value: string) {
+    updateDraft((current) => ({ ...current, collectorColaboradorId: value }));
+    setVerifiedContract(null);
+    setError(null);
   }
 
   function setContacts(update: ContactDraft[] | ((current: ContactDraft[]) => ContactDraft[])) {
@@ -138,12 +162,16 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
       setError('Informe o ID exato do contrato de origem.');
       return;
     }
+    if (viewerRole === 'admin' && !collectorColaboradorId) {
+      setError('Selecione quem realizou a coleta.');
+      return;
+    }
     setIsValidating(true);
     try {
       const response = await fetch('/api/post-sale/contracts/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contractId: contractId.trim() }),
+        body: JSON.stringify({ contractId: contractId.trim(), ...(viewerRole === 'admin' ? { collectorColaboradorId } : {}) }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.success || !payload.contract) {
@@ -183,6 +211,7 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           originContractId: verifiedContract.contractId,
+          ...(viewerRole === 'admin' ? { collectorColaboradorId } : {}),
           outcome,
           contacts: outcome === 'no_referral' ? [] : contacts,
         }),
@@ -248,6 +277,16 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
             </div>
           ) : (
             <>
+              {viewerRole === 'admin' && (
+                <div className="space-y-2">
+                  <label htmlFor="post-sale-collector" className="block text-sm font-bold text-brand-charcoal dark:text-gray-200">Quem realizou a coleta</label>
+                  <select id="post-sale-collector" value={collectorColaboradorId} onChange={(event) => setCollectorId(event.target.value)} disabled={isValidating || isSaving} className={inputClass}>
+                    <option value="">Selecione um colaborador</option>
+                    {collaborators.map((collaborator) => <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>)}
+                  </select>
+                  <p className="text-xs text-brand-muted dark:text-gray-400">A coleta será atribuída a essa pessoa; sua conta ficará registrada como responsável pelo lançamento.</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <label htmlFor="post-sale-contract-id" className="block text-sm font-bold text-brand-charcoal dark:text-gray-200">Contrato de origem no IXC</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -255,10 +294,11 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
                     id="post-sale-contract-id"
                     value={contractId}
                     onChange={(event) => { setContractId(event.target.value); setVerifiedContract(null); setError(null); }}
+                    disabled={isValidating || isSaving}
                     placeholder="Digite o ID exato, preservando zeros à esquerda"
                     className={`${inputClass} min-w-0 flex-1 font-mono`}
                   />
-                  <button type="button" onClick={validateContract} disabled={isValidating || !contractId.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-brand-border px-4 py-2.5 text-sm font-bold text-brand-charcoal transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-zinc-800">
+                  <button type="button" onClick={validateContract} disabled={isValidating || !viewerRole || !contractId.trim() || (viewerRole === 'admin' && !collectorColaboradorId)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-brand-border px-4 py-2.5 text-sm font-bold text-brand-charcoal transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-zinc-800">
                     {isValidating && <Loader2 className="h-4 w-4 animate-spin" />}
                     {isValidating ? 'Consultando IXC' : 'Validar contrato'}
                   </button>

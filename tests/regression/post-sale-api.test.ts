@@ -161,6 +161,40 @@ test('registro no_referral usa colaborador da sessão e ignora ID adulterado do 
   assert.deepEqual(saved.contacts, []);
 });
 
+test('admin sem vínculo escolhe coletor cadastrado e preserva usuário registrador', async () => {
+  const admin = makeHandlers({ role: 'admin', resolveColaborador: async () => null });
+  const options = await admin.handlers.getCollectorOptions(request('/api/post-sale/collectors'));
+  assert.equal(options.status, 200);
+  assert.deepEqual(await options.json(), { success: true, viewerRole: 'admin', collaborators: [{ id: 'EMP-042', name: 'Vendedora' }] });
+  const missing = await admin.handlers.validateContract(request('/api/post-sale/contracts/validate', 'POST', { contractId: '0000042' }));
+  assert.equal(missing.status, 400);
+
+  const invalid = await admin.handlers.validateContract(request('/api/post-sale/contracts/validate', 'POST', { contractId: '0000042', collectorColaboradorId: 'EMP-999' }));
+  assert.equal(invalid.status, 422);
+
+  const validated = await admin.handlers.validateContract(request('/api/post-sale/contracts/validate', 'POST', { contractId: '0000042', collectorColaboradorId: 'EMP-042' }));
+  assert.equal(validated.status, 200);
+  assert.equal((await validated.json()).contract.collectorName, 'Vendedora');
+
+  const savedResponse = await admin.handlers.createCollection(request('/api/post-sale/collections', 'POST', {
+    originContractId: '0000042', collectorColaboradorId: 'EMP-042', outcome: 'no_referral', contacts: [],
+  }));
+  assert.equal(savedResponse.status, 201);
+  assert.equal((admin.calls.createCollection[0] as Record<string, unknown>).collectorColaboradorId, 'EMP-042');
+  assert.equal((admin.calls.createCollection[0] as Record<string, unknown>).recordedBy, user.id);
+});
+
+test('vendedor não pode atribuir coleta a outro colaborador', async () => {
+  const seller = makeHandlers();
+  const options = await seller.handlers.getCollectorOptions(request('/api/post-sale/collectors'));
+  assert.deepEqual(await options.json(), { success: true, viewerRole: 'vendedor', collaborators: [{ id: 'EMP-042', name: 'Vendedora' }] });
+  const response = await seller.handlers.createCollection(request('/api/post-sale/collections', 'POST', {
+    originContractId: '0000042', collectorColaboradorId: 'EMP-999', outcome: 'no_referral', contacts: [],
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(seller.calls.createCollection, []);
+});
+
 test('contatos novos da coleta são enviados ao CRM do IXC e os demais não são reenviados', async () => {
   const ixcCalls: unknown[] = [];
   const historyCalls: unknown[] = [];

@@ -112,6 +112,7 @@ const contactDraftSchema = z.object({
 
 const collectionSchema = z.object({
   originContractId: z.string().trim().min(1).max(100),
+  collectorColaboradorId: z.string().trim().min(1).max(100).optional(),
   outcome: z.enum(COLLECTION_STATES),
   contacts: z.array(contactDraftSchema).max(100),
 }).superRefine((value, context) => {
@@ -603,20 +604,34 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     }
   }
 
+  async function resolveCollector(access: { user: PostSaleUser; role: 'admin' | 'vendedor' }, selectedId?: string): Promise<PostSaleCollaborator | Response> {
+    try {
+      if (access.role === 'admin') {
+        if (!selectedId) return json({ success: false, error: 'Selecione o colaborador que realizou a coleta.' }, 400);
+        const collaborators = await dependencies.store.listCollaborators();
+        return collaborators.find((item) => item.id === selectedId)
+          ?? json({ success: false, error: 'Colaborador selecionado não encontrado.' }, 422);
+      }
+      const collaborator = await dependencies.resolveColaborador(access.user);
+      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      if (selectedId && selectedId !== collaborator.id) {
+        return json({ success: false, error: 'Acesso negado ao colaborador selecionado.' }, 403);
+      }
+      return collaborator;
+    } catch {
+      return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
+    }
+  }
+
   async function validateContract(request: Request): Promise<Response> {
     const access = await identify(request);
     if (access instanceof Response) return access;
-    const parsed = z.object({ contractId: z.string().trim().min(1).max(100) }).safeParse(await readJson(request));
+    const parsed = z.object({ contractId: z.string().trim().min(1).max(100), collectorColaboradorId: z.string().trim().min(1).max(100).optional() }).safeParse(await readJson(request));
     if (!parsed.success) return json({ success: false, error: 'Informe um ID de contrato válido.' }, 400);
 
     try {
-      let collaborator: PostSaleCollaborator | null;
-      try {
-        collaborator = await dependencies.resolveColaborador(access.user);
-      } catch {
-        return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
-      }
-      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      const collaborator = await resolveCollector(access, parsed.data.collectorColaboradorId);
+      if (collaborator instanceof Response) return collaborator;
       const ixc = await getIxcGateway();
       const verified = await validateOriginContract(parsed.data.contractId, ixc);
       return json({
@@ -631,6 +646,21 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
       });
     } catch (error) {
       return parseErrorResponse(error);
+    }
+  }
+
+  async function getCollectorOptions(request: Request): Promise<Response> {
+    const access = await identify(request);
+    if (access instanceof Response) return access;
+    try {
+      if (access.role === 'admin') {
+        return json({ success: true, viewerRole: 'admin', collaborators: await dependencies.store.listCollaborators() });
+      }
+      const collaborator = await dependencies.resolveColaborador(access.user);
+      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      return json({ success: true, viewerRole: 'vendedor', collaborators: [collaborator] });
+    } catch {
+      return json({ success: false, error: 'Não foi possível carregar os colaboradores.' }, 503);
     }
   }
 
@@ -697,16 +727,10 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     const access = await identify(request);
     if (access instanceof Response) return access;
 
-    let collaborator: PostSaleCollaborator | null;
-    try {
-      collaborator = await dependencies.resolveColaborador(access.user);
-    } catch {
-      return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
-    }
-    if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
-
     const parsed = collectionSchema.safeParse(await readJson(request));
     if (!parsed.success) return json({ success: false, error: parsed.error.issues[0]?.message ?? 'Dados da coleta inválidos.' }, 400);
+    const collaborator = await resolveCollector(access, parsed.data.collectorColaboradorId);
+    if (collaborator instanceof Response) return collaborator;
 
     try {
       const ixc = await getIxcGateway();
@@ -866,7 +890,7 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     }
   }
 
-  return { validateContract, getCollections, createCollection, reconcile, reviewConversion, correctCollectionCollector };
+  return { validateContract, getCollectorOptions, getCollections, createCollection, reconcile, reviewConversion, correctCollectionCollector };
 }
 
 const defaultHandlers = createPostSaleHandlers({
