@@ -161,6 +161,126 @@ test('registro no_referral usa colaborador da sessão e ignora ID adulterado do 
   assert.deepEqual(saved.contacts, []);
 });
 
+test('contatos novos da coleta são enviados ao CRM do IXC e os demais não são reenviados', async () => {
+  const ixcCalls: unknown[] = [];
+  const historyCalls: unknown[] = [];
+  const harness = makeHandlers({
+    store: {
+      createCollection: async () => ({
+        collectionId,
+        created: true,
+        outcome: 'contacts_collected',
+        contacts: [
+          { contactId, state: 'created_lead', leadId: 101 },
+          { contactId: '33333333-3333-4333-8333-333333333334', state: 'duplicate_existing', leadId: null },
+          { contactId: '33333333-3333-4333-8333-333333333335', state: 'invalid', leadId: null },
+        ],
+      }),
+      recordIxcSyncResult: async (input: unknown) => historyCalls.push(input),
+    },
+    createIxcProspect: async (input: unknown) => {
+      ixcCalls.push(input);
+      return { success: true, id: 'IXC-7001' };
+    },
+  });
+
+  const response = await harness.handlers.createCollection(request('/api/post-sale/collections', 'POST', {
+    originContractId: '0000042',
+    outcome: 'contacts_collected',
+    contacts: [
+      { name: 'Ana Lima', phone: '(91) 98765-4321' },
+      { name: 'Contato já existente', phone: '91987650000' },
+      { name: 'Contato inválido', phone: '123' },
+    ],
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(ixcCalls, [{ name: 'Ana Lima', phone: '(91) 98765-4321', ref: 'Cliente de origem' }]);
+  assert.deepEqual(historyCalls, [{ leadId: 101, success: true, ixcLeadId: 'IXC-7001', error: null }]);
+  assert.deepEqual(payload.ixcSync, { created: 1, failed: 0 });
+});
+
+test('falha do IXC é registrada sem desfazer a coleta salva no painel', async () => {
+  const historyCalls: unknown[] = [];
+  const harness = makeHandlers({
+    store: {
+      createCollection: async () => ({
+        collectionId,
+        created: true,
+        outcome: 'contacts_collected',
+        contacts: [{ contactId, state: 'created_lead', leadId: 101 }],
+      }),
+      recordIxcSyncResult: async (input: unknown) => historyCalls.push(input),
+    },
+    createIxcProspect: async () => ({ success: false, id: null, error: 'IXC recusou a criação do lead.' }),
+  });
+
+  const response = await harness.handlers.createCollection(request('/api/post-sale/collections', 'POST', {
+    originContractId: '0000042',
+    outcome: 'contacts_collected',
+    contacts: [{ name: 'Ana Lima', phone: '91987654321' }],
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(payload.success, true);
+  assert.deepEqual(payload.ixcSync, { created: 0, failed: 1 });
+  assert.deepEqual(historyCalls, [{ leadId: 101, success: false, ixcLeadId: null, error: 'IXC recusou a criação do lead.' }]);
+});
+
+test('serviço IXC cadastra prospect com nome, telefone e classificação de lead existentes no projeto', async () => {
+  const ixcModule = await import('@/lib/post-sale/ixc');
+  type ProspectInput = { name: string; phone: string; ref: string };
+  type ProspectDependencies = {
+    getCredentials: () => Promise<{ cleanDomain: string; authHeader: string; hasCredentials: boolean }>;
+    fetchWithTimeout: (url: string, init: RequestInit, timeoutMs: number) => Promise<Response>;
+  };
+  type ProspectCreator = (input: ProspectInput, dependencies: ProspectDependencies) => Promise<{
+    success: boolean;
+    id: string | null;
+    error?: string;
+  }>;
+  const createProspect = (ixcModule as unknown as Record<string, unknown>).createIxcProspectRecord as ProspectCreator | undefined;
+  assert.equal(typeof createProspect, 'function');
+
+  let sentUrl = '';
+  let sentBody = '';
+  let sentAuthorization = '';
+  let sentTimeout = 0;
+  const result = await createProspect!({ name: 'Ana Lima', phone: '(91) 98765-4321', ref: 'Cliente de origem' }, {
+    getCredentials: async () => ({ cleanDomain: 'ixc.example.test', authHeader: 'Basic test-credential', hasCredentials: true }),
+    fetchWithTimeout: async (url, init, timeoutMs) => {
+      sentUrl = url;
+      sentBody = String(init.body);
+      sentAuthorization = new Headers(init.headers).get('Authorization') || '';
+      sentTimeout = timeoutMs;
+      return new Response(JSON.stringify({ id: 7001 }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+
+  assert.deepEqual(result, { success: true, id: '7001' });
+  assert.equal(sentUrl, 'https://ixc.example.test/webservice/v1/contato');
+  assert.equal(sentAuthorization, 'Basic test-credential');
+  assert.equal(sentTimeout, 10_000);
+  const sentPayload = JSON.parse(sentBody);
+  assert.match(sentPayload.data_cadastro, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  assert.deepEqual({ ...sentPayload, data_cadastro: undefined }, {
+    nome: 'Ana Lima',
+    razao: 'Ana Lima',
+    fone_celular: '91987654321',
+    id_filial: 1,
+    data_cadastro: undefined,
+    lead: 'S',
+    tipo_pessoa: 'F',
+    origem: 'outros',
+    id_candidato_tipo: 22,
+    id_canal_origem: 22,
+    id_canal_venda: 22,
+    obs: 'Indicado via Gente Digital por: Cliente de origem',
+  });
+});
+
 test('reenvio de coleta devolve conflito e falha de persistência não confirma sucesso', async () => {
   const duplicate = makeHandlers({
     store: { createCollection: async () => ({ collectionId, created: false, outcome: 'no_referral' }) },
