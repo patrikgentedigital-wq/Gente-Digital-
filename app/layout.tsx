@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
+import { Nunito_Sans, Rubik } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' });
+// Rubik (cantos suaves, jeito de conversa) para títulos e números; Nunito Sans para leitura e dados.
+const nunitoSans = Nunito_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-nunito' });
+const rubik = Rubik({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-rubik' });
 
 export const metadata: Metadata = {
   title: 'Gente Digital - Gestão de Links',
@@ -21,8 +22,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${plusJakarta.variable}`} suppressHydrationWarning>
-      <body className="font-sans antialiased min-h-screen bg-brand-surface text-brand-charcoal dark:bg-[#09090b] dark:text-gray-100 selection:bg-brand-yellow selection:text-brand-charcoal" suppressHydrationWarning>
+    <html lang="pt-BR" className={`${nunitoSans.variable} ${rubik.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased min-h-screen bg-[var(--app-canvas)] text-[var(--app-ink)] selection:bg-brand-yellow selection:text-brand-charcoal" suppressHydrationWarning>
         <Providers>
           {children}
         </Providers>

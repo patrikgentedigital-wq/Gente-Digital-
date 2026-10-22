@@ -121,7 +121,7 @@ export function DashboardShell() {
         setIsOpen={setIsSidebarOpen}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-64">
+      <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-[17.5rem]">
         <Header activeTabName={tabNames[activeTab]} onMenuClick={() => setIsSidebarOpen(true)} />
 
         <main className="relative flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8 xl:px-10">
@@ -167,12 +167,12 @@ function ActiveView({ tab }: { tab: TabId }) {
 function ViewLoading() {
   return (
     <div className="space-y-4" aria-label="Carregando seção">
-      <div className="h-8 w-56 animate-pulse rounded-lg bg-slate-200 dark:bg-zinc-800" />
+      <div className="h-8 w-56 animate-pulse rounded-md bg-[var(--app-border)]" />
       <div className="grid gap-4 md:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
           <div
             key={index}
-            className="h-32 animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+            className="h-32 animate-pulse rounded-lg border border-[var(--app-border)] bg-[var(--app-panel)]"
           />
         ))}
       </div>

@@ -213,11 +213,11 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
         role="dialog"
         aria-modal="true"
         aria-labelledby="post-sale-collection-title"
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-brand-border bg-white shadow-2xl dark:border-gray-800 dark:bg-[#18181b]"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-brand-border bg-white shadow-2xl dark:border-gray-800 dark:bg-[var(--app-panel)]"
       >
         <header className="flex items-start justify-between gap-4 border-b border-brand-border px-5 py-4 dark:border-gray-800 sm:px-7 sm:py-5">
           <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Indique e Ganhe</p>
+            <p className="text-xs font-extrabold tracking-[0.18em] text-blue-600 dark:text-blue-400">Indique e Ganhe</p>
             <h2 id="post-sale-collection-title" className="mt-1 text-xl font-extrabold text-brand-charcoal dark:text-white">Registrar coleta de pós-venda</h2>
             <p className="mt-1 text-xs text-brand-muted dark:text-gray-400">A coleta só será confirmada depois da gravação no banco.</p>
           </div>
@@ -238,7 +238,7 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
                   {saved.contacts.map((contact, index) => (
                     <div key={contact.contactId || index} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-border px-3.5 py-3 text-sm dark:border-gray-800">
                       <span className="text-brand-charcoal dark:text-gray-200">Contato {index + 1}</span>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${contact.state === 'created_lead' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : contact.state === 'duplicate_existing' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-300'}`}>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${contact.state === 'created_lead' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : contact.state === 'duplicate_existing' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-300'}`}>
                         {stateLabel[contact.state] || 'Registrado'}
                       </span>
                     </div>
@@ -265,9 +265,9 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
                 </div>
                 {verifiedContract && (
                   <div className="grid gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm dark:border-blue-900 dark:bg-blue-950/25 sm:grid-cols-2">
-                    <p><span className="block text-[11px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300">Cliente de origem</span><span className="font-semibold text-brand-charcoal dark:text-white">{verifiedContract.customerName}</span></p>
-                    <p><span className="block text-[11px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300">Data da venda</span><span className="font-semibold text-brand-charcoal dark:text-white">{formatDate(verifiedContract.soldAt)}</span></p>
-                    <p className="sm:col-span-2"><span className="block text-[11px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300">Coletor</span><span className="font-semibold text-brand-charcoal dark:text-white">{verifiedContract.collectorName}</span></p>
+                    <p><span className="block text-xs font-bold tracking-wide text-blue-700 dark:text-blue-300">Cliente de origem</span><span className="font-semibold text-brand-charcoal dark:text-white">{verifiedContract.customerName}</span></p>
+                    <p><span className="block text-xs font-bold tracking-wide text-blue-700 dark:text-blue-300">Data da venda</span><span className="font-semibold text-brand-charcoal dark:text-white">{formatDate(verifiedContract.soldAt)}</span></p>
+                    <p className="sm:col-span-2"><span className="block text-xs font-bold tracking-wide text-blue-700 dark:text-blue-300">Coletor</span><span className="font-semibold text-brand-charcoal dark:text-white">{verifiedContract.collectorName}</span></p>
                   </div>
                 )}
               </div>
@@ -302,7 +302,7 @@ export function PostSaleCollectionDialog({ onClose, onSaved }: PostSaleCollectio
                           <label className="space-y-1 text-xs font-semibold text-brand-muted dark:text-gray-400">
                             <span>Telefone</span>
                             <input value={contact.phone} onChange={(event) => updateContact(index, 'phone', event.target.value)} maxLength={64} inputMode="tel" placeholder="(91) 99999-9999" className={inputClass} />
-                            {isDuplicate && <span className="block text-[11px] font-bold text-red-600 dark:text-red-400">Este telefone aparece mais de uma vez.</span>}
+                            {isDuplicate && <span className="block text-xs font-bold text-red-600 dark:text-red-400">Este telefone aparece mais de uma vez.</span>}
                           </label>
                           <button type="button" onClick={() => setContacts((current) => current.filter((_, position) => position !== index))} aria-label={`Remover contato ${index + 1}`} className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"><Trash2 className="h-4 w-4" /></button>
                         </div>

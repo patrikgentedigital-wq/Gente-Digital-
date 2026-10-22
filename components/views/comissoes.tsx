@@ -464,7 +464,7 @@ export function ComissoesView() {
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Colaborador (1 a 9 vendas)</h4>
+            <h4 className="text-xs font-semibold text-[var(--app-muted)]">Colaborador (1 a 9 vendas)</h4>
             <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.colaborador.taxaPorVenda},00 <span className="text-xs font-normal text-[var(--app-muted)]">no PIX / venda</span></p>
           </div>
         </div>
@@ -474,7 +474,7 @@ export function ComissoesView() {
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Colaborador (10+ vendas)</h4>
+            <h4 className="text-xs font-semibold text-[var(--app-muted)]">Colaborador (10+ vendas)</h4>
             <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.colaborador.taxaVolume},00 <span className="text-xs font-normal text-[var(--app-muted)]">no PIX / venda</span></p>
           </div>
         </div>
@@ -484,7 +484,7 @@ export function ComissoesView() {
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Top colaborador ({PROGRAM_RULES.bonusTop.minimoIndicacoes}+ vendas)</h4>
+            <h4 className="text-xs font-semibold text-[var(--app-muted)]">Top colaborador ({PROGRAM_RULES.bonusTop.minimoIndicacoes}+ vendas)</h4>
             <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">+ R$ {PROGRAM_RULES.bonusTop.valor},00 <span className="text-xs font-normal text-[var(--app-muted)]">bônus PIX (mín. {PROGRAM_RULES.bonusTop.minimoIndicacoes} vendas no mês)</span></p>
           </div>
         </div>
@@ -494,7 +494,7 @@ export function ComissoesView() {
             <Tag className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[var(--app-muted)]">Cliente indicador</h4>
+            <h4 className="text-xs font-semibold text-[var(--app-muted)]">Cliente indicador</h4>
             <p className="mt-0.5 text-sm font-bold text-[var(--app-ink)]">R$ {PROGRAM_RULES.clienteIndicador.descontoMensalidade},00 <span className="text-xs font-normal text-[var(--app-muted)]">desconto na mensalidade</span></p>
           </div>
         </div>
@@ -647,7 +647,7 @@ export function ComissoesView() {
             </div>
           </div>
 
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Período ativo de apuração: <strong className="text-zinc-800 dark:text-zinc-200">{getPeriodLabel(dateFilter)}</strong></span>
             {selectedColabFilter !== 'all' && (
@@ -659,14 +659,14 @@ export function ComissoesView() {
         {/* Table */}
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-brand-border dark:border-gray-700 text-xs text-brand-muted dark:text-gray-400 uppercase">
+            <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-brand-border dark:border-gray-700 text-xs text-brand-muted dark:text-gray-400">
               <tr>
-                <th className="px-6 py-4 font-bold tracking-wider">Cliente (Lead)</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Quem Indicou</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Tipo / Perfil</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Recompensa</th>
-                <th className="px-6 py-4 font-bold tracking-wider">Status</th>
-                <th className="px-6 py-4 font-bold tracking-wider text-right">Ação / Baixa</th>
+                <th className="px-6 py-4 font-bold">Cliente (Lead)</th>
+                <th className="px-6 py-4 font-bold">Quem Indicou</th>
+                <th className="px-6 py-4 font-bold">Tipo / Perfil</th>
+                <th className="px-6 py-4 font-bold">Recompensa</th>
+                <th className="px-6 py-4 font-bold">Status</th>
+                <th className="px-6 py-4 font-bold text-right">Ação / Baixa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border dark:divide-gray-800 text-sm">
@@ -807,13 +807,13 @@ export function ComissoesView() {
                     <p className="break-words font-semibold text-[var(--app-ink)]">{comm.lead_name}</p>
                     <p className="mt-0.5 break-words text-xs text-[var(--app-muted)]">{comm.colaborador_name} · {comm.date}</p>
                   </div>
-                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold ${comm.status === 'Paga' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${comm.status === 'Paga' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                     {comm.status === 'Paga' ? 'Pago' : 'Pendente'}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-end justify-between gap-3 border-t border-[var(--app-border)] pt-3">
                   <div>
-                    <p className="text-[11px] font-semibold text-[var(--app-muted)]">Recompensa</p>
+                    <p className="text-xs font-semibold text-[var(--app-muted)]">Recompensa</p>
                     <p className="mt-0.5 text-lg font-extrabold text-[var(--app-ink)]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comm.commission_amount)}</p>
                     <p className="text-xs text-[var(--app-muted)]">{comm.type === 'desconto_cliente' ? 'Desconto na mensalidade' : comm.type === 'bonus_top' ? 'Bônus de liderança' : 'Pagamento PIX'}</p>
                   </div>

@@ -887,14 +887,14 @@ export function LeadsView() {
             >
               Filtros
               {activeFiltersCount > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-yellow text-[10px] font-bold text-brand-charcoal">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-yellow text-xs font-bold text-brand-charcoal">
                   {activeFiltersCount}
                 </span>
               )}
             </button>
 
             {isFilterOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-[#18181b] border border-brand-border dark:border-gray-800 rounded-2xl shadow-xl z-50 p-5 space-y-4 animate-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-[var(--app-panel)] border border-brand-border dark:border-gray-800 rounded-2xl shadow-xl z-50 p-5 space-y-4 animate-in zoom-in-95 duration-150">
                 <div className="flex justify-between items-center pb-2 border-b border-brand-border dark:border-gray-800">
                   <h4 className="font-bold text-sm text-brand-charcoal dark:text-white">Filtrar Leads</h4>
                   {activeFiltersCount > 0 && (
@@ -917,7 +917,7 @@ export function LeadsView() {
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label htmlFor="lead-date-filter" className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                  <label htmlFor="lead-date-filter" className="block text-xs font-bold text-brand-muted dark:text-gray-400 tracking-wide">
                     Período
                   </label>
                   <select
@@ -994,7 +994,7 @@ export function LeadsView() {
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label htmlFor="lead-origin-filter" className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                  <label htmlFor="lead-origin-filter" className="block text-xs font-bold text-brand-muted dark:text-gray-400 tracking-wide">
                     Origem / Indicador
                   </label>
                   <select
@@ -1011,7 +1011,7 @@ export function LeadsView() {
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <span className="block text-xs font-bold text-brand-muted dark:text-gray-400 uppercase tracking-wide">
+                  <span className="block text-xs font-bold text-brand-muted dark:text-gray-400 tracking-wide">
                     Valor da Venda (R$)
                   </span>
                   <div className="flex items-center gap-2">
@@ -1097,7 +1097,7 @@ export function LeadsView() {
             ) : pageLeads.map(lead => (
               <article key={lead.id} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <Avatar size={36} name={lead.name} variant="beam" colors={['#d6bb00', '#59677a', '#a5adb5', '#2f7265', '#7d8792']} />
+                  <Avatar size={36} name={lead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                   <div className="min-w-0 flex-1">
                     <button
                       type="button"
@@ -1109,13 +1109,13 @@ export function LeadsView() {
                     </button>
                     <p className="mt-1 whitespace-nowrap text-xs text-[var(--app-muted)]">{lead.phone}</p>
                   </div>
-                  <span className={`max-w-[116px] whitespace-normal rounded-full border px-2.5 py-1 text-center text-[10px] font-semibold leading-tight ${getStatusColor(lead.status)}`}>
+                  <span className={`max-w-[116px] whitespace-normal rounded-full border px-2.5 py-1 text-center text-xs font-semibold leading-tight ${getStatusColor(lead.status)}`}>
                     {lead.status}
                   </span>
                 </div>
 
                 <div className="mt-3 border-t border-[var(--app-border)] pt-3">
-                  <p className="text-[10px] font-semibold text-[var(--app-muted)]">Origem da indicação</p>
+                  <p className="text-xs font-semibold text-[var(--app-muted)]">Origem da indicação</p>
                   <p className="mt-0.5 break-words text-xs font-medium text-[var(--app-ink)]">{lead.ref || 'Não informado'}</p>
                 </div>
 
@@ -1143,13 +1143,13 @@ export function LeadsView() {
 
           <div className="leads-desktop-table flex-1 overflow-auto">
             <table className="w-full min-w-[780px] text-left border-collapse">
-              <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-brand-border dark:border-gray-700 text-xs text-brand-muted dark:text-gray-400 uppercase sticky top-0 z-10">
+              <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-brand-border dark:border-gray-700 text-xs text-brand-muted dark:text-gray-400 sticky top-0 z-10">
                 <tr>
-                  <th className="min-w-[205px] px-6 py-4 font-bold tracking-wider">Nome do Lead</th>
-                  <th className="min-w-[145px] px-6 py-4 font-bold tracking-wider">Contato</th>
-                  <th className="min-w-[170px] px-6 py-4 font-bold tracking-wider">Origem (Ref)</th>
-                  <th className="min-w-[145px] px-6 py-4 font-bold tracking-wider">Status</th>
-                  <th className="min-w-[115px] px-6 py-4 font-bold tracking-wider text-right">Ações</th>
+                  <th className="min-w-[205px] px-6 py-4 font-bold">Nome do Lead</th>
+                  <th className="min-w-[145px] px-6 py-4 font-bold">Contato</th>
+                  <th className="min-w-[170px] px-6 py-4 font-bold">Origem (Ref)</th>
+                  <th className="min-w-[145px] px-6 py-4 font-bold">Status</th>
+                  <th className="min-w-[115px] px-6 py-4 font-bold text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border dark:divide-gray-800 text-sm">
@@ -1186,7 +1186,7 @@ export function LeadsView() {
                    >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <Avatar size={32} name={lead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                        <Avatar size={32} name={lead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                         <span className="font-semibold text-brand-charcoal dark:text-white">{lead.name}</span>
                       </div>
                     </td>
@@ -1253,7 +1253,7 @@ export function LeadsView() {
                   <div className="flex items-center gap-2">
                     <div className={`w-3.5 h-3.5 rounded-full border-2 ${getStatusCircleColor(status)}`} />
                     <h3 className="font-bold text-brand-charcoal dark:text-white text-[14px]">{status}</h3>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${getStatusBadgeClass(status)}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full shadow-sm ${getStatusBadgeClass(status)}`}>
                       {columnLeads.length}
                     </span>
                   </div>
@@ -1283,7 +1283,7 @@ export function LeadsView() {
                            role="button"
                            tabIndex={0}
                            aria-label={`Abrir detalhes do lead ${lead.name}`}
-                           className="bg-[var(--app-panel)] dark:bg-[#18181b] border border-[var(--app-border)] dark:border-gray-700 p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md transition-all group flex flex-col gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                           className="bg-[var(--app-panel)] dark:bg-[var(--app-panel)] border border-[var(--app-border)] dark:border-gray-700 p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-[var(--app-ink)] dark:hover:border-[var(--app-muted)] hover:shadow-md transition-all group flex flex-col gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
                         >
                           <div className="flex items-center justify-end gap-1">
                             <button
@@ -1317,7 +1317,7 @@ export function LeadsView() {
                           <div className="space-y-2">
                             {/* Phone */}
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-bold text-gray-400 tracking-wider">TELEFONE</span>
+                              <span className="text-xs font-bold text-gray-400">Telefone</span>
                               <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
                                 <Phone className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
                                 {lead.phone}
@@ -1326,9 +1326,9 @@ export function LeadsView() {
 
                             {/* Responsável / Indicador */}
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-400 tracking-wider">RESPONSÁVEL / INDICADOR</span>
+                              <span className="text-xs font-bold text-gray-400 dark:text-gray-400">Responsável / indicador</span>
                               <div className="flex items-center text-xs font-bold text-brand-charcoal dark:text-white mt-0.5">
-                                <Avatar size={16} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} className="mr-1.5 shrink-0" />
+                                <Avatar size={16} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} className="mr-1.5 shrink-0" />
                                 <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
                               </div>
                             </div>
@@ -1336,7 +1336,7 @@ export function LeadsView() {
                             {/* Espera (only if defined) */}
                             {lead.waitingDays !== undefined && (
                               <div className="flex flex-col">
-                                <span className="text-[9px] font-bold text-gray-400 tracking-wider">ESPERA</span>
+                                <span className="text-xs font-bold text-gray-400">Tempo de espera</span>
                                 <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
                                   <Clock className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
                                   {lead.waitingDays} dias
@@ -1347,7 +1347,7 @@ export function LeadsView() {
                             {/* Valor da Venda (if defined/greater than 0) */}
                             {lead.value !== undefined && lead.value > 0 && (
                               <div className="flex flex-col">
-                                <span className="text-[9px] font-bold text-gray-400 tracking-wider">VALOR DA VENDA</span>
+                                <span className="text-xs font-bold text-gray-400">Valor da venda</span>
                                 <div className="flex items-center text-xs font-semibold text-green-700 dark:text-green-500 mt-0.5">
                                   <span className="text-xs font-bold mr-1.5">$</span>
                                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
@@ -1357,7 +1357,7 @@ export function LeadsView() {
                           </div>
 
                           {/* Footer Colaborador */}
-                          <div className="text-[11px] text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
+                          <div className="text-xs text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
 <span className="font-semibold text-gray-600 dark:text-gray-400">
                             Indicador {(lead.ref || 'Não especificado').toUpperCase()}
                           </span>
@@ -1365,9 +1365,9 @@ export function LeadsView() {
                         </motion.div>
                       ))
                     ) : (
-                      <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white dark:bg-[#18181b]/50">
+                      <div className="h-32 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-[20px] flex flex-col items-center justify-center text-gray-400 bg-white dark:bg-[var(--app-panel)]/50">
                         <Inbox className="w-6 h-6 mb-2 text-gray-300 dark:text-gray-600" />
-                        <span className="text-[11px] font-bold">Não há leads nessa etapa</span>
+                        <span className="text-xs font-bold">Não há leads nessa etapa</span>
                       </div>
                     )}
                   </AnimatePresence>
@@ -1556,14 +1556,14 @@ export function LeadsView() {
             {/* Sidebar Header */}
             <div className="flex items-start justify-between p-6 border-b border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-zinc-800/50">
               <div className="flex items-center gap-4">
-                <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                 <div>
                   <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{currentLead.name}</h3>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(currentLead.status)}`}>{currentLead.status}</span>
                     <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {currentLead.phone}</span>
                     <span className="text-xs font-semibold text-brand-charcoal dark:text-white flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full">
-                      <Avatar size={14} name={currentLead.responsible || currentLead.ref || 'Admin'} variant="beam" colors={['#FFC700', '#3B82F6', '#10B981', '#F59E0B', '#6366F1']} />
+                      <Avatar size={14} name={currentLead.responsible || currentLead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} />
                       {currentLead.responsible || currentLead.ref || 'Admin'}
                     </span>
                     <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full">
@@ -1602,7 +1602,7 @@ export function LeadsView() {
             
             {/* Timeline Area */}
             <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
-              <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-6 flex items-center gap-2 uppercase tracking-wider">
+              <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 mb-6 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-brand-muted" /> Linha do Tempo
               </h4>
               
@@ -1612,17 +1612,17 @@ export function LeadsView() {
                     <div className="flex flex-col items-center">
                       <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-all z-10 shadow-sm border-2 ${
                         i === 0 
-                          ? 'bg-brand-yellow border-white dark:border-[#18181b] text-brand-charcoal ring-4 ring-brand-yellow/20'
-                          : 'bg-white dark:bg-[#27272a] border-gray-200 dark:border-gray-700 text-brand-muted group-hover:border-brand-yellow'
+                          ? 'bg-brand-yellow border-white dark:border-[var(--app-panel)] text-brand-charcoal ring-4 ring-brand-yellow/20'
+                          : 'bg-white dark:bg-[var(--app-panel-muted)] border-gray-200 dark:border-gray-700 text-brand-muted group-hover:border-brand-yellow'
                       }`}>
                         {i === 0 ? <Sparkles className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                       </div>
                     </div>
                     <div className="flex-1 pt-1 pb-2">
-                      <div className="bg-gray-50 dark:bg-[#27272a]/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="bg-gray-50 dark:bg-[var(--app-panel-muted)]/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-2 gap-2">
                           <span className="font-bold text-[15px] text-brand-charcoal dark:text-gray-100">{h.action}</span>
-                          <span className="text-[11px] font-bold text-brand-muted dark:text-gray-400 whitespace-nowrap bg-white dark:bg-[#18181b] px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 shadow-sm">{h.date}</span>
+                          <span className="text-xs font-bold text-brand-muted dark:text-gray-400 whitespace-nowrap bg-white dark:bg-[var(--app-panel)] px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 shadow-sm">{h.date}</span>
                         </div>
                         {h.note && <p className="text-[13px] text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{h.note}</p>}
                       </div>
@@ -1633,7 +1633,7 @@ export function LeadsView() {
 
               {/* AI Assistant Section */}
               <div className="mt-8 pt-6 border-t border-brand-border dark:border-gray-800 space-y-4">
-                <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 flex items-center gap-2 uppercase tracking-wider">
+                <h4 className="font-bold text-sm text-brand-charcoal dark:text-gray-300 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-brand-yellow animate-pulse" /> Assistente de IA Gente Digital
                 </h4>
                 <div className="flex gap-3">
@@ -1657,14 +1657,14 @@ export function LeadsView() {
 
                 {/* AI Output Result */}
                 {aiResult && (
-                  <div className="bg-gray-50 dark:bg-[#27272a]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 space-y-3 relative overflow-hidden animate-in fade-in duration-300">
+                  <div className="bg-gray-50 dark:bg-[var(--app-panel-muted)]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 space-y-3 relative overflow-hidden animate-in fade-in duration-300">
                     <button onClick={() => setAiResult(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
                       <X className="w-3.5 h-3.5" />
                     </button>
                     {aiResult.type === 'qualify' ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Qualificação:</span>
+                          <span className="text-xs font-bold text-brand-muted">Qualificação:</span>
                           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                             aiResult.qualification === 'Quente' ? 'bg-red-100 text-red-800 border-red-200' :
                             aiResult.qualification === 'Morno' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
@@ -1682,8 +1682,8 @@ export function LeadsView() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Mensagem Recomendada:</span>
-                        <p className="text-xs text-brand-charcoal dark:text-gray-300 bg-white dark:bg-[#18181b] p-3 rounded-lg border border-gray-100 dark:border-gray-800 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap select-all">{aiResult.message}</p>
+                        <span className="text-xs font-bold text-brand-muted">Mensagem Recomendada:</span>
+                        <p className="text-xs text-brand-charcoal dark:text-gray-300 bg-white dark:bg-[var(--app-panel)] p-3 rounded-lg border border-gray-100 dark:border-gray-800 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap select-all">{aiResult.message}</p>
                         <div className="flex gap-2">
                           <button 
                             onClick={async () => {
@@ -1696,7 +1696,7 @@ export function LeadsView() {
                                 toastError('Erro ao Copiar', 'Não foi possível copiar a mensagem para a área de transferência.');
                               }
                             }}
-                            className="flex-1 py-2 bg-gray-100 dark:bg-[#27272a] hover:bg-gray-200 dark:hover:bg-[#3f3f46] text-brand-charcoal dark:text-white font-semibold text-[11px] rounded-lg transition-colors border border-brand-border dark:border-gray-700"
+                            className="flex-1 py-2 bg-gray-100 dark:bg-[var(--app-panel-muted)] hover:bg-gray-200 dark:hover:bg-[#243650] text-brand-charcoal dark:text-white font-semibold text-xs rounded-lg transition-colors border border-brand-border dark:border-gray-700"
                           >
                             {copiedMessage ? 'Copiado!' : 'Copiar Texto'}
                           </button>
@@ -1708,7 +1708,7 @@ export function LeadsView() {
                             })()}?text=${encodeURIComponent(aiResult.message || '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                            className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold text-xs rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
                           >
                             Enviar WhatsApp
                           </a>
@@ -1726,7 +1726,7 @@ export function LeadsView() {
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
                   placeholder="Descreva a nova interação com o lead..." 
-                  className="w-full bg-gray-50 dark:bg-[#27272a]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow resize-none h-28 transition-all dark:text-white dark:placeholder-gray-500"
+                  className="w-full bg-gray-50 dark:bg-[var(--app-panel-muted)]/50 border border-brand-border dark:border-gray-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand-yellow focus:ring-1 focus:ring-brand-yellow resize-none h-28 transition-all dark:text-white dark:placeholder-gray-500"
                 ></textarea>
                 <button
                   onClick={handleSaveNote}
@@ -1759,7 +1759,7 @@ export function LeadsView() {
       {/* Modal de Motivo de Descarte / Erro */}
       {lossReasonModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
+          <div className="bg-white dark:bg-[var(--app-panel)] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-start gap-3">
               <div className="p-3 bg-red-100 dark:bg-red-950/40 rounded-xl text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-6 h-6" />

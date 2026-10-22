@@ -67,23 +67,23 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-[var(--app-sidebar-border)] bg-[var(--app-sidebar)] py-5 text-slate-100 shadow-2xl shadow-black/10 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`fixed left-3 top-3 z-50 flex h-[calc(100vh-1.5rem)] w-64 flex-col rounded-[28px] bg-[var(--app-sidebar)] py-5 text-[#0e1b2c] shadow-xl transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
         {/* Mobile close button */}
-        <button 
+        <button
           type="button"
           aria-label="Fechar menu de navegação"
-          className="md:hidden absolute top-5 right-5 text-slate-400 hover:text-white transition-colors"
+          className="md:hidden absolute top-5 right-5 text-[#0e1b2c]/70 hover:text-[#0e1b2c] transition-colors"
           onClick={() => setIsOpen(false)}
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="mb-7 mt-1 px-5">
-          <BrandMark showTagline />
+        <div className="mb-8 mt-1 px-5">
+          <BrandMark showTagline tone="onYellow" />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto relative">
+        <nav className="flex-1 flex flex-col gap-1.5 px-3 overflow-y-auto relative">
           {SIDEBAR_NAV_ITEMS.map(({ id, label }) => (
             <NavItem
               key={id}
@@ -97,40 +97,40 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </nav>
 
         {/* User Profile Card */}
-        <div className="mt-auto flex flex-col gap-2 border-t border-[var(--app-sidebar-border)] px-3 pt-4">
-          <div className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-2.5">
-            <Avatar size={32} name={userEmail || 'Gente Digital'} variant="beam" colors={['#FFE600', '#0F172A', '#2563EB', '#10B981', '#F59E0B']} />
+        <div className="mt-auto flex flex-col gap-2 px-3 pt-4">
+          <div className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2.5">
+            <Avatar size={32} name={userEmail || 'Gente Digital'} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-semibold text-slate-200 truncate" title={userEmail || 'Usuário Autenticado'}>
+              <span className="text-sm font-semibold text-[#0e1b2c] truncate" title={userEmail || 'Usuário Autenticado'}>
                 {userEmail ? userEmail.split('@')[0] : 'Administrador'}
               </span>
               <div className="flex items-center gap-1 mt-0.5">
                 {userRole === 'admin' ? (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded border border-amber-500/20 uppercase tracking-wider">
-                    <ShieldCheck className="w-2.5 h-2.5" /> Admin
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 bg-[#0e1b2c] text-[#ffe300] rounded-full">
+                    <ShieldCheck className="w-3 h-3" /> Admin
                   </span>
                 ) : userRole === 'vendedor' ? (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 uppercase tracking-wider">
-                    <UserIcon className="w-2.5 h-2.5" /> Vendedor
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 border border-[#0e1b2c] text-[#0e1b2c] rounded-full">
+                    <UserIcon className="w-3 h-3" /> Vendedor
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-zinc-700/40 text-zinc-400 rounded border border-zinc-700/30 uppercase tracking-wider">
-                    <UserIcon className="w-2.5 h-2.5" /> ...
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 border border-[#0e1b2c]/40 text-[#0e1b2c]/60 rounded-full">
+                    <UserIcon className="w-3 h-3" /> ...
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          <motion.button 
+          <motion.button
             whileHover={{ x: 2 }}
             onClick={handleLogout}
             type="button"
             aria-label="Sair do sistema"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs font-medium"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full transition-colors text-[#0e1b2c]/80 hover:text-[#0e1b2c] hover:bg-[#0e1b2c]/10 text-sm font-semibold"
           >
             <LogOut className="w-4 h-4" />
-            <span>Sair do Sistema</span>
+            <span>Sair do sistema</span>
           </motion.button>
         </div>
 
@@ -151,21 +151,14 @@ function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl transition-all duration-200 group relative text-xs ${
+      aria-current={active ? 'page' : undefined}
+      className={`w-full flex items-center gap-3 py-3 px-4 rounded-full transition-colors duration-150 group relative text-sm ${
         active
-        ? 'border border-[#ffe600]/15 bg-[#ffe600]/10 font-bold text-white shadow-sm'
-          : 'border border-transparent font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100'
+          ? 'bg-[#0e1b2c] font-bold text-[#ffe300] shadow-md'
+          : 'font-semibold text-[#0e1b2c] hover:bg-white/50'
       }`}
     >
-      {active && (
-        <motion.div
-          layoutId="activeNavIndicator"
-          className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[#ffe600] shadow-md shadow-yellow-400/30"
-        />
-      )}
-      <motion.div whileHover={{ scale: 1.1 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
-        <Icon className={`h-4 w-4 transition-colors ${active ? 'text-[#ffe600]' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
-      </motion.div>
+      <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#ffe300]' : 'text-[#0e1b2c]'}`} />
       <span className="truncate">{label}</span>
     </button>
   );

@@ -244,23 +244,23 @@ export function ColaboradorExtratoModal({
         {/* Cards de Métricas do Período */}
         <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-50/30 dark:bg-zinc-900/50">
           <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-            <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Indicações</span>
+            <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 block">Indicações</span>
             <span className="font-display text-2xl font-bold text-zinc-900 dark:text-white mt-1 block">{totalIndicacoes}</span>
-            <span className="text-[10px] text-zinc-400">no período</span>
+            <span className="text-xs text-zinc-400">no período</span>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Vendas Ganhas</span>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block">Vendas Ganhas</span>
             <span className="font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">{vendasGanhas}</span>
-            <span className="text-[10px] text-zinc-400">instaladas</span>
+            <span className="text-xs text-zinc-400">instaladas</span>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-            <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Taxa Aplicada</span>
+            <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 block">Taxa Aplicada</span>
             <span className="font-display text-2xl font-bold text-zinc-900 dark:text-white mt-1 block">
               R$ {taxaPorVenda},00
             </span>
-            <span className="text-[10px] text-zinc-400">
+            <span className="text-xs text-zinc-400">
               {taxasAplicadas.length > 1
                 ? 'Variável por mês de indicação'
                 : taxaPorVenda >= PROGRAM_RULES.colaborador.taxaVolume
@@ -270,11 +270,11 @@ export function ColaboradorExtratoModal({
           </div>
 
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-400/10 to-transparent border border-amber-500/30 shadow-xs">
-            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">Comissão PIX</span>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block">Comissão PIX</span>
             <span className="font-display text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 block">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalComissao)}
             </span>
-            <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80">
+            <span className="text-xs text-amber-600/80 dark:text-amber-400/80">
               {atingiuMetaBonus
                 ? '🎉 Bônus Top Liberado!'
                 : 'Bônus Top: concorra sendo o top indicador do mês'}
@@ -286,7 +286,7 @@ export function ColaboradorExtratoModal({
         <div className="flex-1 overflow-y-auto p-6 pt-2">
           <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-zinc-100/70 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 uppercase font-bold border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="bg-zinc-100/70 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 font-bold border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
                   <th className="px-4 py-3">Cliente (Lead)</th>
                   <th className="px-4 py-3">Data Indicação</th>
@@ -308,7 +308,7 @@ export function ColaboradorExtratoModal({
                     <tr key={lead.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
                       <td className="px-4 py-3 font-semibold">
                         <div className="text-zinc-900 dark:text-white font-bold">{lead.name}</div>
-                        <div className="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
+                        <div className="text-xs text-zinc-400 flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3" />
                           <span>{lead.phone}</span>
                         </div>
@@ -319,7 +319,7 @@ export function ColaboradorExtratoModal({
                             <span className="font-semibold text-zinc-900 dark:text-zinc-200">
                               {new Date(lead.created_at).toLocaleDateString('pt-BR')}
                             </span>
-                            <span className="block text-[10px] text-zinc-400">
+                            <span className="block text-xs text-zinc-400">
                               {new Date(lead.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </>
@@ -328,11 +328,11 @@ export function ColaboradorExtratoModal({
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${getStatusBadge(lead.status)}`}>
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${getStatusBadge(lead.status)}`}>
                           {lead.status}
                         </span>
                         {lead.loss_reason && (
-                          <span className="block text-[10px] text-red-500 dark:text-red-400 mt-1 truncate max-w-[140px]" title={lead.loss_reason}>
+                          <span className="block text-xs text-red-500 dark:text-red-400 mt-1 truncate max-w-[140px]" title={lead.loss_reason}>
                             Motivo: {lead.loss_reason}
                           </span>
                         )}
@@ -345,7 +345,7 @@ export function ColaboradorExtratoModal({
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
                           <Tag className="w-2.5 h-2.5" />
                           {lead.source === 'ms_forms'
                             ? 'MS Forms'
@@ -360,7 +360,7 @@ export function ColaboradorExtratoModal({
                             R$ {taxaParaLead(lead.created_at)},00
                           </span>
                         ) : (
-                          <span className="text-zinc-400 text-[11px] font-normal">Pendente venda</span>
+                          <span className="text-zinc-400 text-xs font-normal">Pendente venda</span>
                         )}
                       </td>
                     </tr>
