@@ -1,6 +1,7 @@
 export type DashboardTabId =
   | 'dashboard'
   | 'leads'
+  | 'viabilidade'
   | 'vendas'
   | 'colaboradores'
   | 'comissoes'
@@ -26,6 +27,7 @@ export interface SidebarNavItem {
 export const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'leads', label: 'Leads & Funil' },
+  { id: 'viabilidade', label: 'Viabilidade' },
   { id: 'colaboradores', label: 'Colaboradores' },
   { id: 'comissoes', label: 'Comissões & PIX' },
 ];

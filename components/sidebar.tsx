@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UsersRound, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Users, UsersRound, MapPin, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Avatar from 'boring-avatars';
@@ -19,6 +19,7 @@ interface SidebarProps {
 const NAV_ICONS: Record<SidebarTabId, LucideIcon> = {
   dashboard: LayoutDashboard,
   leads: Users,
+  viabilidade: MapPin,
   colaboradores: UsersRound,
   comissoes: Wallet,
 };

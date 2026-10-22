@@ -40,10 +40,15 @@ const AnalyticsView = dynamic(
   () => import('@/components/views/analytics/analytics-view').then((module) => module.AnalyticsView),
   { loading: ViewLoading }
 );
+const ViabilidadeView = dynamic(
+  () => import('@/components/views/viabilidade').then((module) => module.ViabilidadeView),
+  { loading: ViewLoading }
+);
 
 const tabNames = {
   dashboard: 'Dashboard',
   leads: 'Leads & Funil',
+  viabilidade: 'Viabilidade de instalação',
   vendas: 'Vendas & Rastreamento',
   colaboradores: 'Colaboradores',
   comissoes: 'Gestão de Comissões & PIX',
@@ -109,6 +114,7 @@ export function DashboardShell() {
     setIsSidebarOpen(false);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
+    params.delete('leadId');
     router.push(`?${params.toString()}`);
   };
 
@@ -149,6 +155,8 @@ function ActiveView({ tab }: { tab: TabId }) {
       return <DashboardView />;
     case 'leads':
       return <LeadsView />;
+    case 'viabilidade':
+      return <ViabilidadeView />;
     case 'vendas':
       return <VendasRastreamentoView />;
     case 'colaboradores':

@@ -1,4 +1,4 @@
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import next from "eslint-config-next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,4 +8,4 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig([{
     extends: [...next],
-}]);
+}, globalIgnores([".next-viabilidade/**", ".test-build/**", "output/playwright/**"])]);

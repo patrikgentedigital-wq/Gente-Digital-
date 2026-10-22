@@ -9,3 +9,7 @@ coverage/
 .vercel
 scratch/
 .worktrees/
+/.next-viabilidade/
+.test-build/
+.data/
+output/playwright/
