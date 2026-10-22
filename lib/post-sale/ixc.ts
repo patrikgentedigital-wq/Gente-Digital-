@@ -1,5 +1,5 @@
 import 'server-only';
-import { fetchIxcWithTimeout, getIxcCredentials, type IxcConfig } from '@/lib/ixc';
+import { fetchIxcWithTimeout, formatIxcDate, getIxcCredentials, type IxcConfig } from '@/lib/ixc';
 import { isValidPhoneDigits, normalizePhoneDigits } from './phones';
 import { parseIxcDate } from './metrics';
 import {
@@ -8,6 +8,8 @@ import {
   type IxcClientRecord,
   type IxcContractRecord,
   type IxcGateway,
+  type IxcProspectCreateResult,
+  type IxcProspectInput,
   type PostSaleContact,
   type VerifiedOriginContract,
 } from './contracts';
@@ -161,6 +163,93 @@ export async function createIxcGateway(dependencies: IxcGatewayDependencies = {}
       return rows.map(mapContract);
     },
   };
+}
+
+export async function createIxcProspectRecord(
+  input: IxcProspectInput,
+  dependencies: IxcGatewayDependencies = {},
+): Promise<IxcProspectCreateResult> {
+  const name = input.name.trim();
+  const phone = normalizePhoneDigits(input.phone);
+  const ref = input.ref.trim().slice(0, 100);
+
+  if (name.length < 2 || name.length > 150) {
+    return { success: false, id: null, error: 'Nome fora do limite aceito pelo IXC.' };
+  }
+  if (!isValidPhoneDigits(phone)) {
+    return { success: false, id: null, error: 'Telefone inválido para o cadastro no IXC.' };
+  }
+
+  let credentials: IxcCredentials;
+  try {
+    credentials = await (dependencies.getCredentials ?? getIxcCredentials)();
+  } catch {
+    return { success: false, id: null, error: 'Não foi possível carregar a configuração do IXC.' };
+  }
+
+  if (!credentials.hasCredentials || !credentials.cleanDomain || !credentials.authHeader) {
+    return { success: false, id: null, error: 'IXC não configurado.' };
+  }
+
+  let response: Response;
+  try {
+    response = await (dependencies.fetchWithTimeout ?? fetchIxcWithTimeout)(
+      `https://${credentials.cleanDomain}/webservice/v1/contato`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: credentials.authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nome: name,
+          razao: name,
+          fone_celular: phone,
+          id_filial: 1,
+          data_cadastro: formatIxcDate(),
+          lead: 'S',
+          tipo_pessoa: 'F',
+          origem: 'outros',
+          id_candidato_tipo: 22,
+          id_canal_origem: 22,
+          id_canal_venda: 22,
+          obs: `Indicado via Gente Digital por: ${ref || 'Desconhecido'}`,
+        }),
+      },
+      10_000,
+    );
+  } catch {
+    console.warn('post_sale_ixc_prospect_failed', { reason: 'network_or_timeout' });
+    return { success: false, id: null, error: 'Não foi possível conectar ao IXC.' };
+  }
+
+  if (!response.ok) {
+    console.warn('post_sale_ixc_prospect_failed', { reason: 'http_status', status: response.status });
+    return { success: false, id: null, error: `IXC respondeu com HTTP ${response.status}.` };
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    const value: unknown = await response.json();
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_shape');
+    payload = value as Record<string, unknown>;
+  } catch {
+    console.warn('post_sale_ixc_prospect_failed', { reason: 'invalid_json' });
+    return { success: false, id: null, error: 'IXC retornou uma resposta inválida.' };
+  }
+
+  if (payload.type === 'error' || payload.error) {
+    console.warn('post_sale_ixc_prospect_failed', { reason: 'api_error' });
+    return { success: false, id: null, error: 'IXC recusou a criação do lead.' };
+  }
+
+  const id = textualId(payload.id);
+  if (!id) {
+    console.warn('post_sale_ixc_prospect_failed', { reason: 'missing_created_id' });
+    return { success: false, id: null, error: 'IXC não confirmou o ID do lead criado.' };
+  }
+
+  return { success: true, id };
 }
 
 export async function validateOriginContract(
