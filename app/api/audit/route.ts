@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase-admin';
 import { checkRateLimit } from '@/lib/ratelimit';
+import { getAuthenticatedUser } from '@/lib/auth-server';
 
 /**
  * Endpoint server-side para gravação de logs de auditoria.
  * Existe para que lib/audit.ts (usado em componentes cliente) nunca importe
  * supabase-admin no bundle do browser: o insert acontece aqui, no servidor.
- * Sem auth obrigatória (o cliente não possui credenciais), mas com rate limit simples.
+ * Exige sessão válida e grava o e-mail da sessão: o user_email do corpo é ignorado,
+ * para ninguém forjar a autoria de um log.
  */
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+    }
+
     try {
-      const rateLimit = await checkRateLimit(`audit_${ip}`, 30, 60);
+      const rateLimit = await checkRateLimit(`audit_${user.id}`, 30, 60);
       if (!rateLimit.success) {
         return NextResponse.json({ success: false, error: 'Muitas requisições.' }, { status: 429 });
       }
@@ -24,7 +30,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const action = typeof body?.action === 'string' ? body.action.slice(0, 200) : '';
     const details = typeof body?.details === 'string' ? body.details.slice(0, 5000) : '';
-    const user_email = typeof body?.user_email === 'string' ? body.user_email.slice(0, 320) : 'Admin';
+    const user_email = (user.email || 'desconhecido').slice(0, 320);
 
     if (!action || !details) {
       return NextResponse.json({ success: false, error: 'Campos obrigatórios ausentes (action, details).' }, { status: 400 });

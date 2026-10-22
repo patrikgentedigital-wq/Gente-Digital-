@@ -638,11 +638,11 @@ export function ColaboradoresView() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800/40 border-b border-brand-border dark:border-gray-800">
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider">Colaborador</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-center">ID</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider">Link Único</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-center">Indicações</th>
-                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400">Colaborador</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 text-center">ID</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400">Link Único</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 text-center">Indicações</th>
+                <th className="px-6 py-4 font-bold text-xs text-brand-muted dark:text-gray-400 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border dark:divide-gray-800">
@@ -656,7 +656,7 @@ export function ColaboradoresView() {
                           <img src={colab.photo_url} alt={colab.name} className="w-9 h-9 rounded-full object-cover border border-brand-border" />
                         </>
                       ) : (
-                        <Avatar size={36} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                        <Avatar size={36} name={colab.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                       )}
                       <div>
                         <p className="font-semibold text-brand-charcoal dark:text-white text-sm">{colab.name}</p>
@@ -688,17 +688,17 @@ export function ColaboradoresView() {
                   <td className="px-6 py-4 text-center">
                     <span className="font-bold text-brand-charcoal dark:text-white text-base">{(colab.count ?? 0).toString().padStart(2, '0')}</span>
                     {dateFilter.period !== 'all' && (
-                      <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                      <span className="block text-xs text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
                         {colab.totalAllTime ?? 0} no histórico total
                       </span>
                     )}
                     {colab.vendasGanhas !== undefined && colab.vendasGanhas > 0 && (
-                      <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                      <span className="block text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                         {colab.vendasGanhas} venda(s) instalada(s)
                       </span>
                     )}
                     {clicksLoaded && (
-                      <span className="block text-[10px] text-brand-muted dark:text-gray-400 font-medium mt-0.5">
+                      <span className="block text-xs text-brand-muted dark:text-gray-400 font-medium mt-0.5">
                         {clickCounts[normalizeRef(colab.id)] ?? clickCounts[normalizeRef(colab.name)] ?? 0} cliques no link
                       </span>
                     )}
@@ -785,7 +785,7 @@ export function ColaboradoresView() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={colab.photo_url} alt={colab.name} className="h-10 w-10 shrink-0 rounded-full object-cover border border-[var(--app-border)]" />
                     ) : (
-                      <Avatar size={40} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
+                      <Avatar size={40} name={colab.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-semibold text-[var(--app-ink)]">{colab.name}</p>
@@ -796,7 +796,7 @@ export function ColaboradoresView() {
 
                   <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel-muted)] p-3">
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-[var(--app-muted)]">Link único</span>
+                      <span className="text-xs font-semibold text-[var(--app-muted)]">Link único</span>
                       <button
                         type="button"
                         onClick={() => void handleCopyLink(referralLink, colab.name)}
@@ -811,7 +811,7 @@ export function ColaboradoresView() {
 
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-semibold text-[var(--app-muted)]">Indicações no período</p>
+                      <p className="text-xs font-semibold text-[var(--app-muted)]">Indicações no período</p>
                       <p className="mt-0.5 text-xl font-bold text-[var(--app-ink)]">{(colab.count ?? 0).toString().padStart(2, '0')}</p>
                       <p className="text-xs text-[var(--app-muted)]">{clickCounts[normalizeRef(colab.id)] ?? clickCounts[normalizeRef(colab.name)] ?? 0} cliques no link</p>
                     </div>
@@ -926,7 +926,7 @@ export function ColaboradoresView() {
                 ) : (
                   <div className="w-44 h-44 flex items-center justify-center rounded-xl border-4 border-white bg-white text-xs text-brand-muted" role="status">Gerando QR Code...</div>
                 )}
-                <p className="text-[11px] text-brand-muted font-bold mt-4 uppercase tracking-wider">
+                <p className="text-xs text-brand-muted font-bold mt-4">
                   Escaneie para indicar
                 </p>
               </div>

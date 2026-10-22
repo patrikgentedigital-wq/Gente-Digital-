@@ -8,18 +8,23 @@ const redis = (url && token && !url.includes('placeholder'))
   ? new Redis({ url, token }) 
   : null;
 
-// Singleton de Ratelimit em nível de módulo (lazy init) — evita criar uma
-// instância nova (e reconfigurar o limiter) em cada chamada de checkRateLimit.
-let ratelimitInstance: Ratelimit | null = null;
+// Uma instância de Ratelimit por combinação (limite, janela), criada sob demanda —
+// evita recriar o limiter a cada chamada sem fazer todas as rotas herdarem a
+// configuração da primeira que chamou.
+const ratelimitInstances = new Map<string, Ratelimit>();
 
-function getRatelimitInstance(limit: number, windowSeconds: number): Ratelimit {
-  if (!ratelimitInstance) {
-    ratelimitInstance = new Ratelimit({
+export function getRatelimitInstance(limit: number, windowSeconds: number): Ratelimit {
+  const cacheKey = `${limit}:${windowSeconds}`;
+  let instance = ratelimitInstances.get(cacheKey);
+  if (!instance) {
+    instance = new Ratelimit({
       redis: redis as Redis,
       limiter: Ratelimit.slidingWindow(limit, `${windowSeconds} s`),
+      prefix: `@upstash/ratelimit:${cacheKey}`,
     });
+    ratelimitInstances.set(cacheKey, instance);
   }
-  return ratelimitInstance;
+  return instance;
 }
 
 // Armazenamento em memória caso o Redis não esteja disponível.

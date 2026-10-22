@@ -12,9 +12,9 @@ const PayCommissionSchema = z.object({
   type: z.enum(['pix_colaborador', 'desconto_cliente', 'bonus_top']),
 });
 
-async function getRole(user: { id: string; email?: string | null; user_metadata?: any }): Promise<'admin' | 'vendedor'> {
+async function getRole(user: { id: string; email?: string | null }): Promise<'admin' | 'vendedor'> {
   if (user.id === 'dev-local') return 'admin';
-  return getUserRole(user.id, user.email, (user as any).user_metadata);
+  return getUserRole(user.id, user.email);
 }
 
 async function getAllowedColabNames(user: { id: string; email?: string | null }): Promise<string[]> {

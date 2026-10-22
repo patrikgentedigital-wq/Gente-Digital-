@@ -46,10 +46,10 @@ export function PostSaleReviewDialog({ conversion, contacts, onClose, onSaved }:
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-6">
-      <section role="dialog" aria-modal="true" aria-labelledby="post-sale-review-title" className="w-full max-w-lg overflow-hidden rounded-3xl border border-brand-border bg-white shadow-2xl dark:border-gray-800 dark:bg-[#18181b]">
+      <section role="dialog" aria-modal="true" aria-labelledby="post-sale-review-title" className="w-full max-w-lg overflow-hidden rounded-3xl border border-brand-border bg-white shadow-2xl dark:border-gray-800 dark:bg-[var(--app-panel)]">
         <header className="flex items-start justify-between gap-4 border-b border-brand-border px-5 py-4 dark:border-gray-800 sm:px-6">
           <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Revisão administrativa</p>
+            <p className="text-xs font-extrabold tracking-[0.18em] text-amber-600 dark:text-amber-400">Revisão administrativa</p>
             <h2 id="post-sale-review-title" className="mt-1 text-lg font-extrabold text-brand-charcoal dark:text-white">Vincular contrato confirmado</h2>
             <p className="mt-1 text-xs text-brand-muted dark:text-gray-400">Contrato IXC {conversion.ixcContractId} · ativado em {new Date(conversion.activatedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
           </div>
