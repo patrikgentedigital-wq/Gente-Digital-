@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    const role = await getUserRole(user.id, user.email, (user as any).user_metadata);
+    const role = await getUserRole(user.id, user.email);
 
     const response = NextResponse.json({
       id: user.id,

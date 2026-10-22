@@ -66,13 +66,13 @@ export async function getAuthenticatedUser(req: NextRequest) {
 }
 
 /**
- * Retorna o role do usuário consultando múltiplas fontes (ADMIN_EMAILS, user_roles, colaboradores, auth metadata).
+ * Retorna o role do usuário consultando múltiplas fontes (ADMIN_EMAILS, user_roles, colaboradores).
  * O fallback seguro é 'vendedor': nenhum usuário recebe admin implicitamente.
+ * user_metadata nunca concede papel: o próprio usuário consegue editá-lo via auth.updateUser.
  */
 export async function getUserRole(
   userId: string,
-  userEmail?: string | null,
-  userMetadata?: any
+  userEmail?: string | null
 ): Promise<'admin' | 'vendedor'> {
   // 1. Dev local
   if (userId === 'dev-local') return 'admin';
@@ -114,12 +114,7 @@ export async function getUserRole(
     return 'admin';
   }
 
-  // 3. Checar metadados do Supabase Auth
-  if (userMetadata?.role === 'admin') {
-    return 'admin';
-  }
-
-  // 4. Checar tabela user_roles
+  // 3. Checar tabela user_roles
   try {
     const { data, error } = await supabaseAdmin
       .from('user_roles')
@@ -134,7 +129,7 @@ export async function getUserRole(
     console.warn('Erro ao consultar user_roles:', err);
   }
 
-  // 5. Checar tabela colaboradores (valores entre aspas para não quebrar a sintaxe do or())
+  // 4. Checar tabela colaboradores (valores entre aspas para não quebrar a sintaxe do or())
   if (userId || emailLower) {
     try {
       const orParts: string[] = [];
@@ -171,7 +166,7 @@ export async function verifyAuth(req: NextRequest): Promise<boolean> {
   // Dev local sem Supabase
   if (user.id === 'dev-local') return true;
 
-  const role = await getUserRole(user.id, user.email, (user as any).user_metadata);
+  const role = await getUserRole(user.id, user.email);
   if (role !== 'admin') {
     console.warn(`Acesso negado: ${user.email} (role: ${role}) tentou acessar rota admin.`);
     return false;
