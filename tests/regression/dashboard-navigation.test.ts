@@ -20,7 +20,7 @@ test('menu lateral oculta somente Indicadores, Vendas e Integrações', async ()
 
   assert.deepEqual(
     SIDEBAR_NAV_ITEMS.map((item: { id: string }) => item.id),
-    ['dashboard', 'leads', 'colaboradores', 'comissoes'],
+    ['dashboard', 'leads', 'viabilidade', 'colaboradores', 'comissoes'],
   );
   assert.deepEqual(TEMPORARILY_HIDDEN_DASHBOARD_TABS, [
     'vendas',
@@ -42,6 +42,10 @@ test('menu lateral oculta somente Indicadores, Vendas e Integrações', async ()
   }
   assert.deepEqual(resolveDashboardNavigation('leads'), {
     activeTab: 'leads',
+    redirectHiddenTab: false,
+  });
+  assert.deepEqual(resolveDashboardNavigation('viabilidade'), {
+    activeTab: 'viabilidade',
     redirectHiddenTab: false,
   });
   assert.deepEqual(resolveDashboardNavigation(null), {

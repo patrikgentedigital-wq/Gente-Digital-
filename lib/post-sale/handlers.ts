@@ -8,6 +8,7 @@ import {
 } from './metrics';
 import {
   createIxcGateway,
+  createIxcProspectRecord,
   reconcileContractsForContacts,
   validateOriginContract,
 } from './ixc';
@@ -16,6 +17,8 @@ import {
   PostSaleDomainError,
   type ConversionCandidate,
   type IxcGateway,
+  type IxcProspectCreateResult,
+  type IxcProspectInput,
   type PostSaleCollectionMetricRow,
   type PostSaleContact,
   type PostSaleContactDraft,
@@ -65,6 +68,12 @@ export interface PostSaleStore {
   listCollaborators(): Promise<PostSaleCollaborator[]>;
   listDataset(filter: PostSaleDashboardFilter): Promise<PostSaleDataset>;
   createCollection(input: CreatePostSaleCollectionInput): Promise<PostSaleCollectionCreateResult>;
+  recordIxcSyncResult(input: {
+    leadId: number;
+    success: boolean;
+    ixcLeadId: string | null;
+    error: string | null;
+  }): Promise<void>;
   listReconciliationContacts(collectionRange: PostSaleDateRange): Promise<PostSaleContact[]>;
   insertConversions(candidates: ConversionCandidate[], verifiedAt: string): Promise<number>;
   findConversionForReview(id: string): Promise<{ id: string; state: string } | null>;
@@ -91,6 +100,7 @@ export interface PostSaleHandlerDependencies {
   getRole(userId: string, email?: string | null): Promise<'admin' | 'vendedor'>;
   resolveColaborador(user: PostSaleUser): Promise<PostSaleCollaborator | null>;
   createIxcGateway(): Promise<IxcGateway>;
+  createIxcProspect(input: IxcProspectInput): Promise<IxcProspectCreateResult>;
   store: PostSaleStore;
   now(): string;
 }
@@ -102,6 +112,7 @@ const contactDraftSchema = z.object({
 
 const collectionSchema = z.object({
   originContractId: z.string().trim().min(1).max(100),
+  collectorColaboradorId: z.string().trim().min(1).max(100).optional(),
   outcome: z.enum(COLLECTION_STATES),
   contacts: z.array(contactDraftSchema).max(100),
 }).superRefine((value, context) => {
@@ -437,6 +448,27 @@ function createSupabaseStore(): PostSaleStore {
       };
     },
 
+    async recordIxcSyncResult(input) {
+      const date = new Intl.DateTimeFormat('en-GB', {
+        timeZone: BUSINESS_TIME_ZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }).format(new Date()).replace(',', '');
+      const { error } = await supabaseAdmin.from('lead_history').insert([{
+        lead_id: input.leadId,
+        date,
+        action: input.success ? 'Sincronizado com IXC' : 'Falha na Sincronização IXC',
+        note: input.success
+          ? `Prospect criado automaticamente no IXC com o ID: ${input.ixcLeadId}`
+          : `Não foi possível criar o lead no IXC: ${input.error ?? 'falha de integração.'}`,
+      }]);
+      if (error) throw new Error('Não foi possível registrar o resultado da sincronização IXC.');
+    },
+
     async listReconciliationContacts(collectionRange) {
       const bounds = timestampRange(collectionRange);
       const collectionRows = await pagination<Record<string, unknown>>((from, to) => (
@@ -572,20 +604,34 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     }
   }
 
+  async function resolveCollector(access: { user: PostSaleUser; role: 'admin' | 'vendedor' }, selectedId?: string): Promise<PostSaleCollaborator | Response> {
+    try {
+      if (access.role === 'admin') {
+        if (!selectedId) return json({ success: false, error: 'Selecione o colaborador que realizou a coleta.' }, 400);
+        const collaborators = await dependencies.store.listCollaborators();
+        return collaborators.find((item) => item.id === selectedId)
+          ?? json({ success: false, error: 'Colaborador selecionado não encontrado.' }, 422);
+      }
+      const collaborator = await dependencies.resolveColaborador(access.user);
+      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      if (selectedId && selectedId !== collaborator.id) {
+        return json({ success: false, error: 'Acesso negado ao colaborador selecionado.' }, 403);
+      }
+      return collaborator;
+    } catch {
+      return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
+    }
+  }
+
   async function validateContract(request: Request): Promise<Response> {
     const access = await identify(request);
     if (access instanceof Response) return access;
-    const parsed = z.object({ contractId: z.string().trim().min(1).max(100) }).safeParse(await readJson(request));
+    const parsed = z.object({ contractId: z.string().trim().min(1).max(100), collectorColaboradorId: z.string().trim().min(1).max(100).optional() }).safeParse(await readJson(request));
     if (!parsed.success) return json({ success: false, error: 'Informe um ID de contrato válido.' }, 400);
 
     try {
-      let collaborator: PostSaleCollaborator | null;
-      try {
-        collaborator = await dependencies.resolveColaborador(access.user);
-      } catch {
-        return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
-      }
-      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      const collaborator = await resolveCollector(access, parsed.data.collectorColaboradorId);
+      if (collaborator instanceof Response) return collaborator;
       const ixc = await getIxcGateway();
       const verified = await validateOriginContract(parsed.data.contractId, ixc);
       return json({
@@ -600,6 +646,21 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
       });
     } catch (error) {
       return parseErrorResponse(error);
+    }
+  }
+
+  async function getCollectorOptions(request: Request): Promise<Response> {
+    const access = await identify(request);
+    if (access instanceof Response) return access;
+    try {
+      if (access.role === 'admin') {
+        return json({ success: true, viewerRole: 'admin', collaborators: await dependencies.store.listCollaborators() });
+      }
+      const collaborator = await dependencies.resolveColaborador(access.user);
+      if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
+      return json({ success: true, viewerRole: 'vendedor', collaborators: [collaborator] });
+    } catch {
+      return json({ success: false, error: 'Não foi possível carregar os colaboradores.' }, 503);
     }
   }
 
@@ -666,16 +727,10 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     const access = await identify(request);
     if (access instanceof Response) return access;
 
-    let collaborator: PostSaleCollaborator | null;
-    try {
-      collaborator = await dependencies.resolveColaborador(access.user);
-    } catch {
-      return json({ success: false, error: 'Não foi possível resolver o vínculo do colaborador.' }, 503);
-    }
-    if (!collaborator) return json({ success: false, error: 'Colaborador não vinculado à sessão.' }, 403);
-
     const parsed = collectionSchema.safeParse(await readJson(request));
     if (!parsed.success) return json({ success: false, error: parsed.error.issues[0]?.message ?? 'Dados da coleta inválidos.' }, 400);
+    const collaborator = await resolveCollector(access, parsed.data.collectorColaboradorId);
+    if (collaborator instanceof Response) return collaborator;
 
     try {
       const ixc = await getIxcGateway();
@@ -692,7 +747,48 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
       if (!saved.created) {
         return json({ success: false, error: 'Este contrato de origem já possui uma coleta registrada.', collectionId: saved.collectionId }, 409);
       }
-      return json({ success: true, ...saved, collector: collaborator }, 201);
+
+      const ixcSync = { created: 0, failed: 0 };
+      const contacts = Array.isArray(saved.contacts) ? saved.contacts : [];
+      for (const [index, value] of contacts.entries()) {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) continue;
+        const contactResult = value as Record<string, unknown>;
+        if (contactResult.state !== 'created_lead') continue;
+
+        const leadId = typeof contactResult.leadId === 'number' ? contactResult.leadId : Number(contactResult.leadId);
+        const draft = parsed.data.contacts[index];
+        if (!Number.isSafeInteger(leadId) || leadId <= 0 || !draft) {
+          ixcSync.failed += 1;
+          continue;
+        }
+
+        let result: IxcProspectCreateResult;
+        try {
+          result = await dependencies.createIxcProspect({
+            name: draft.name,
+            phone: draft.phone,
+            ref: origin.customerName.slice(0, 100),
+          });
+        } catch {
+          result = { success: false, id: null, error: 'Não foi possível confirmar a criação do lead no IXC.' };
+        }
+
+        if (result.success) ixcSync.created += 1;
+        else ixcSync.failed += 1;
+
+        try {
+          await dependencies.store.recordIxcSyncResult({
+            leadId,
+            success: result.success,
+            ixcLeadId: result.success ? result.id : null,
+            error: result.success ? null : result.error,
+          });
+        } catch {
+          console.warn('post_sale_ixc_sync_history_failed', { reason: 'history_write_failed', leadId });
+        }
+      }
+
+      return json({ success: true, ...saved, ixcSync, collector: collaborator }, 201);
     } catch (error) {
       return parseErrorResponse(error);
     }
@@ -794,7 +890,7 @@ export function createPostSaleHandlers(dependencies: PostSaleHandlerDependencies
     }
   }
 
-  return { validateContract, getCollections, createCollection, reconcile, reviewConversion, correctCollectionCollector };
+  return { validateContract, getCollectorOptions, getCollections, createCollection, reconcile, reviewConversion, correctCollectionCollector };
 }
 
 const defaultHandlers = createPostSaleHandlers({
@@ -822,6 +918,7 @@ const defaultHandlers = createPostSaleHandlers({
       : null;
   },
   createIxcGateway,
+  createIxcProspect: createIxcProspectRecord,
   store: createSupabaseStore(),
   now: () => new Date().toISOString(),
 });

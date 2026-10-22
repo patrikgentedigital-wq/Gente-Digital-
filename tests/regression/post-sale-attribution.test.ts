@@ -12,6 +12,7 @@ function makeHandler(role: 'admin' | 'vendedor') {
     getRole: async () => role,
     resolveColaborador: async () => ({ id: 'EMP-042', name: 'Vendedora' }),
     createIxcGateway: async () => { throw new Error('not used'); },
+    createIxcProspect: async () => ({ success: false, id: null, error: 'not used' }),
     store: {
       correctCollectionCollector: async (input: unknown) => {
         changes.push(input);

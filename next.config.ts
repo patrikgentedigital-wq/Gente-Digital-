@@ -1,6 +1,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   devIndicators: false,
   eslint: {
@@ -21,6 +22,9 @@ const nextConfig: NextConfig = {
     ],
   },
   transpilePackages: ['motion'],
+  outputFileTracingIncludes: {
+    '/api/viabilidade': ['./data/viabilidade/osm/graphs/*.json.gz'],
+  },
   async headers() {
     // 'unsafe-eval' só é necessário em dev (React Refresh/HMR). Em produção,
     // removemos do CSP. TODO: migrar para nonce-based CSP quando possível —

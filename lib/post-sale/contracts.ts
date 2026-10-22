@@ -57,6 +57,16 @@ export interface IxcGateway {
   listContractsByClientId(clientId: string): Promise<IxcContractRecord[]>;
 }
 
+export interface IxcProspectInput {
+  name: string;
+  phone: string;
+  ref: string;
+}
+
+export type IxcProspectCreateResult =
+  | { success: true; id: string }
+  | { success: false; id: null; error: string };
+
 export interface ConversionCandidate {
   contractId: string;
   activatedAt: string;

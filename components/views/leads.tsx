@@ -1559,6 +1559,7 @@ export function LeadsView() {
                 <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                 <div>
                   <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{currentLead.name}</h3>
+                  <a href={`?tab=viabilidade&leadId=${currentLead.id}`} className="mt-3 inline-flex text-sm font-semibold text-sky-800 underline dark:text-sky-300">Consultar viabilidade de instalação</a>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(currentLead.status)}`}>{currentLead.status}</span>
                     <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {currentLead.phone}</span>
