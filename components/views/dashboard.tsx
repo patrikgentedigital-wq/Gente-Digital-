@@ -4,7 +4,6 @@ import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Meda
 import dynamic from 'next/dynamic';
 import Avatar from 'boring-avatars';
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
 import { initialLeads, initialColaboradores } from '@/lib/mock-data';
@@ -550,11 +549,20 @@ export function DashboardView() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={UsersIcon} title="Total de Leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
-        <StatCard icon={Target} title="Conversões" value={conversoesCount.toString()} trend={trends.convsTrend} trendUp={trends.convsTrendUp} />
-        <StatCard icon={MousePointerClick} title="Cliques em Links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
-        <StatCard icon={TrendingUp} title="Taxa de Conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
+      {/* Conversões são o resultado do programa; as demais métricas explicam esse número. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <StatCard
+          featured
+          icon={Target}
+          title="Conversões"
+          value={conversoesCount.toString()}
+          detail={`de ${totalLeads} ${totalLeads === 1 ? 'lead' : 'leads'} no período`}
+          trend={trends.convsTrend}
+          trendUp={trends.convsTrendUp}
+        />
+        <StatCard icon={UsersIcon} title="Total de leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
+        <StatCard icon={MousePointerClick} title="Cliques em links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
+        <StatCard icon={TrendingUp} title="Taxa de conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
       </div>
 
       <div className="workspace-panel flex min-h-[420px] flex-col p-5 sm:p-6">
@@ -719,33 +727,35 @@ interface StatCardProps {
   value: string;
   trend: string;
   trendUp: boolean;
+  featured?: boolean;
+  detail?: string;
 }
 
-function StatCard({ icon: Icon, title, value, trend, trendUp }: StatCardProps) {
+function StatCard({ icon: Icon, title, value, trend, trendUp, featured = false, detail }: StatCardProps) {
+  // No cartão amarelo a tendência usa tinta marinho; nos demais, verde/vermelho.
+  const trendClass = featured
+    ? 'border-[#0e1b2c]/25 bg-white/50 text-[#0e1b2c]'
+    : trendUp
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      : 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400';
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="workspace-metric group flex min-h-[170px] flex-col justify-between transition-shadow hover:shadow-lg"
+    <div
+      className={`workspace-metric flex min-h-[130px] flex-col justify-between sm:min-h-[150px] ${featured ? 'workspace-metric--highlight col-span-2 xl:col-span-1' : ''}`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="workspace-metric-icon rounded-xl p-2.5 text-slate-700 transition-colors group-hover:bg-brand-yellow group-hover:text-slate-950 dark:text-slate-200">
-          <Icon className="w-5 h-5" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className={`rounded-full p-2.5 ${featured ? 'bg-[#0e1b2c] text-[#ffe300]' : 'workspace-metric-icon text-[var(--app-muted)]'}`}>
+          <Icon className="h-5 w-5" />
         </div>
-        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
-          trendUp 
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
-        }`}>
+        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${trendClass}`}>
           {trend}
         </span>
       </div>
       <div>
-         <h3 className="mb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{title}</h3>
-        <p className="font-display text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{value}</p>
+        <h3 className={`mb-1 text-sm font-bold ${featured ? 'text-[#0e1b2c]/80' : 'text-[var(--app-muted)]'}`}>{title}</h3>
+        <p className={`font-display font-extrabold tabular-nums leading-none tracking-tight ${featured ? 'text-6xl text-[#0e1b2c]' : 'text-3xl text-[var(--app-ink)]'}`}>{value}</p>
+        {detail && <p className="mt-2 text-sm font-semibold text-[#0e1b2c]/80">{detail}</p>}
       </div>
-    </motion.div>
+    </div>
   );
 }

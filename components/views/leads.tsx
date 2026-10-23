@@ -811,27 +811,23 @@ export function LeadsView() {
       </div>
 
       <div className="workspace-toolbar shrink-0 flex-wrap">
-        <div className="flex gap-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveSection('leads')}
-            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
-              activeSection === 'leads'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
-            }`}
-          >
-            Leads
-          </button>
-          <button
-            onClick={() => setActiveSection('post-sale')}
-            className={`px-5 py-3 font-bold text-sm transition-all border-b-2 -mb-[9px] ${
-              activeSection === 'post-sale'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                : 'border-transparent text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
-            }`}
-          >
-            Pós-venda
-          </button>
+        {/* Seção (Leads / Pós-venda) é a escolha principal: pílula marinho preenchida, distinta da troca Kanban/Lista. */}
+        <div className="flex shrink-0 gap-1 rounded-full bg-[var(--app-panel)] p-1 shadow-sm">
+          {([['leads', 'Leads'], ['post-sale', 'Pós-venda']] as const).map(([section, label]) => (
+            <button
+              key={section}
+              type="button"
+              onClick={() => setActiveSection(section)}
+              aria-pressed={activeSection === section}
+              className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${
+                activeSection === section
+                  ? 'bg-[var(--app-ink)] text-[var(--app-canvas)]'
+                  : 'text-[var(--app-muted)] hover:text-[var(--app-ink)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {activeSection === 'leads' ? (
@@ -842,7 +838,7 @@ export function LeadsView() {
             onClick={() => setViewMode('kanban')} 
             disabled={isCompactLayout}
             aria-pressed={displayViewMode === 'kanban'}
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-all ${
+            className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-all ${
               displayViewMode === 'kanban'
                 ? 'bg-[var(--app-panel)] text-[var(--app-ink)] shadow-sm'
                 : 'text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-45'
@@ -854,7 +850,7 @@ export function LeadsView() {
             type="button"
             onClick={() => setViewMode('list')} 
             aria-pressed={displayViewMode === 'list'}
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-all ${
+            className={`rounded-full px-3.5 py-2 text-sm font-semibold transition-all ${
               displayViewMode === 'list'
                 ? 'bg-[var(--app-panel)] text-[var(--app-ink)] shadow-sm'
                 : 'text-brand-muted hover:text-brand-charcoal dark:hover:text-gray-200'
@@ -864,8 +860,8 @@ export function LeadsView() {
           </button>
         </div>
         
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2.5">
-          <div className="relative text-brand-muted focus-within:text-brand-charcoal transition-colors">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-2.5 sm:justify-end">
+          <div className="relative w-full text-brand-muted transition-colors focus-within:text-brand-charcoal sm:w-auto">
             <input 
               type="text" 
               value={searchQuery}
@@ -1039,7 +1035,7 @@ export function LeadsView() {
                   onClick={() => setIsFilterOpen(false)}
                   className="w-full py-2 bg-brand-charcoal dark:bg-zinc-700 hover:bg-gray-800 dark:hover:bg-zinc-600 text-white font-bold text-xs rounded-xl shadow-sm transition-colors mt-2"
                 >
-                  Aplicar Filtros
+                  Aplicar filtros
                 </button>
               </div>
             )}
@@ -1283,84 +1279,70 @@ export function LeadsView() {
                            role="button"
                            tabIndex={0}
                            aria-label={`Abrir detalhes do lead ${lead.name}`}
-                           className="bg-[var(--app-panel)] dark:bg-[var(--app-panel)] border border-[var(--app-border)] dark:border-gray-700 p-4 rounded-[16px] shadow-sm cursor-grab active:cursor-grabbing hover:border-[var(--app-ink)] dark:hover:border-[var(--app-muted)] hover:shadow-md transition-all group flex flex-col gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+                           className="group flex cursor-grab flex-col gap-2.5 rounded-[18px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm transition-colors hover:border-[var(--app-ink)] active:cursor-grabbing dark:hover:border-[var(--app-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
                         >
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(lead);
-                              }}
-                              aria-label={`Editar lead ${lead.name}`}
-                               className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-zinc-800 dark:hover:text-gray-200"
-                              title="Editar Lead"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteLead(lead.id);
-                              }}
-                              aria-label={`Excluir lead ${lead.name}`}
-                               className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
-                              title="Excluir Lead"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                            <GripVertical aria-hidden="true" className="h-4 w-4 text-gray-300 dark:text-gray-600" />
+                          {/* Nome e ações: as ações ficam discretas até o cartão receber foco ou o mouse */}
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="min-w-0 break-words font-display text-base font-bold leading-snug text-[var(--app-ink)]">{lead.name}</h4>
+                            <div className="-mr-1.5 -mt-1 flex shrink-0 items-center opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(lead);
+                                }}
+                                aria-label={`Editar lead ${lead.name}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--app-muted)] transition-colors hover:bg-[var(--app-panel-muted)] hover:text-[var(--app-ink)]"
+                                title="Editar lead"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLead(lead.id);
+                                }}
+                                aria-label={`Excluir lead ${lead.name}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--app-muted)] transition-colors hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
+                                title="Excluir lead"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <GripVertical aria-hidden="true" className="h-4 w-4 text-[var(--app-border)]" />
+                            </div>
                           </div>
 
-                          <h4 className="break-words font-display text-[15px] font-bold leading-snug text-brand-charcoal dark:text-gray-100">{lead.name}</h4>
+                          {lead.value !== undefined && lead.value > 0 && (
+                            <p className="font-display text-xl font-bold tabular-nums leading-none text-[var(--app-ink)]">
+                              <span className="sr-only">Valor da venda: </span>
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
+                            </p>
+                          )}
 
-                          {/* Details List */}
-                          <div className="space-y-2">
-                            {/* Phone */}
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-gray-400">Telefone</span>
-                              <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
-                                <Phone className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
-                                {lead.phone}
-                              </div>
-                            </div>
-
-                            {/* Responsável / Indicador */}
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-gray-400 dark:text-gray-400">Responsável / indicador</span>
-                              <div className="flex items-center text-xs font-bold text-brand-charcoal dark:text-white mt-0.5">
-                                <Avatar size={16} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} className="mr-1.5 shrink-0" />
-                                <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
-                              </div>
-                            </div>
-
-                            {/* Espera (only if defined) */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-[var(--app-muted)]">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span className="sr-only">Telefone: </span>
+                              {lead.phone}
+                            </span>
                             {lead.waitingDays !== undefined && (
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold text-gray-400">Tempo de espera</span>
-                                <div className="flex items-center text-xs font-semibold text-brand-charcoal dark:text-gray-300 mt-0.5">
-                                  <Clock className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
-                                  {lead.waitingDays} dias
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Valor da Venda (if defined/greater than 0) */}
-                            {lead.value !== undefined && lead.value > 0 && (
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold text-gray-400">Valor da venda</span>
-                                <div className="flex items-center text-xs font-semibold text-green-700 dark:text-green-500 mt-0.5">
-                                  <span className="text-xs font-bold mr-1.5">$</span>
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
-                                </div>
-                              </div>
+                              <span className="inline-flex items-center gap-1.5" title="Tempo de espera">
+                                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span className="sr-only">Tempo de espera: </span>
+                                {lead.waitingDays} {lead.waitingDays === 1 ? 'dia' : 'dias'}
+                              </span>
                             )}
                           </div>
 
-                          {/* Footer Colaborador */}
-                          <div className="text-xs text-gray-500 border-t border-gray-100 dark:border-gray-700/50 pt-2.5 flex items-center justify-between">
-<span className="font-semibold text-gray-600 dark:text-gray-400">
-                            Indicador {(lead.ref || 'Não especificado').toUpperCase()}
-                          </span>
+                          <div className="flex items-center justify-between gap-2 border-t border-[var(--app-border)] pt-2.5 text-sm">
+                            <span className="flex min-w-[40%] items-center gap-1.5 font-bold text-[var(--app-ink)]" title="Responsável">
+                              <Avatar size={20} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} className="shrink-0" />
+                              <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
+                            </span>
+                            {lead.ref && lead.ref !== lead.responsible && (
+                              <span className="min-w-0 truncate rounded-full bg-[var(--app-panel-muted)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-muted)]" title={`Quem indicou: ${lead.ref}`}>
+                                via {lead.ref}
+                              </span>
+                            )}
                           </div>
                         </motion.div>
                       ))
@@ -1559,7 +1541,7 @@ export function LeadsView() {
                 <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
                 <div>
                   <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{currentLead.name}</h3>
-                  <a href={`?tab=viabilidade&leadId=${currentLead.id}`} className="mt-3 inline-flex text-sm font-semibold text-sky-800 underline dark:text-sky-300">Consultar viabilidade de instalação</a>
+                  <a href={`?tab=viabilidade&leadId=${currentLead.id}`} className="mt-3 inline-flex text-sm font-semibold text-[#0b4fa8] underline dark:text-[#a9cdf7]">Consultar viabilidade de instalação</a>
                   <div className="flex flex-wrap gap-2 items-center mt-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(currentLead.status)}`}>{currentLead.status}</span>
                     <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {currentLead.phone}</span>

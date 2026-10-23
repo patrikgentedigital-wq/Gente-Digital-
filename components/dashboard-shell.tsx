@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AnimatePresence, motion } from 'motion/react';
 import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -127,22 +126,14 @@ export function DashboardShell() {
         setIsOpen={setIsSidebarOpen}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-[17.5rem]">
+      <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-[6.5rem] lg:ml-[17.5rem]">
         <Header activeTabName={tabNames[activeTab]} onMenuClick={() => setIsSidebarOpen(true)} />
 
         <main className="relative flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8 xl:px-10">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8, scale: 0.995 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.995 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="h-full w-full"
-            >
-              <ActiveView tab={activeTab} />
-            </motion.div>
-          </AnimatePresence>
+          {/* Troca de aba imediata: a espera da animação de saída deixava o painel lento. */}
+          <div key={activeTab} className="h-full w-full">
+            <ActiveView tab={activeTab} />
+          </div>
         </main>
       </div>
     </div>
