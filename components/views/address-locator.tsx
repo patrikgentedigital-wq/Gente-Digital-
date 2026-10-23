@@ -69,7 +69,7 @@ export default function AddressLocator({ region, onLocated, onInvalidated, onAdd
       <label className="block text-sm font-medium">Número<input aria-label="Número" value={fields.number} onChange={e => edit('number', e.target.value)} maxLength={20} placeholder="123 ou s/n" className={inputClass}/></label>
       <label className="block text-sm font-medium">Bairro<input aria-label="Bairro" value={fields.neighborhood} onChange={e => edit('neighborhood', e.target.value)} maxLength={100} autoComplete="address-level3" className={inputClass}/></label>
     </div>
-    <button type="button" disabled={busy} onClick={() => void search()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-700 px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:opacity-60 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-950/40">
+    <button type="button" disabled={busy} onClick={() => void search()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#0e1b2c] px-4 py-2.5 text-sm font-semibold text-[#0b4fa8] hover:bg-[#fff8c2] disabled:opacity-60 dark:border-[#ffe300] dark:text-[#a9cdf7] dark:hover:bg-[#ffe300]/10">
       {busy ? <Loader2 size={16} className="animate-spin"/> : <Search size={16}/>} {busy ? 'Localizando rua…' : 'Localizar endereço'}
     </button>
     <p className="text-xs leading-relaxed text-slate-500 dark:text-zinc-400">A busca localiza a rua. O número fica no painel; confirme a casa no mapa antes da consulta.</p>
@@ -82,7 +82,7 @@ export default function AddressLocator({ region, onLocated, onInvalidated, onAdd
       </div>
     </div>}
     {places.length > 0 && <div className="space-y-2" aria-live="polite"><p className="text-xs font-medium text-slate-600 dark:text-zinc-400">Selecione o local e ajuste o imóvel no mapa</p>
-      {places.map(place => <button key={place.id} type="button" onClick={() => onLocated(place.location)} className="block w-full rounded-lg border border-slate-200 px-3 py-3 text-left text-sm hover:border-sky-600 hover:bg-sky-50 dark:border-zinc-700 dark:hover:bg-sky-950/40">{place.label}</button>)}
+      {places.map(place => <button key={place.id} type="button" onClick={() => onLocated(place.location)} className="block w-full rounded-lg border border-slate-200 px-3 py-3 text-left text-sm hover:border-[#0e1b2c] hover:bg-[#fff8c2] dark:border-zinc-700 dark:hover:bg-[#ffe300]/10">{place.label}</button>)}
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="inline-block text-xs text-slate-500 underline dark:text-zinc-400">Busca: OpenStreetMap / Nominatim</a>
     </div>}
   </div>;

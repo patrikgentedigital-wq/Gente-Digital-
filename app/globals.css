@@ -89,7 +89,7 @@
   --app-ink: #e8eef5;
   --app-muted: #93a3b8;
   --app-border: #23344c;
-  --app-sidebar: #ffe300;
+  --app-sidebar: #e3c800;
   --app-sidebar-border: rgb(14 27 44 / 22%);
   --app-accent: #ffe300;
   --app-accent-ink: #0e1b2c;
@@ -554,7 +554,7 @@ body {
 }
 
 .leaflet-control-attribution a {
-  color: #075985;
+  color: #0b4fa8;
 }
 
 .viability-map-marker {
@@ -571,7 +571,7 @@ body {
   place-items: center;
   border: 2px solid #fff;
   border-radius: 999px;
-  background: #334155;
+  background: #354965;
   box-shadow: 0 2px 8px rgb(15 23 42 / 35%);
   color: #fff;
   font-size: 11px;
@@ -579,14 +579,14 @@ body {
 }
 
 .viability-map-marker--recommended > span {
-  background: #13795b;
+  background: #1fa855;
 }
 
 .viability-map-marker--install > span {
   width: 30px;
   height: 30px;
   border: 3px solid #fff;
-  background: #075985;
+  background: #0e1b2c;
 }
 
 .viability-map-marker--install i {

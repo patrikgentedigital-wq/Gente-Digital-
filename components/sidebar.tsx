@@ -68,7 +68,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-3 top-3 z-50 flex h-[calc(100vh-1.5rem)] w-64 flex-col rounded-[28px] bg-[var(--app-sidebar)] py-5 text-[#0e1b2c] shadow-xl transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
+      {/* Em tablet (md) o menu vira uma faixa só de ícones; a partir de lg mostra os nomes. */}
+      <aside className={`fixed left-3 top-3 z-50 flex h-[calc(100vh-1.5rem)] w-64 flex-col rounded-[28px] bg-[var(--app-sidebar)] py-5 text-[#0e1b2c] shadow-xl transition-transform duration-300 md:w-[5.5rem] lg:w-64 ${isOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
         {/* Mobile close button */}
         <button
           type="button"
@@ -79,8 +80,11 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
           <X className="w-5 h-5" />
         </button>
 
-        <div className="mb-8 mt-1 px-5">
+        <div className="mb-8 mt-1 px-5 md:hidden lg:block">
           <BrandMark showTagline tone="onYellow" />
+        </div>
+        <div className="mb-8 mt-1 hidden justify-center md:flex lg:hidden" aria-label="Gente Digital">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0e1b2c] font-display text-lg font-extrabold text-[#ffe300]">GD</span>
         </div>
 
         {/* Navigation */}
@@ -99,9 +103,9 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
 
         {/* User Profile Card */}
         <div className="mt-auto flex flex-col gap-2 px-3 pt-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2.5">
+          <div className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2.5 md:justify-center lg:justify-start" title={userEmail || undefined}>
             <Avatar size={32} name={userEmail || 'Gente Digital'} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
-            <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex flex-col min-w-0 flex-1 md:hidden lg:flex">
               <span className="text-sm font-semibold text-[#0e1b2c] truncate" title={userEmail || 'Usuário Autenticado'}>
                 {userEmail ? userEmail.split('@')[0] : 'Administrador'}
               </span>
@@ -128,10 +132,11 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
             onClick={handleLogout}
             type="button"
             aria-label="Sair do sistema"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full transition-colors text-[#0e1b2c]/80 hover:text-[#0e1b2c] hover:bg-[#0e1b2c]/10 text-sm font-semibold"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full transition-colors text-[#0e1b2c]/80 hover:text-[#0e1b2c] hover:bg-[#0e1b2c]/10 text-sm font-semibold md:justify-center lg:justify-start"
+            title="Sair do sistema"
           >
             <LogOut className="w-4 h-4" />
-            <span>Sair do sistema</span>
+            <span className="md:sr-only lg:not-sr-only">Sair do sistema</span>
           </motion.button>
         </div>
 
@@ -153,14 +158,15 @@ function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`w-full flex items-center gap-3 py-3 px-4 rounded-full transition-colors duration-150 group relative text-sm ${
+      title={label}
+      className={`w-full flex items-center gap-3 py-3 px-4 rounded-full transition-colors duration-150 group relative text-sm md:justify-center md:px-0 lg:justify-start lg:px-4 ${
         active
           ? 'bg-[#0e1b2c] font-bold text-[#ffe300] shadow-md'
           : 'font-semibold text-[#0e1b2c] hover:bg-white/50'
       }`}
     >
       <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#ffe300]' : 'text-[#0e1b2c]'}`} />
-      <span className="truncate">{label}</span>
+      <span className="truncate md:sr-only lg:not-sr-only">{label}</span>
     </button>
   );
 }

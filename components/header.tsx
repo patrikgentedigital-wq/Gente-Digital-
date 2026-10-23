@@ -37,9 +37,15 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
             <BrandMark compact tone="onYellow" />
           </span>
           <ChevronRight className="h-3.5 w-3.5 opacity-50 md:hidden" />
-          <span className="max-w-[45vw] truncate text-sm font-semibold text-[var(--app-ink)] sm:max-w-none">
+          {/* No celular o nome da seção orienta; no desktop o título grande da página já faz isso, então mostramos a data. */}
+          <span className="max-w-[45vw] truncate text-sm font-semibold text-[var(--app-ink)] md:hidden">
             {activeTabName}
           </span>
+          {mounted && (
+            <span className="hidden text-sm font-semibold text-[var(--app-muted)] first-letter:uppercase md:inline">
+              {new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
+            </span>
+          )}
         </div>
       </div>
 

@@ -158,7 +158,7 @@ export default function CoverageMap({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPoles} onChange={e=>setShowPoles(e.target.checked)}/>Postes FiberDocs</label>
         <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showCables} onChange={e=>setShowCables(e.target.checked)}/>Cabos FiberDocs</label>
-        <label className="ml-auto flex flex-wrap items-center gap-2 font-medium">KML de conferência<input aria-label="Importar KML do FiberDocs" type="file" accept=".kml,application/vnd.google-earth.kml+xml" className="max-w-56 text-xs file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-sky-900 dark:file:bg-sky-950 dark:file:text-sky-200" onChange={e=>{void importKml(e.target.files?.[0]);e.target.value='';}}/></label>
+        <label className="ml-auto flex flex-wrap items-center gap-2 font-medium">KML de conferência<input aria-label="Importar KML do FiberDocs" type="file" accept=".kml,application/vnd.google-earth.kml+xml" className="max-w-56 text-xs file:mr-2 file:rounded file:border-0 file:bg-[#fff8c2] file:px-2 file:py-1 file:text-[#0e1b2c] dark:file:bg-[#17263b] dark:file:text-[#e8eef5]" onChange={e=>{void importKml(e.target.files?.[0]);e.target.value='';}}/></label>
       </div>
       <p className="text-slate-500 dark:text-zinc-400">{networkStatus} {imported?`KML de conferência carregado nesta sessão: ${imported.cables.length} cabo(s), ${imported.poles.length} ponto(s).`:''} {networkIssues.join(' ')}</p>
       <p className="text-slate-500 dark:text-zinc-400">Cabos e postes são consultados automaticamente no FiberDocs. O KML é apenas uma conferência local quando a fonte estiver incompleta.</p>
@@ -201,7 +201,7 @@ export default function CoverageMap({
       {tilesUnavailable&&<div role="status" className="absolute left-3 right-3 top-3 z-[1000] rounded-lg border border-amber-300 bg-amber-50/95 px-3 py-2 text-xs text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/95 dark:text-amber-100">O mapa de ruas não carregou; os marcadores e o raio continuam disponíveis.</div>}
     </div>
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 px-5 py-3 text-xs text-slate-600 dark:border-zinc-800 dark:text-zinc-300">
-      <span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-full border-2 border-white bg-sky-700 shadow"/>Ponto de instalação</span>
+      <span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-full border-2 border-white bg-[#0e1b2c] shadow"/>Ponto de instalação</span>
       <span className="inline-flex items-center gap-2"><i className="grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-slate-700 text-xs font-bold text-white shadow">1</i>CTO; selecione para detalhes</span>
       {nearest.some(box => box.id === recommended)&&<span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-full bg-emerald-600"/>Recomendada</span>}
       {cables.length>0&&<span className="inline-flex items-center gap-2"><i className="h-3 w-3 rounded-full bg-violet-700"/>Cabos FiberDocs</span>}
