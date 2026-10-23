@@ -73,3 +73,14 @@ O caminho `LIVE` instancia fontes reais e registra a decisão no Supabase. As mi
 Leitura completa nos projetos identificados: AC 268 CTOs / 732 linhas da planilha, 101 associações e 90 correspondências ambíguas; CP 676 CTOs / 657 linhas, 615 associações. As associações não certificam coordenadas, restrições nem trajeto. Esses resultados são de 06/10/2026 e não substituem a leitura atual de cada avaliação.
 
 Não é necessário usar n8n para a consulta interativa no painel: IXC, Google Sheets e o serviço de rotas são chamados pelo servidor Next.js. n8n pode ser acrescentado depois para tarefas agendadas ou avisos, sem substituir a autorização e a decisão dentro do painel.
+
+## Parâmetros de decisão
+
+| Parâmetro | Valor | Observação |
+|---|---|---|
+| Limite de cabo | 500 m | Vale para o cabo total: rede, acesso ao imóvel, acesso à CTO e reserva. O filtro em linha reta é só um atalho. |
+| Reserva de cabo | 20 m | Somada às estimativas automáticas. |
+| Encaixe em rua ou cabo | 30 m | Acima disso não há trajeto estimado. |
+| União de cabos por poste | 3 m | |
+| Tolerância de posição IXC × planilha | 25 m | Acima disso a CTO fica bloqueada (`COORDENADAS_DIVERGENTES`). Era 1 m, o que bloqueava quase todas as CTOs. |
+| Trajeto só por ruas (OSM) | análise técnica | Rua não comprova cabo instalado nem autorização de passagem. |

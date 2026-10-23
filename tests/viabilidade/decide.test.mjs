@@ -153,3 +153,19 @@ test('fontes de regiões distintas não misturam vagas', () => {
     [{ ctoId: 'cto-1', location: point, meters: 20, confirmedAt: now.toISOString(), reference: 'OS' }], policy, now);
   assert.equal(result.status, 'ANALISE_TECNICA');
 });
+
+// 1 grau de latitude ≈ 111.195 m; deslocamos só a latitude para controlar a diferença em metros.
+const metersToLatitude = (meters) => meters / 111_195;
+const shifted = (meters) => ({ latitude: point.latitude + metersToLatitude(meters), longitude: point.longitude });
+
+test('diferença de posição entre IXC e planilha até 25 m não bloqueia a CTO', () => {
+  const result = fixture({ sheetLocation: shifted(24) });
+  assert.equal(result.status, 'VIAVEL');
+  assert.ok(!result.candidates[0].reasons.includes('COORDENADAS_DIVERGENTES'));
+});
+
+test('diferença de posição acima de 25 m bloqueia a CTO e exige análise técnica', () => {
+  const result = fixture({ sheetLocation: shifted(26) });
+  assert.equal(result.status, 'ANALISE_TECNICA');
+  assert.ok(result.candidates[0].reasons.includes('COORDENADAS_DIVERGENTES'));
+});
