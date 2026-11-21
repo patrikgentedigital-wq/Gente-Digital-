@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { loadCancellationMetrics, loadCommercialMetrics, parseCommercialPeriod } from '@/lib/analytics/commercial-ixc';
+import { readCommercialIxcPage } from '@/lib/analytics/commercial-ixc-read';
 import { verifyAuth } from '@/lib/auth-server';
-import { fetchIxcWithTimeout, getIxcCredentials } from '@/lib/ixc';
+import { getIxcCredentials } from '@/lib/ixc';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const headers = { 'Cache-Control': 'private, no-store' };
 
@@ -30,23 +32,13 @@ export async function GET(request: NextRequest) {
     const ixc = await getIxcCredentials();
     if (!ixc.hasCredentials) throw new Error('IXC não configurado.');
 
-    const deadline = Date.now() + 10_000;
+    const deadline = Date.now() + 18_000;
     const load = request.nextUrl.searchParams.get('section') === 'cancelamentos'
       ? loadCancellationMetrics
       : loadCommercialMetrics;
-    const metrics = await load(period, async (table, body) => {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) throw new Error('Tempo de consulta excedido.');
-      const response = await fetchIxcWithTimeout('https://' + ixc.cleanDomain + '/webservice/v1/' + table, {
-        method: 'POST',
-        headers: { Authorization: ixc.authHeader, 'Content-Type': 'application/json', ixcsoft: 'listar' },
-        body: JSON.stringify(body),
-        cache: 'no-store',
-        redirect: 'error',
-      }, remaining);
-      if (!response.ok) throw new Error('Falha na consulta ao IXC.');
-      return response.json();
-    });
+    const baseUrl = 'https://' + ixc.cleanDomain + '/webservice/v1/';
+    const metrics = await load(period, (table, body) =>
+      readCommercialIxcPage(baseUrl + table, ixc.authHeader, body, deadline));
 
     if (Object.values(metrics).every((records) => records === null)) throw new Error('IXC indisponível.');
     return NextResponse.json({ metrics, readAt: new Date().toISOString() }, { headers });
