@@ -35,7 +35,8 @@ const catalogs = {
   seller: { table: 'vendedor', field: 'nome' },
 } as const;
 
-type Catalog = (typeof catalogs)[keyof typeof catalogs];
+const cancellationReasonCatalog = { table: 'fn_areceber_mot_cancelamento', field: 'motivo' } as const;
+type Catalog = (typeof catalogs)[keyof typeof catalogs] | typeof cancellationReasonCatalog;
 type ListTable = Source['table'] | Catalog['table'];
 type List = (table: ListTable, body: Record<string, string>) => Promise<unknown>;
 type IxcRow = Record<string, unknown>;
@@ -101,21 +102,29 @@ async function loadIxcRows(table: ListTable, filters: Record<string, string>, li
   throw new Error('Limite de páginas do IXC excedido.');
 }
 
-async function loadRecords(source: Source, period: CommercialPeriod, list: List): Promise<CommercialRecordIds[]> {
-  const field = source.table + '.' + source.date;
+function loadRowsInPeriod(table: Source['table'], date: string, period: CommercialPeriod, list: List) {
+  const field = table + '.' + date;
   const endExclusive = new Date(Date.parse(period.to) + DAY).toISOString().slice(0, 10);
-  const rows = await loadIxcRows(source.table, {
+  return loadIxcRows(table, {
     qtype: field, query: period.from, oper: '>=',
     grid_param: JSON.stringify([{ TB: field, OP: '<', P: endExclusive }]),
   }, list);
+}
+
+function checkedBusinessDate(value: unknown, period: CommercialPeriod): string {
+  const timestamp = normalizeSourceBusinessDate(value);
+  const date = timestamp ? businessDay.format(new Date(timestamp)) : null;
+  if (!date || date < period.from || date > period.to) {
+    throw new Error('A consulta ao IXC retornou um registro fora do período.');
+  }
+  return date;
+}
+
+async function loadRecords(source: Source, period: CommercialPeriod, list: List): Promise<CommercialRecordIds[]> {
+  const rows = await loadRowsInPeriod(source.table, source.date, period, list);
   return Array.from(rows, ([id, row]) => {
-    const timestamp = normalizeSourceBusinessDate(row[source.date]);
-    const date = timestamp ? businessDay.format(new Date(timestamp)) : null;
-    if (!date || date < period.from || date > period.to) {
-      throw new Error('A consulta ao IXC retornou um registro fora do período.');
-    }
     return {
-      id, date,
+      id, date: checkedBusinessDate(row[source.date], period),
       channel: source.channel ? positiveId(row[source.channel]) : null,
       responsible: positiveId(row[source.responsible]),
     };
@@ -161,4 +170,26 @@ export async function loadCommercialMetrics(period: CommercialPeriod, list: List
     sales: withNames(sales, channels, employees),
     contracts: withNames(contracts, channels, sellers),
   };
+}
+
+export interface DirectCancellationMetrics {
+  total: number;
+  byReason: { key: string; count: number }[] | null;
+}
+
+export async function loadCancellationMetrics(period: CommercialPeriod, list: List): Promise<DirectCancellationMetrics> {
+  const [rows, reasons] = await Promise.all([
+    loadRowsInPeriod('cliente_contrato', 'data_cancelamento', period, list),
+    loadCatalog(cancellationReasonCatalog, list).catch(() => null),
+  ]);
+  const groups = new Map<string, number>();
+  for (const row of rows.values()) {
+    checkedBusinessDate(row.data_cancelamento, period);
+    const id = positiveId(row.motivo_cancelamento);
+    const reason = id ? reasons?.get(id) ?? 'Motivo não localizado no IXC' : 'Sem motivo';
+    groups.set(reason, (groups.get(reason) ?? 0) + 1);
+  }
+  const byReason = Array.from(groups, ([key, count]) => ({ key, count }))
+    .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key, 'pt-BR'));
+  return { total: rows.size, byReason: reasons || !rows.size ? byReason : null };
 }

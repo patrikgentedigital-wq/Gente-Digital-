@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { loadCommercialMetrics, parseCommercialPeriod } from '@/lib/analytics/commercial-ixc';
+import { loadCancellationMetrics, loadCommercialMetrics, parseCommercialPeriod } from '@/lib/analytics/commercial-ixc';
 import { verifyAuth } from '@/lib/auth-server';
 import { fetchIxcWithTimeout, getIxcCredentials } from '@/lib/ixc';
 
@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
     if (!ixc.hasCredentials) throw new Error('IXC não configurado.');
 
     const deadline = Date.now() + 10_000;
-    const metrics = await loadCommercialMetrics(period, async (table, body) => {
+    const load = request.nextUrl.searchParams.get('section') === 'cancelamentos'
+      ? loadCancellationMetrics
+      : loadCommercialMetrics;
+    const metrics = await load(period, async (table, body) => {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error('Tempo de consulta excedido.');
       const response = await fetchIxcWithTimeout('https://' + ixc.cleanDomain + '/webservice/v1/' + table, {
