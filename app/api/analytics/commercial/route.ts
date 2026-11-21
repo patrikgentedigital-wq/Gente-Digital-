@@ -32,13 +32,18 @@ export async function GET(request: NextRequest) {
     const ixc = await getIxcCredentials();
     if (!ixc.hasCredentials) throw new Error('IXC não configurado.');
 
-    const deadline = Date.now() + 18_000;
-    const load = request.nextUrl.searchParams.get('section') === 'cancelamentos'
-      ? loadCancellationMetrics
-      : loadCommercialMetrics;
+    const isCancellation = request.nextUrl.searchParams.get('section') === 'cancelamentos';
+    const deadline = Date.now() + (isCancellation ? 18_000 : 22_000);
+    const load = isCancellation ? loadCancellationMetrics : loadCommercialMetrics;
     const baseUrl = 'https://' + ixc.cleanDomain + '/webservice/v1/';
-    const metrics = await load(period, (table, body) =>
-      readCommercialIxcPage(baseUrl + table, ixc.authHeader, body, deadline));
+    const metrics = await load(period, async (table, body) => {
+      try {
+        return await readCommercialIxcPage(baseUrl + table, ixc.authHeader, body, deadline);
+      } catch (error) {
+        console.warn('Leitura comercial do IXC falhou', { table, page: body.page, errorType: error instanceof Error ? error.name : 'Unknown' });
+        throw error;
+      }
+    });
 
     if (Object.values(metrics).every((records) => records === null)) throw new Error('IXC indisponível.');
     return NextResponse.json({ metrics, readAt: new Date().toISOString() }, { headers });

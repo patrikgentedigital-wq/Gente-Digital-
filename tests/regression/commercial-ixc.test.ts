@@ -3,6 +3,27 @@ import { test } from 'node:test';
 
 import { loadCommercialMetrics, parseCommercialPeriod } from '../../lib/analytics/commercial-ixc';
 
+test('prioriza as três leituras de indicadores antes dos catálogos de nomes', async () => {
+  const metricTables = ['contato', 'crm_negociacoes', 'cliente_contrato'];
+  const completedMetrics = new Set<string>();
+  const startedCatalogs: string[] = [];
+  const result = await loadCommercialMetrics(
+    { from: '2026-10-01', to: '2026-10-31' },
+    async (table) => {
+      if (metricTables.includes(table)) {
+        await Promise.resolve();
+        completedMetrics.add(table);
+      } else {
+        startedCatalogs.push(table);
+        assert.deepEqual(completedMetrics, new Set(metricTables));
+      }
+      return { total: '0' };
+    },
+  );
+  assert.deepEqual(result, { leads: [], sales: [], contracts: [] });
+  assert.deepEqual(startedCatalogs, []);
+});
+
 test('criação usa a data de cadastro e inclui o último dia do período', async () => {
   const result = await loadCommercialMetrics(
     { from: '2026-10-01', to: '2026-10-31' },

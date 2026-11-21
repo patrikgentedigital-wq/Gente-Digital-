@@ -157,13 +157,18 @@ function withNames(
 }
 
 export async function loadCommercialMetrics(period: CommercialPeriod, list: List): Promise<CommercialMetrics> {
-  const [leads, sales, contracts, channels, employees, sellers] = await Promise.allSettled([
+  const [leads, sales, contracts] = await Promise.allSettled([
     loadRecords(sources.leads, period, list),
     loadRecords(sources.sales, period, list),
     loadRecords(sources.contracts, period, list),
-    loadCatalog(catalogs.channel, list),
-    loadCatalog(catalogs.employee, list),
-    loadCatalog(catalogs.seller, list),
+  ]);
+  const leadAndSaleRows = [leads, sales].flatMap(result => result.status === 'fulfilled' ? result.value : []);
+  const contractRows = contracts.status === 'fulfilled' ? contracts.value : [];
+  const emptyCatalog: CatalogById = new Map();
+  const [channels, employees, sellers] = await Promise.allSettled([
+    leadAndSaleRows.some(row => row.channel) ? loadCatalog(catalogs.channel, list) : emptyCatalog,
+    leadAndSaleRows.some(row => row.responsible) ? loadCatalog(catalogs.employee, list) : emptyCatalog,
+    contractRows.some(row => row.responsible) ? loadCatalog(catalogs.seller, list) : emptyCatalog,
   ]);
   return {
     leads: withNames(leads, channels, employees),
