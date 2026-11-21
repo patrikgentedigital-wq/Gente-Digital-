@@ -18,7 +18,7 @@ test('criação usa a data de cadastro e inclui o último dia do período', asyn
       }] };
     },
   );
-  assert.deepEqual(result.contracts, [{ id: '10', date: '2026-10-31', channel: null, responsible: '7' }]);
+  assert.deepEqual(result.contracts, [{ id: '10', date: '2026-10-31', channel: null, channelName: null, responsible: '7', responsibleName: null }]);
   assert.deepEqual(result.sales, []);
 });
 
@@ -58,6 +58,27 @@ test('pagina por ID até completar o total e preserva o dia local dos leads', as
   assert.deepEqual(pages, ['1', '2']);
   assert.equal(result.leads?.length, 251);
   assert.deepEqual(result.leads?.at(-1), {
-    id: '251', date: '2026-10-31', channel: '12', responsible: null,
+    id: '251', date: '2026-10-31', channel: '12', channelName: null, responsible: null, responsibleName: null,
   });
+});
+
+test('resolve canal e responsável pelos catálogos corretos mesmo quando os IDs são iguais', async () => {
+  const replies: Record<string, unknown> = {
+    contato: { total: 1, registros: [{ id: '4', data_cadastro: '2026-10-31', id_candidato_tipo: '7', id_responsavel: '8' }] },
+    crm_negociacoes: { total: 1, registros: [{ id: '5', data_vencemos: '2026-10-31', id_canal_origem: '7', id_responsavel: '8' }] },
+    cliente_contrato: { total: 1, registros: [{ id: '6', data_cadastro_sistema: '2026-10-31', id_vendedor: '8' }] },
+    crm_tipo_candidato: { total: 1, registros: [{ id: '7', tipo: ' Indicação ', ativo: 'N' }] },
+    funcionarios: { total: 1, registros: [{ id: '8', funcionario: 'Ana Lima', nome_mae: 'Campo privado' }] },
+    vendedor: { total: 1, registros: [{ id: '8', nome: 'Rui Silva' }] },
+  };
+  const result = await loadCommercialMetrics(
+    { from: '2026-10-01', to: '2026-10-31' }, async (table) => replies[table],
+  );
+  assert.deepEqual(result.leads?.[0], {
+    id: '4', date: '2026-10-31', channel: '7', channelName: 'Indicação',
+    responsible: '8', responsibleName: 'Ana Lima',
+  });
+  assert.equal(result.sales?.[0]?.channelName, 'Indicação');
+  assert.equal(result.sales?.[0]?.responsibleName, 'Ana Lima');
+  assert.equal(result.contracts?.[0]?.responsibleName, 'Rui Silva');
 });

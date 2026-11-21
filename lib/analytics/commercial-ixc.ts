@@ -7,11 +7,16 @@ export interface CommercialPeriod {
   to: string;
 }
 
-export interface CommercialRecord {
+interface CommercialRecordIds {
   id: string;
   date: string;
   channel: string | null;
   responsible: string | null;
+}
+
+export interface CommercialRecord extends CommercialRecordIds {
+  channelName: string | null;
+  responsibleName: string | null;
 }
 
 type Metric = 'leads' | 'sales' | 'contracts';
@@ -24,7 +29,17 @@ const sources = {
 } as const;
 
 type Source = (typeof sources)[Metric];
-type List = (table: Source['table'], body: Record<string, string>) => Promise<unknown>;
+const catalogs = {
+  channel: { table: 'crm_tipo_candidato', field: 'tipo' },
+  employee: { table: 'funcionarios', field: 'funcionario' },
+  seller: { table: 'vendedor', field: 'nome' },
+} as const;
+
+type Catalog = (typeof catalogs)[keyof typeof catalogs];
+type ListTable = Source['table'] | Catalog['table'];
+type List = (table: ListTable, body: Record<string, string>) => Promise<unknown>;
+type IxcRow = Record<string, unknown>;
+type CatalogById = ReadonlyMap<string, string>;
 const businessDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Fortaleza' });
 const DAY = 86_400_000;
 const PAGE_SIZE = 250;
@@ -50,17 +65,14 @@ function positiveId(value: unknown): string | null {
   return /^[1-9]\d*$/.test(id) ? id : null;
 }
 
-async function loadRecords(source: Source, period: CommercialPeriod, list: List): Promise<CommercialRecord[]> {
-  const field = source.table + '.' + source.date;
-  const endExclusive = new Date(Date.parse(period.to) + DAY).toISOString().slice(0, 10);
-  const records = new Map<string, CommercialRecord>();
+async function loadIxcRows(table: ListTable, filters: Record<string, string>, list: List): Promise<Map<string, IxcRow>> {
+  const records = new Map<string, IxcRow>();
   let expectedTotal: number | undefined;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const value = await list(source.table, {
-      qtype: field, query: period.from, oper: '>=',
-      grid_param: JSON.stringify([{ TB: field, OP: '<', P: endExclusive }]),
-      sortname: source.table + '.id', sortorder: 'asc',
+    const value = await list(table, {
+      ...filters,
+      sortname: table + '.id', sortorder: 'asc',
       page: String(page), rp: String(PAGE_SIZE),
     });
     const payload = value as { total?: unknown; registros?: unknown; type?: string; error?: unknown } | null;
@@ -79,32 +91,74 @@ async function loadRecords(source: Source, period: CommercialPeriod, list: List)
     }
     for (const row of rows) {
       const id = positiveId(row?.id);
-      const timestamp = normalizeSourceBusinessDate(row?.[source.date]);
-      const date = timestamp ? businessDay.format(new Date(timestamp)) : null;
-      if (!id || !date || date < period.from || date > period.to || records.has(id)) {
+      if (!id || records.has(id)) {
         throw new Error('A consulta ao IXC retornou um registro inválido ou repetido.');
       }
-      records.set(id, {
-        id,
-        date,
-        channel: source.channel ? positiveId(row[source.channel]) : null,
-        responsible: positiveId(row[source.responsible]),
-      });
+      records.set(id, row);
     }
-    if (records.size === total) return [...records.values()];
+    if (records.size === total) return records;
   }
   throw new Error('Limite de páginas do IXC excedido.');
 }
 
+async function loadRecords(source: Source, period: CommercialPeriod, list: List): Promise<CommercialRecordIds[]> {
+  const field = source.table + '.' + source.date;
+  const endExclusive = new Date(Date.parse(period.to) + DAY).toISOString().slice(0, 10);
+  const rows = await loadIxcRows(source.table, {
+    qtype: field, query: period.from, oper: '>=',
+    grid_param: JSON.stringify([{ TB: field, OP: '<', P: endExclusive }]),
+  }, list);
+  return Array.from(rows, ([id, row]) => {
+    const timestamp = normalizeSourceBusinessDate(row[source.date]);
+    const date = timestamp ? businessDay.format(new Date(timestamp)) : null;
+    if (!date || date < period.from || date > period.to) {
+      throw new Error('A consulta ao IXC retornou um registro fora do período.');
+    }
+    return {
+      id, date,
+      channel: source.channel ? positiveId(row[source.channel]) : null,
+      responsible: positiveId(row[source.responsible]),
+    };
+  });
+}
+
+async function loadCatalog(catalog: Catalog, list: List): Promise<CatalogById> {
+  const rows = await loadIxcRows(catalog.table, {
+    qtype: catalog.table + '.id', query: '1', oper: '>=',
+  }, list);
+  const names = new Map<string, string>();
+  for (const [id, row] of rows) {
+    const name = row[catalog.field];
+    if (typeof name === 'string' && name.trim()) names.set(id, name.trim());
+  }
+  return names;
+}
+
+function withNames(
+  records: PromiseSettledResult<CommercialRecordIds[]>,
+  channel: PromiseSettledResult<CatalogById>,
+  responsible: PromiseSettledResult<CatalogById>,
+): CommercialRecord[] | null {
+  if (records.status === 'rejected') return null;
+  return records.value.map((record) => ({
+    ...record,
+    channelName: record.channel && channel.status === 'fulfilled' ? channel.value.get(record.channel) ?? null : null,
+    responsibleName: record.responsible && responsible.status === 'fulfilled' ? responsible.value.get(record.responsible) ?? null : null,
+  }));
+}
+
 export async function loadCommercialMetrics(period: CommercialPeriod, list: List): Promise<CommercialMetrics> {
-  const [leads, sales, contracts] = await Promise.allSettled([
+  const [leads, sales, contracts, channels, employees, sellers] = await Promise.allSettled([
     loadRecords(sources.leads, period, list),
     loadRecords(sources.sales, period, list),
     loadRecords(sources.contracts, period, list),
+    loadCatalog(catalogs.channel, list),
+    loadCatalog(catalogs.employee, list),
+    loadCatalog(catalogs.seller, list),
   ]);
   return {
-    leads: leads.status === 'fulfilled' ? leads.value : null,
-    sales: sales.status === 'fulfilled' ? sales.value : null,
-    contracts: contracts.status === 'fulfilled' ? contracts.value : null,
+    leads: withNames(leads, channels, employees),
+    sales: withNames(sales, channels, employees),
+    contracts: withNames(contracts, channels, sellers),
   };
 }

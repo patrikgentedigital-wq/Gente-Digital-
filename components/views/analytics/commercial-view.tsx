@@ -28,9 +28,22 @@ function formatDay(value: string) {
   return value.split('-').reverse().join('/');
 }
 
-function options(records: readonly CommercialRecord[], field: 'channel' | 'responsible') {
-  return [...new Set(records.flatMap((row) => row[field] ?? []))]
-    .sort((left, right) => left.localeCompare(right, 'pt-BR', { numeric: true }));
+type NameField = 'channel' | 'responsible';
+
+function displayName(row: CommercialRecord, field: NameField): string {
+  const name = field === 'channel' ? row.channelName : row.responsibleName;
+  const id = row[field];
+  return name ?? (id ? 'Nome indisponível (ref. ' + id + ')' : '—');
+}
+
+function options(records: readonly CommercialRecord[], field: NameField) {
+  const labels = new Map<string, string>();
+  for (const row of records) {
+    const id = row[field];
+    if (id) labels.set(id, displayName(row, field));
+  }
+  return [...labels.entries()].sort((left, right) =>
+    left[1].localeCompare(right[1], 'pt-BR', { numeric: true }));
 }
 
 type CommercialResult = { metrics: CommercialMetrics; readAt: string };
@@ -158,18 +171,18 @@ export function CommercialView() {
                 <div className="flex flex-wrap gap-3">
                   {selected !== 'contracts' && (
                     <label className="text-sm">
-                      Canal (ID)
+                      Canal
                       <select className={control} value={channel} onChange={(event) => { setChannel(event.target.value); setPage(1); }}>
                         <option value="">Todos</option>
-                        {options(current, 'channel').map((id) => <option key={id}>{id}</option>)}
+                        {options(current, 'channel').map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                       </select>
                     </label>
                   )}
                   <label className="text-sm">
-                    {responsibleLabel} (ID)
+                    {responsibleLabel}
                     <select className={control} value={responsible} onChange={(event) => { setResponsible(event.target.value); setPage(1); }}>
                       <option value="">Todos</option>
-                      {options(current, 'responsible').map((id) => <option key={id}>{id}</option>)}
+                      {options(current, 'responsible').map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                     </select>
                   </label>
                 </div>
@@ -193,8 +206,8 @@ export function CommercialView() {
                       <tr key={row.id} className="border-t border-[var(--app-border)] tabular-nums">
                         <td className="px-4 py-2">{row.id}</td>
                         <td className="px-4 py-2">{formatDay(row.date)}</td>
-                        {selected !== 'contracts' && <td className="px-4 py-2">{row.channel ?? '—'}</td>}
-                        <td className="px-4 py-2">{row.responsible ?? '—'}</td>
+                        {selected !== 'contracts' && <td className="px-4 py-2">{displayName(row, 'channel')}</td>}
+                        <td className="px-4 py-2">{displayName(row, 'responsible')}</td>
                       </tr>
                     ))}
                   </tbody>
