@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { CommercialMetrics, CommercialRecord } from '@/lib/analytics/commercial-ixc';
-import { formatDay, ixcFilterControl, IxcPeriodPanel } from './ixc-period-panel';
+import { formatDay, ixcFilterControl, IxcMetricComparison, IxcMetricStatus, IxcPeriodPanel, type IxcPeriodData } from './ixc-period-panel';
 
 const metrics = [
   { id: 'leads', label: 'Leads recebidos', detail: 'Contatos cadastrados no IXC' },
@@ -43,7 +43,7 @@ export function CommercialView() {
 }
 
 function CommercialDetails({ data, selected, setSelected }: {
-  data: CommercialMetrics;
+  data: IxcPeriodData<CommercialMetrics>;
   selected: MetricId;
   setSelected: (metric: MetricId) => void;
 }) {
@@ -51,7 +51,8 @@ function CommercialDetails({ data, selected, setSelected }: {
   const [responsible, setResponsible] = useState('');
   const [page, setPage] = useState(1);
 
-  const current = data[selected];
+  const current = data.metrics[selected];
+  const missingNames = current?.some(row => (row.channel && !row.channelName) || (row.responsible && !row.responsibleName));
   const channelOptions = options(current ?? [], 'channel');
   const responsibleOptions = options(current ?? [], 'responsible');
   const activeChannel = channelOptions.some(([id]) => id === channel) ? channel : '';
@@ -74,15 +75,19 @@ function CommercialDetails({ data, selected, setSelected }: {
     <>
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Totais do período">
         {metrics.map(({ id, label, detail }) => {
-          const records = data[id];
+          const records = data.metrics[id];
+          const timestamp = data.timestamps[id];
           return (
             <button key={id} type="button" aria-pressed={selected === id}
               onClick={() => { setSelected(id); resetDetail(); }}
               className={'rounded-xl border bg-[var(--app-panel)] p-4 text-left outline-offset-2 focus-visible:outline-2 '
                 + (selected === id ? 'border-amber-500 ring-1 ring-amber-500' : 'border-[var(--app-border)]')}>
               <span className="block text-sm font-semibold">{label}</span>
-              <span className="my-1 block text-2xl font-bold tabular-nums">{records ? numbers.format(records.length) : 'Indisponível'}</span>
+              <span className="my-1 block text-2xl font-bold tabular-nums">{records ? numbers.format(records.length) : '—'}</span>
               <span className="block text-xs text-[var(--app-muted)]">{detail}</span>
+              <IxcMetricComparison current={timestamp === data.readAt ? records?.length : undefined}
+                previous={data.comparison[id]} loading={data.comparisonLoading} />
+              <IxcMetricStatus timestamp={timestamp} readAt={data.readAt} loading={data.loading} />
             </button>
           );
         })}
@@ -115,8 +120,12 @@ function CommercialDetails({ data, selected, setSelected }: {
             </div>
           )}
         </div>
+        {missingNames && <p className="border-b border-[var(--app-border)] px-4 py-2 text-xs text-[var(--app-muted)]">
+          Alguns nomes de canais ou responsáveis estão indisponíveis no IXC. O total de registros está disponível.
+        </p>}
         {!filtered.length ? (
-          <p className="p-4 text-sm text-[var(--app-muted)]">{current ? 'Nenhum registro neste recorte.' : 'Este indicador não pôde ser carregado. Consulte o período novamente.'}</p>
+          <p className="p-4 text-sm text-[var(--app-muted)]">{current ? 'Nenhum registro neste recorte.'
+            : data.loading ? 'Aguardando a consulta do IXC.' : 'Este indicador não pôde ser carregado. Consulte o período novamente.'}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

@@ -156,7 +156,7 @@ function withNames(
   }));
 }
 
-export async function loadCommercialMetrics(period: CommercialPeriod, list: List): Promise<CommercialMetrics> {
+export async function loadCommercialMetrics(period: CommercialPeriod, list: List, includeNames = true): Promise<CommercialMetrics> {
   const [leads, sales, contracts] = await Promise.allSettled([
     loadRecords(sources.leads, period, list),
     loadRecords(sources.sales, period, list),
@@ -166,9 +166,9 @@ export async function loadCommercialMetrics(period: CommercialPeriod, list: List
   const contractRows = contracts.status === 'fulfilled' ? contracts.value : [];
   const emptyCatalog: CatalogById = new Map();
   const [channels, employees, sellers] = await Promise.allSettled([
-    leadAndSaleRows.some(row => row.channel) ? loadCatalog(catalogs.channel, list) : emptyCatalog,
-    leadAndSaleRows.some(row => row.responsible) ? loadCatalog(catalogs.employee, list) : emptyCatalog,
-    contractRows.some(row => row.responsible) ? loadCatalog(catalogs.seller, list) : emptyCatalog,
+    includeNames && leadAndSaleRows.some(row => row.channel) ? loadCatalog(catalogs.channel, list) : emptyCatalog,
+    includeNames && leadAndSaleRows.some(row => row.responsible) ? loadCatalog(catalogs.employee, list) : emptyCatalog,
+    includeNames && contractRows.some(row => row.responsible) ? loadCatalog(catalogs.seller, list) : emptyCatalog,
   ]);
   return {
     leads: withNames(leads, channels, employees),
@@ -182,14 +182,15 @@ export interface DirectCancellationMetrics {
   byReason: { key: string; count: number }[] | null;
 }
 
-export async function loadCancellationMetrics(period: CommercialPeriod, list: List): Promise<DirectCancellationMetrics> {
+export async function loadCancellationMetrics(period: CommercialPeriod, list: List, includeReasons = true): Promise<DirectCancellationMetrics> {
   const [rows, reasons] = await Promise.all([
     loadRowsInPeriod('cliente_contrato', 'data_cancelamento', period, list),
-    loadCatalog(cancellationReasonCatalog, list).catch(() => null),
+    includeReasons ? loadCatalog(cancellationReasonCatalog, list).catch(() => null) : null,
   ]);
   const groups = new Map<string, number>();
   for (const row of rows.values()) {
     checkedBusinessDate(row.data_cancelamento, period);
+    if (!includeReasons) continue;
     const id = positiveId(row.motivo_cancelamento);
     const reason = id ? reasons?.get(id) ?? 'Motivo não localizado no IXC' : 'Sem motivo';
     groups.set(reason, (groups.get(reason) ?? 0) + 1);

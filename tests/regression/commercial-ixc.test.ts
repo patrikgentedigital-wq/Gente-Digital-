@@ -24,6 +24,18 @@ test('prioriza as três leituras de indicadores antes dos catálogos de nomes', 
   assert.deepEqual(startedCatalogs, []);
 });
 
+test('comparação consulta registros mesmo com canal sem consultar catálogos', async () => {
+  const tables: string[] = [];
+  const data = await loadCommercialMetrics({ from: '2026-09-01', to: '2026-09-30' }, async (table) => {
+    tables.push(table);
+    return table === 'contato'
+      ? { total: 1, registros: [{ id: 9, data_cadastro: '2026-09-30', id_candidato_tipo: '7', id_responsavel: '8' }] }
+      : { total: 0 };
+  }, false);
+  assert.deepEqual(tables, ['contato', 'crm_negociacoes', 'cliente_contrato']);
+  assert.equal(data.leads?.length, 1);
+});
+
 test('criação usa a data de cadastro e inclui o último dia do período', async () => {
   const result = await loadCommercialMetrics(
     { from: '2026-10-01', to: '2026-10-31' },
