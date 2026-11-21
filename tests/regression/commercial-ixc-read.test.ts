@@ -37,3 +37,14 @@ test('não repete falha de autorização e respeita o limite de tentativas', asy
     assert.equal(attempts, expectedAttempts);
   }
 });
+
+test('permite recuperar a leitura comercial após dois timeouts sucessivos', async () => {
+  let attempts = 0;
+  const result = await readCommercialIxcPage(url, auth, body, Date.now() + 2_000, async () => {
+    attempts += 1;
+    if (attempts < 3) throw new DOMException('Timeout', 'TimeoutError');
+    return Response.json({ total: '0' });
+  }, 3);
+  assert.deepEqual(result, { total: '0' });
+  assert.equal(attempts, 3);
+});

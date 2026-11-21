@@ -8,9 +8,10 @@ export async function readCommercialIxcPage(
   body: Record<string, string>,
   deadline: number,
   fetcher: typeof fetch = fetch,
+  maxAttempts = 2,
 ): Promise<unknown> {
   const requestBody = JSON.stringify(body);
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
 
@@ -27,13 +28,13 @@ export async function readCommercialIxcPage(
     } catch (error) {
       const transient = error instanceof TypeError
         || (error instanceof DOMException && error.name === 'TimeoutError');
-      if (!transient || attempt === 1) throw error;
+      if (!transient || attempt === maxAttempts) throw error;
       continue;
     }
 
     if (response.ok) return response.json();
     await response.body?.cancel();
-    if (!RETRYABLE_STATUS.has(response.status) || attempt === 1) {
+    if (!RETRYABLE_STATUS.has(response.status) || attempt === maxAttempts) {
       throw new Error('Falha na consulta ao IXC.');
     }
   }

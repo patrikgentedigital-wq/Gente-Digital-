@@ -6,7 +6,7 @@ import { verifyAuth } from '@/lib/auth-server';
 import { getIxcCredentials } from '@/lib/ixc';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 50;
 
 const headers = { 'Cache-Control': 'private, no-store' };
 
@@ -33,12 +33,16 @@ export async function GET(request: NextRequest) {
     if (!ixc.hasCredentials) throw new Error('IXC não configurado.');
 
     const isCancellation = request.nextUrl.searchParams.get('section') === 'cancelamentos';
-    const deadline = Date.now() + (isCancellation ? 18_000 : 22_000);
+    const startedAt = Date.now();
+    const recordsDeadline = startedAt + (isCancellation ? 18_000 : 25_000);
+    const catalogsDeadline = startedAt + 40_000;
     const load = isCancellation ? loadCancellationMetrics : loadCommercialMetrics;
     const baseUrl = 'https://' + ixc.cleanDomain + '/webservice/v1/';
     const metrics = await load(period, async (table, body) => {
       try {
-        return await readCommercialIxcPage(baseUrl + table, ixc.authHeader, body, deadline);
+        // Vendas loads name catalogs after the period records. Give them time even after retries.
+        const deadline = !isCancellation && body.qtype === table + '.id' ? catalogsDeadline : recordsDeadline;
+        return await readCommercialIxcPage(baseUrl + table, ixc.authHeader, body, deadline, fetch, isCancellation ? 2 : 3);
       } catch (error) {
         console.warn('Leitura comercial do IXC falhou', { table, page: body.page, errorType: error instanceof Error ? error.name : 'Unknown' });
         throw error;
