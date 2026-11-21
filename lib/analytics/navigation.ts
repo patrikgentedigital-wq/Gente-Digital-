@@ -9,8 +9,8 @@ export interface AnalyticsTabDefinition {
 export const ANALYTICS_TABS: readonly AnalyticsTabDefinition[] = [
   {
     id: 'geral',
-    label: 'GERAL',
-    description: 'Leads, vendas e contratos',
+    label: 'Comercial',
+    description: 'Leads, vendas e contratos criados',
   },
   {
     id: 'atendimento',
@@ -29,5 +29,5 @@ export function isAnalyticsTabId(value: string | null): value is AnalyticsTabId 
 }
 
 export function getAnalyticsTabLabel(tab: AnalyticsTabId): string {
-  return ANALYTICS_TABS.find((item) => item.id === tab)?.label ?? 'GERAL';
+  return ANALYTICS_TABS.find((item) => item.id === tab)?.label ?? 'Comercial';
 }

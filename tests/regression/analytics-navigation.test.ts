@@ -22,7 +22,7 @@ test('rotula as três páginas em português e mantém ordem fechada', () => {
     'atendimento',
     'cancelamentos',
   ]);
-  assert.equal(getAnalyticsTabLabel('geral'), 'GERAL');
+  assert.equal(getAnalyticsTabLabel('geral'), 'Comercial');
   assert.equal(getAnalyticsTabLabel('atendimento'), 'ATENDIMENTO');
   assert.equal(getAnalyticsTabLabel('cancelamentos'), 'CANCELAMENTOS');
 });

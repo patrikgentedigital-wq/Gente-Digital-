@@ -32,8 +32,8 @@ async function defaultAuthenticate(request: Request): Promise<unknown | null> {
   // O helper e o cliente Supabase só são carregados quando a autenticação
   // padrão é usada. Isso mantém a dependência administrativa fora do bundle
   // de testes das funções puras.
-  const { getAuthenticatedUser } = await import('@/lib/auth-server');
-  return getAuthenticatedUser(request as NextRequest);
+  const { verifyAuth } = await import('@/lib/auth-server');
+  return verifyAuth(request as NextRequest);
 }
 
 function defaultQuery(window: MetricWindow): Promise<AnalyticsOverviewQueryResult> {

@@ -10,7 +10,6 @@ export type DashboardTabId =
 
 export const TEMPORARILY_HIDDEN_DASHBOARD_TABS = [
   'vendas',
-  'indicadores',
   'integracoes',
 ] as const satisfies readonly DashboardTabId[];
 
@@ -30,6 +29,7 @@ export const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
   { id: 'viabilidade', label: 'Viabilidade' },
   { id: 'colaboradores', label: 'Colaboradores' },
   { id: 'comissoes', label: 'Comissões & PIX' },
+  { id: 'indicadores', label: 'Indicadores' },
 ];
 
 export function isTemporarilyHiddenDashboardTab(

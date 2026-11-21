@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const navigationModulePath = new URL('../../lib/dashboard-navigation.ts', import.meta.url);
 
-test('menu lateral oculta somente Indicadores, Vendas e Integrações', async () => {
+test('menu lateral exibe Indicadores e mantém Vendas e Integrações ocultas', async () => {
   assert.equal(
     existsSync(navigationModulePath),
     true,
@@ -20,11 +20,10 @@ test('menu lateral oculta somente Indicadores, Vendas e Integrações', async ()
 
   assert.deepEqual(
     SIDEBAR_NAV_ITEMS.map((item: { id: string }) => item.id),
-    ['dashboard', 'leads', 'viabilidade', 'colaboradores', 'comissoes'],
+    ['dashboard', 'leads', 'viabilidade', 'colaboradores', 'comissoes', 'indicadores'],
   );
   assert.deepEqual(TEMPORARILY_HIDDEN_DASHBOARD_TABS, [
     'vendas',
-    'indicadores',
     'integracoes',
   ]);
 
@@ -54,7 +53,7 @@ test('menu lateral oculta somente Indicadores, Vendas e Integrações', async ()
   });
 });
 
-test('remove o atalho de Analytics enquanto Indicadores está oculto', () => {
+test('não reintroduz o atalho de Analytics nos colaboradores', () => {
   const source = readFileSync(
     new URL('../../components/views/colaboradores.tsx', import.meta.url),
     'utf8',

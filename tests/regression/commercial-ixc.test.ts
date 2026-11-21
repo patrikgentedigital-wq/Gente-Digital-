@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { loadCommercialMetrics, parseCommercialPeriod } from '../../lib/analytics/commercial-ixc';
+
+test('criação usa a data de cadastro e inclui o último dia do período', async () => {
+  const result = await loadCommercialMetrics(
+    { from: '2026-10-01', to: '2026-10-31' },
+    async (table, body) => {
+      if (table !== 'cliente_contrato') return { total: '0' };
+      assert.equal(body.qtype, 'cliente_contrato.data_cadastro_sistema');
+      assert.deepEqual(JSON.parse(body.grid_param), [
+        { TB: 'cliente_contrato.data_cadastro_sistema', OP: '<', P: '2026-11-01' },
+      ]);
+      return { total: '1', registros: [{
+        id: '10', id_vendedor: '7', data_cadastro_sistema: '2026-10-31',
+        data_ativacao: '2026-11-02', id_cliente: '123',
+      }] };
+    },
+  );
+  assert.deepEqual(result.contracts, [{ id: '10', date: '2026-10-31', channel: null, responsible: '7' }]);
+  assert.deepEqual(result.sales, []);
+});
+
+test('uma resposta parcial não vira total válido e as outras métricas continuam disponíveis', async () => {
+  const result = await loadCommercialMetrics(
+    { from: '2026-10-01', to: '2026-10-31' },
+    async (table) => table === 'contato'
+      ? { total: '2', registros: [{ id: '10', data_cadastro: '2026-10-31' }] }
+      : { total: '0' },
+  );
+  assert.equal(result.leads, null);
+  assert.deepEqual(result.contracts, []);
+});
+
+test('rejeita datas inexistentes e intervalos invertidos', () => {
+  assert.throws(() => parseCommercialPeriod(new URLSearchParams('from=2026-02-30&to=2026-03-01')));
+  assert.throws(() => parseCommercialPeriod(new URLSearchParams('from=2026-10-02&to=2026-10-01')));
+});
+
+
+test('pagina por ID até completar o total e preserva o dia local dos leads', async () => {
+  const pages: string[] = [];
+  const result = await loadCommercialMetrics(
+    { from: '2026-10-01', to: '2026-10-31' },
+    async (table, body) => {
+      if (table !== 'contato') return { total: '0' };
+      pages.push(body.page);
+      assert.equal(body.sortname, 'contato.id');
+      const ids = body.page === '1'
+        ? Array.from({ length: 250 }, (_, index) => index + 1)
+        : [251];
+      return { total: '251', registros: ids.map((id) => ({
+        id, data_cadastro: '2026-10-31 23:58:00', id_candidato_tipo: '12',
+      })) };
+    },
+  );
+  assert.deepEqual(pages, ['1', '2']);
+  assert.equal(result.leads?.length, 251);
+  assert.deepEqual(result.leads?.at(-1), {
+    id: '251', date: '2026-10-31', channel: '12', responsible: null,
+  });
+});

@@ -13,7 +13,7 @@ import {
 
 import { AtendimentoView } from './atendimento-view';
 import { CancelamentosView } from './cancelamentos-view';
-import { GeralView } from './geral-view';
+import { CommercialView } from './commercial-view';
 import { AnalyticsUnavailable } from './analytics-primitives';
 
 type ViewStatus = 'loading' | 'ready' | 'unavailable' | 'error';
@@ -72,12 +72,6 @@ export function AnalyticsView() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [fromDate, setFromDate] = useState(searchParams.get('analyticsFrom') ?? '');
-  const [toDate, setToDate] = useState(searchParams.get('analyticsTo') ?? '');
-  const [overview, setOverview] = useState<AnalyticsOverviewResponse | null>(null);
-  const [viewStatus, setViewStatus] = useState<ViewStatus>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const activeTab: AnalyticsTabId = isAnalyticsTabId(searchParams.get('indicadores'))
     ? searchParams.get('indicadores') as AnalyticsTabId
     : 'geral';
@@ -88,6 +82,33 @@ export function AnalyticsView() {
     params.set('indicadores', tab);
     router.push(`${pathname}?${params.toString()}`);
   }, [pathname, router, searchParams]);
+
+  return (
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <nav className="flex flex-wrap gap-2 border-b border-[var(--app-border)] pb-2" aria-label="Abas de indicadores">
+        {ANALYTICS_TABS.map(({ id, label }) => (
+          <button key={id} type="button" aria-current={id === activeTab ? 'page' : undefined}
+            onClick={() => setActiveTab(id)}
+            className={'rounded-lg px-4 py-2 text-sm font-semibold outline-offset-2 focus-visible:outline-2 '
+              + (id === activeTab ? 'bg-[#ffe300] text-[#0e1b2c]' : 'text-[var(--app-ink)] hover:bg-[var(--app-panel)]')}>
+            {label}
+          </button>
+        ))}
+      </nav>
+      {activeTab === 'geral' ? <CommercialView /> : <OperationalAnalyticsView activeTab={activeTab} />}
+    </div>
+  );
+}
+
+function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsTabId, 'geral'> }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [fromDate, setFromDate] = useState(searchParams.get('analyticsFrom') ?? '');
+  const [toDate, setToDate] = useState(searchParams.get('analyticsTo') ?? '');
+  const [overview, setOverview] = useState<AnalyticsOverviewResponse | null>(null);
+  const [viewStatus, setViewStatus] = useState<ViewStatus>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
     setViewStatus('loading');
@@ -150,15 +171,9 @@ export function AnalyticsView() {
 
   const page = useMemo(() => {
     if (!overview || viewStatus !== 'ready') return null;
-    switch (activeTab) {
-      case 'atendimento':
-        return <AtendimentoView overview={overview} />;
-      case 'cancelamentos':
-        return <CancelamentosView overview={overview} />;
-      case 'geral':
-      default:
-        return <GeralView overview={overview} />;
-    }
+    return activeTab === 'atendimento'
+      ? <AtendimentoView overview={overview} />
+      : <CancelamentosView overview={overview} />;
   }, [activeTab, overview, viewStatus]);
 
   return (
@@ -168,7 +183,7 @@ export function AnalyticsView() {
           <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-amber-400">Indique e Ganhe / centro de indicadores</p>
           <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-white md:text-4xl">Leitura operacional</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-            Três visões do mesmo contrato de dados, com a origem e a cobertura expostas na tela.
+            Acompanhe atendimentos e cancelamentos no período selecionado.
           </p>
         </div>
         <button
@@ -240,27 +255,6 @@ export function AnalyticsView() {
           {statusLabel(currentStatus)}
         </span>
       </section>
-
-      <nav className="grid gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-2 md:grid-cols-3" aria-label="Abas de indicadores">
-        {ANALYTICS_TABS.map((tab) => {
-          const active = tab.id === activeTab;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              aria-current={active ? 'page' : undefined}
-              onClick={() => setActiveTab(tab.id)}
-              className={`group rounded-xl border px-4 py-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${active
-                ? 'border-amber-400/40 bg-amber-400/10 shadow-[0_8px_30px_rgba(251,191,36,0.08)]'
-                : 'border-transparent hover:border-zinc-700 hover:bg-zinc-900'
-              }`}
-            >
-              <span className={`block text-[10px] font-bold tracking-[0.18em] ${active ? 'text-amber-300' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{tab.label}</span>
-              <span className="mt-1 block text-xs text-zinc-600">{tab.description}</span>
-            </button>
-          );
-        })}
-      </nav>
 
       {viewStatus === 'loading' && (
         <div className="space-y-4" role="status" aria-label="Carregando indicadores">

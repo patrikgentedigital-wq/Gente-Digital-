@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UsersRound, MapPin, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
+import { ChartNoAxesColumn, LayoutDashboard, Users, UsersRound, MapPin, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Avatar from 'boring-avatars';
@@ -22,6 +22,7 @@ const NAV_ICONS: Record<SidebarTabId, LucideIcon> = {
   viabilidade: MapPin,
   colaboradores: UsersRound,
   comissoes: Wallet,
+  indicadores: ChartNoAxesColumn,
 };
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
@@ -89,7 +90,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
 
         {/* Navigation */}
         <nav className="flex-1 flex flex-col gap-1.5 px-3 overflow-y-auto relative">
-          {SIDEBAR_NAV_ITEMS.map(({ id, label }) => (
+          {SIDEBAR_NAV_ITEMS.filter(({ id }) => id !== 'indicadores' || userRole === 'admin').map(({ id, label }) => (
             <NavItem
               key={id}
               id={id}
