@@ -16,10 +16,10 @@ export function CancelamentosView({ overview }: { overview: AnalyticsOverviewRes
   return (
     <div className="space-y-6">
       <AnalyticsPageIntro
-        eyebrow="03 / retenção"
-        title="CANCELAMENTOS"
+        eyebrow="Retenção"
+        title="Cancelamentos"
         description="Identifique o volume de cancelamentos e os motivos que precisam de ação operacional."
-        source="IXC"
+        source="IXC via base analítica"
       />
       <AnalyticsSourceNotice status={overview.meta.sections.cancelamentos} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -7,22 +7,20 @@ import {
   isAnalyticsTabId,
 } from '../../lib/analytics/navigation';
 
-test('aceita somente as três páginas do escopo', () => {
+test('aceita Vendas e Cancelamentos e rejeita a aba de Atendimento', () => {
   assert.equal(isAnalyticsTabId('geral'), true);
-  assert.equal(isAnalyticsTabId('atendimento'), true);
+  assert.equal(isAnalyticsTabId('atendimento'), false);
   assert.equal(isAnalyticsTabId('cancelamentos'), true);
   assert.equal(isAnalyticsTabId('hunter'), false);
   assert.equal(isAnalyticsTabId('farmer'), false);
   assert.equal(isAnalyticsTabId(null), false);
 });
 
-test('rotula as três páginas em português e mantém ordem fechada', () => {
+test('mostra somente Vendas e Cancelamentos na ordem do menu', () => {
   assert.deepEqual(ANALYTICS_TABS.map((tab) => tab.id), [
     'geral',
-    'atendimento',
     'cancelamentos',
   ]);
-  assert.equal(getAnalyticsTabLabel('geral'), 'Comercial');
-  assert.equal(getAnalyticsTabLabel('atendimento'), 'ATENDIMENTO');
-  assert.equal(getAnalyticsTabLabel('cancelamentos'), 'CANCELAMENTOS');
+  assert.equal(getAnalyticsTabLabel('geral'), 'Vendas');
+  assert.equal(getAnalyticsTabLabel('cancelamentos'), 'Cancelamentos');
 });

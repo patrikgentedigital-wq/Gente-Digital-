@@ -1,4 +1,4 @@
-export type AnalyticsTabId = 'geral' | 'atendimento' | 'cancelamentos';
+export type AnalyticsTabId = 'geral' | 'cancelamentos';
 
 export interface AnalyticsTabDefinition {
   id: AnalyticsTabId;
@@ -9,17 +9,12 @@ export interface AnalyticsTabDefinition {
 export const ANALYTICS_TABS: readonly AnalyticsTabDefinition[] = [
   {
     id: 'geral',
-    label: 'Comercial',
+    label: 'Vendas',
     description: 'Leads, vendas e contratos criados',
   },
   {
-    id: 'atendimento',
-    label: 'ATENDIMENTO',
-    description: 'Volume, canais e status',
-  },
-  {
     id: 'cancelamentos',
-    label: 'CANCELAMENTOS',
+    label: 'Cancelamentos',
     description: 'Eventos e motivos',
   },
 ];
@@ -29,5 +24,5 @@ export function isAnalyticsTabId(value: string | null): value is AnalyticsTabId 
 }
 
 export function getAnalyticsTabLabel(tab: AnalyticsTabId): string {
-  return ANALYTICS_TABS.find((item) => item.id === tab)?.label ?? 'Comercial';
+  return ANALYTICS_TABS.find((item) => item.id === tab)?.label ?? 'Vendas';
 }

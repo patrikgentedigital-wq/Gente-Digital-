@@ -1,7 +1,7 @@
 'use client';
 
-import { CalendarDays, Database, RefreshCw, ShieldAlert } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, RefreshCw, ShieldAlert } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import type { AnalyticsOverviewResponse } from '@/lib/analytics/response';
@@ -11,61 +11,15 @@ import {
   type AnalyticsTabId,
 } from '@/lib/analytics/navigation';
 
-import { AtendimentoView } from './atendimento-view';
 import { CancelamentosView } from './cancelamentos-view';
 import { CommercialView } from './commercial-view';
 import { AnalyticsUnavailable } from './analytics-primitives';
 
 type ViewStatus = 'loading' | 'ready' | 'unavailable' | 'error';
 
-const BUSINESS_TIMEZONE = 'America/Sao_Paulo';
-
 function localDateToBoundary(value: string, endOfDay: boolean): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}-03:00`;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return 'Ainda não sincronizado';
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return 'Data indisponível';
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-    timeZone: BUSINESS_TIMEZONE,
-  }).format(timestamp);
-}
-
-function statusLabel(status: ViewStatus | AnalyticsOverviewResponse['meta']['status']): string {
-  switch (status) {
-    case 'ready':
-    case 'success':
-      return 'Cobertura confirmada';
-    case 'partial':
-      return 'Cobertura parcial';
-    case 'loading':
-      return 'Consultando fontes';
-    case 'error':
-    case 'failed':
-      return 'Falha de leitura';
-    case 'unavailable':
-    default:
-      return 'Fonte indisponível';
-  }
-}
-
-function statusClasses(status: ViewStatus | AnalyticsOverviewResponse['meta']['status']): string {
-  switch (status) {
-    case 'ready':
-    case 'success':
-      return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200';
-    case 'partial':
-      return 'border-amber-400/20 bg-amber-400/10 text-amber-200';
-    case 'loading':
-      return 'border-blue-400/20 bg-blue-400/10 text-blue-200';
-    default:
-      return 'border-rose-400/20 bg-rose-400/10 text-rose-200';
-  }
 }
 
 export function AnalyticsView() {
@@ -95,12 +49,12 @@ export function AnalyticsView() {
           </button>
         ))}
       </nav>
-      {activeTab === 'geral' ? <CommercialView /> : <OperationalAnalyticsView activeTab={activeTab} />}
+      {activeTab === 'geral' ? <CommercialView /> : <CancelamentosPanel />}
     </div>
   );
 }
 
-function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsTabId, 'geral'> }) {
+function CancelamentosPanel() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -165,25 +119,14 @@ function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsT
     return () => window.clearTimeout(timer);
   }, [loadOverview]);
 
-  const currentStatus = overview?.meta.status ?? viewStatus;
-  const coverageLabel = overview ? `${Math.round(overview.meta.coverage * 100)}%` : '—';
-  const updateLabel = overview ? formatDate(overview.meta.lastUpdatedAt) : 'Ainda não sincronizado';
-
-  const page = useMemo(() => {
-    if (!overview || viewStatus !== 'ready') return null;
-    return activeTab === 'atendimento'
-      ? <AtendimentoView overview={overview} />
-      : <CancelamentosView overview={overview} />;
-  }, [activeTab, overview, viewStatus]);
-
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-12">
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-amber-400">Indique e Ganhe / centro de indicadores</p>
-          <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-white md:text-4xl">Leitura operacional</h2>
+          <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-white md:text-4xl">Consulta de cancelamentos</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-            Acompanhe atendimentos e cancelamentos no período selecionado.
+            Consulte os cancelamentos do IXC que já foram sincronizados com a base de indicadores.
           </p>
         </div>
         <button
@@ -193,7 +136,7 @@ function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsT
           className="inline-flex w-fit items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition-colors hover:border-amber-400/40 hover:text-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090B] disabled:cursor-wait disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${viewStatus === 'loading' ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />
-          Atualizar leitura
+          Consultar base
         </button>
       </header>
 
@@ -232,30 +175,6 @@ function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsT
         </button>
       </section>
 
-      <section className="grid gap-3 border-l-2 border-amber-400/80 bg-gradient-to-r from-amber-400/[0.08] to-transparent px-4 py-3 md:grid-cols-[1.4fr_1fr_0.7fr_auto] md:items-center">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-amber-400/10 p-2 text-amber-300 ring-1 ring-amber-400/20">
-            <Database className="h-4 w-4" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Proveniência da leitura</p>
-            <p className="mt-1 text-xs text-zinc-500">Opa! Suite + IXC + dados do Indique e Ganhe</p>
-          </div>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-600">Última atualização</p>
-          <p className="mt-1 text-xs font-semibold text-zinc-300">{updateLabel}</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-600">Cobertura</p>
-          <p className="mt-1 text-xs font-semibold tabular-nums text-zinc-300">{coverageLabel}</p>
-        </div>
-        <span className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${statusClasses(currentStatus)}`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-          {statusLabel(currentStatus)}
-        </span>
-      </section>
-
       {viewStatus === 'loading' && (
         <div className="space-y-4" role="status" aria-label="Carregando indicadores">
           <div className="h-20 animate-pulse rounded-2xl bg-zinc-900 motion-reduce:animate-none" />
@@ -282,7 +201,7 @@ function OperationalAnalyticsView({ activeTab }: { activeTab: Exclude<AnalyticsT
         </div>
       )}
 
-      {page}
+      {overview && viewStatus === 'ready' && <CancelamentosView overview={overview} />}
     </div>
   );
 }

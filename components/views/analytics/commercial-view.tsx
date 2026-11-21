@@ -105,7 +105,7 @@ export function CommercialView() {
     <section className="space-y-6 text-[var(--app-ink)]" aria-labelledby="commercial-title">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="commercial-title" className="font-display text-3xl font-bold tracking-tight">Comercial</h2>
+          <h2 id="commercial-title" className="font-display text-3xl font-bold tracking-tight">Vendas</h2>
           <p className="mt-1 text-sm text-[var(--app-muted)]">Leads, vendas e contratos criados no IXC.</p>
         </div>
         {result && <p className="text-xs text-[var(--app-muted)]">Consultado em {dateTime.format(new Date(result.readAt))}</p>}
