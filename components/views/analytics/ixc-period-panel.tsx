@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { CommercialPeriod } from '@/lib/analytics/commercial-ixc';
+import { startIxcRefresh } from '@/lib/analytics/ixc-refresh';
 
 export const ixcFilterControl = 'block w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-sm outline-offset-2 focus-visible:outline-2';
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
@@ -41,26 +42,28 @@ export function IxcPeriodPanel<Metrics>({ title, description, section, children 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    const controller = new AbortController();
     const params = new URLSearchParams({ ...request.period });
     if (section) params.set('section', section);
-    void (async () => {
+
+    return startIxcRefresh(async (signal) => {
       try {
         const response = await fetch('/api/analytics/commercial?' + params, {
-          cache: 'no-store', signal: controller.signal,
+          cache: 'no-store', signal,
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Não foi possível consultar o IXC.');
-        if (!controller.signal.aborted) setResult(payload);
+        if (!signal.aborted) {
+          setResult(payload);
+          setError(null);
+        }
       } catch (cause) {
-        if (!controller.signal.aborted) {
+        if (!signal.aborted) {
           setError(cause instanceof Error ? cause.message : 'Não foi possível consultar o IXC.');
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
-    })();
-    return () => controller.abort();
+    });
   }, [request, section]);
 
   return (
@@ -70,7 +73,10 @@ export function IxcPeriodPanel<Metrics>({ title, description, section, children 
           <h2 id="ixc-period-title" className="font-display text-3xl font-bold tracking-tight">{title}</h2>
           <p className="mt-1 text-sm text-[var(--app-muted)]">{description}</p>
         </div>
-        {result && <p className="text-xs text-[var(--app-muted)]">Consultado em {dateTime.format(new Date(result.readAt))}</p>}
+        <div className="text-xs text-[var(--app-muted)]">
+          <p>Atualização automática a cada hora</p>
+          {result && <p>Última consulta em {dateTime.format(new Date(result.readAt))}</p>}
+        </div>
       </header>
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
@@ -102,7 +108,11 @@ export function IxcPeriodPanel<Metrics>({ title, description, section, children 
       </form>
 
       {loading && <p role="status" className="text-sm text-[var(--app-muted)]">Consultando o IXC…</p>}
-      {error && <p role="alert" className="rounded-lg border border-red-500/40 p-4 text-sm">{error}</p>}
+      {error && (
+        <p role="alert" className="rounded-lg border border-red-500/40 p-4 text-sm">
+          {result ? 'A atualização falhou. Exibindo os dados da última consulta.' : error}
+        </p>
+      )}
       {result && (
         <>
           <p className="text-sm font-medium">Período consultado: {formatDay(request.period.from)} a {formatDay(request.period.to)}</p>

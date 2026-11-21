@@ -52,11 +52,17 @@ function CommercialDetails({ data, selected, setSelected }: {
   const [page, setPage] = useState(1);
 
   const current = data[selected];
+  const channelOptions = options(current ?? [], 'channel');
+  const responsibleOptions = options(current ?? [], 'responsible');
+  const activeChannel = channelOptions.some(([id]) => id === channel) ? channel : '';
+  const activeResponsible = responsibleOptions.some(([id]) => id === responsible) ? responsible : '';
   const filtered = current?.filter((row) =>
-    (!channel || row.channel === channel) && (!responsible || row.responsible === responsible)) ?? [];
+    (!activeChannel || row.channel === activeChannel)
+    && (!activeResponsible || row.responsible === activeResponsible)) ?? [];
   const selectedLabel = metrics.find(({ id }) => id === selected)?.label;
   const responsibleLabel = selected === 'contracts' ? 'Vendedor' : 'Responsável';
   const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const visiblePage = Math.min(page, lastPage);
 
   function resetDetail() {
     setChannel('');
@@ -93,17 +99,17 @@ function CommercialDetails({ data, selected, setSelected }: {
               {selected !== 'contracts' && (
                 <label className="text-sm">
                   Canal
-                  <select className={ixcFilterControl} value={channel} onChange={(event) => { setChannel(event.target.value); setPage(1); }}>
+                  <select className={ixcFilterControl} value={activeChannel} onChange={(event) => { setChannel(event.target.value); setPage(1); }}>
                     <option value="">Todos</option>
-                    {options(current, 'channel').map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                    {channelOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
                 </label>
               )}
               <label className="text-sm">
                 {responsibleLabel}
-                <select className={ixcFilterControl} value={responsible} onChange={(event) => { setResponsible(event.target.value); setPage(1); }}>
+                <select className={ixcFilterControl} value={activeResponsible} onChange={(event) => { setResponsible(event.target.value); setPage(1); }}>
                   <option value="">Todos</option>
-                  {options(current, 'responsible').map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  {responsibleOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </label>
             </div>
@@ -123,7 +129,7 @@ function CommercialDetails({ data, selected, setSelected }: {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice((page - 1) * pageSize, page * pageSize).map((row) => (
+                {filtered.slice((visiblePage - 1) * pageSize, visiblePage * pageSize).map((row) => (
                   <tr key={row.id} className="border-t border-[var(--app-border)] tabular-nums">
                     <td className="px-4 py-2">{row.id}</td>
                     <td className="px-4 py-2">{formatDay(row.date)}</td>
@@ -137,9 +143,9 @@ function CommercialDetails({ data, selected, setSelected }: {
         )}
         {lastPage > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--app-border)] p-4 text-sm">
-            <button type="button" disabled={page === 1} className="underline disabled:opacity-40" onClick={() => setPage(page - 1)}>Anterior</button>
-            <span>Página {page} de {lastPage}</span>
-            <button type="button" disabled={page === lastPage} className="underline disabled:opacity-40" onClick={() => setPage(page + 1)}>Próxima</button>
+            <button type="button" disabled={visiblePage === 1} className="underline disabled:opacity-40" onClick={() => setPage(visiblePage - 1)}>Anterior</button>
+            <span>Página {visiblePage} de {lastPage}</span>
+            <button type="button" disabled={visiblePage === lastPage} className="underline disabled:opacity-40" onClick={() => setPage(visiblePage + 1)}>Próxima</button>
           </div>
         )}
       </section>
