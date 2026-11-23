@@ -39,3 +39,22 @@ test('distingue zero real de uma resposta incompleta do IXC', async () => {
   assert.deepEqual(await loadCancellationMetrics(october, async () => ({ total: '0' })), { total: 0, byReason: [] });
   await assert.rejects(loadCancellationMetrics(october, async () => ({ total: '1' })), /incompleta/);
 });
+
+test('consulta o total de cancelamentos sem carregar o catálogo e valida a data de cada registro', async () => {
+  const tables: string[] = [];
+  const result = await loadCancellationMetrics(october, async (table, body) => {
+    tables.push(table);
+    assert.equal(body.qtype, 'cliente_contrato.data_cancelamento');
+    assert.equal(body.query, october.from);
+    assert.deepEqual(JSON.parse(body.grid_param), [
+      { TB: 'cliente_contrato.data_cancelamento', OP: '<', P: '2026-11-01' },
+    ]);
+    return { total: 1, registros: [{ id: '1', data_cancelamento: october.to }] };
+  }, false);
+
+  assert.deepEqual(tables, ['cliente_contrato']);
+  assert.equal(result.total, 1);
+  await assert.rejects(loadCancellationMetrics(october, async () => ({
+    total: 1, registros: [{ id: '1', data_cancelamento: '2026-11-01' }],
+  }), false), /fora do período/);
+});

@@ -3,9 +3,8 @@
 import { ArrowDown, ArrowRight, ArrowUp, Check } from 'lucide-react';
 import { useState } from 'react';
 import { sortCommercialRecordsByDate, type CommercialDateOrder } from '@/lib/analytics/commercial-detail';
-import type { CommercialRecord } from '@/lib/analytics/commercial-ixc';
-import { CommercialPeriodPanel, IxcMetricComparison, IxcMetricStatus, type CommercialPeriodData } from './commercial-period-panel';
-import { formatDay, ixcFilterControl } from './ixc-period-panel';
+import type { CommercialMetrics, CommercialRecord } from '@/lib/analytics/commercial-ixc';
+import { formatDay, ixcFilterControl, IxcMetricComparison, IxcMetricStatus, IxcPeriodPanel, type IxcPeriodData } from './ixc-period-panel';
 
 const metrics = [
   { id: 'leads', label: 'Leads recebidos', detail: 'Contatos cadastrados no IXC' },
@@ -39,14 +38,14 @@ type MetricId = (typeof metrics)[number]['id'];
 export function CommercialView() {
   const [selected, setSelected] = useState<MetricId>('leads');
   return (
-    <CommercialPeriodPanel>
+    <IxcPeriodPanel<CommercialMetrics> title="Vendas" description="Leads, vendas e contratos criados no IXC.">
       {(data) => <CommercialDetails key={data.periodKey} data={data} selected={selected} setSelected={setSelected} />}
-    </CommercialPeriodPanel>
+    </IxcPeriodPanel>
   );
 }
 
 function CommercialDetails({ data, selected, setSelected }: {
-  data: CommercialPeriodData;
+  data: IxcPeriodData<CommercialMetrics>;
   selected: MetricId;
   setSelected: (metric: MetricId) => void;
 }) {
