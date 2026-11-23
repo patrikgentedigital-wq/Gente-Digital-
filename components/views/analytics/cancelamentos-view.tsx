@@ -1,7 +1,7 @@
 'use client';
 
 import type { DirectCancellationMetrics } from '@/lib/analytics/commercial-ixc';
-import { IxcMetricComparison, IxcMetricStatus, IxcPeriodPanel } from './ixc-period-panel';
+import { IxcPeriodPanel } from './ixc-period-panel';
 
 const numbers = new Intl.NumberFormat('pt-BR');
 
@@ -12,21 +12,15 @@ export function CancelamentosView() {
       description="Contratos por data de cancelamento, consultados no IXC."
       section="cancelamentos"
     >
-      {({ metrics: { total, byReason }, timestamps, loading, readAt, comparison, comparisonLoading }) => (
+      {({ total, byReason }) => (
         <>
           <section className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4" aria-label="Total de cancelamentos">
             <h3 className="text-sm font-semibold">Cancelamentos no período</h3>
-            <p className="mt-1 text-2xl font-bold tabular-nums">{total === undefined ? '—' : numbers.format(total)}</p>
-            <IxcMetricComparison current={timestamps.total === readAt ? total : undefined}
-              previous={comparison.total} loading={comparisonLoading} />
-            <IxcMetricStatus timestamp={timestamps.total} readAt={readAt} loading={loading} />
+            <p className="mt-1 text-2xl font-bold tabular-nums">{numbers.format(total)}</p>
           </section>
 
           <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)]" aria-labelledby="cancellation-reasons">
-            <div className="p-4">
-              <h3 id="cancellation-reasons" className="font-semibold">Cancelamentos por motivo</h3>
-              <IxcMetricStatus timestamp={timestamps.byReason} readAt={readAt} loading={loading} />
-            </div>
+            <h3 id="cancellation-reasons" className="p-4 font-semibold">Cancelamentos por motivo</h3>
             {byReason?.length ? (
               <table className="w-full text-left text-sm">
                 <thead className="bg-[var(--app-canvas)]">
@@ -46,8 +40,7 @@ export function CancelamentosView() {
               </table>
             ) : (
               <p className="px-4 pb-4 text-sm text-[var(--app-muted)]">
-                {byReason ? 'Nenhum cancelamento no período.'
-                  : loading ? 'Aguardando a consulta do IXC.' : 'O catálogo de motivos do IXC está indisponível.'}
+                {byReason ? 'Nenhum cancelamento no período.' : 'O catálogo de motivos do IXC está indisponível.'}
               </p>
             )}
           </section>

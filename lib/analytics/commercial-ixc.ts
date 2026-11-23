@@ -182,15 +182,14 @@ export interface DirectCancellationMetrics {
   byReason: { key: string; count: number }[] | null;
 }
 
-export async function loadCancellationMetrics(period: CommercialPeriod, list: List, includeReasons = true): Promise<DirectCancellationMetrics> {
+export async function loadCancellationMetrics(period: CommercialPeriod, list: List): Promise<DirectCancellationMetrics> {
   const [rows, reasons] = await Promise.all([
     loadRowsInPeriod('cliente_contrato', 'data_cancelamento', period, list),
-    includeReasons ? loadCatalog(cancellationReasonCatalog, list).catch(() => null) : null,
+    loadCatalog(cancellationReasonCatalog, list).catch(() => null),
   ]);
   const groups = new Map<string, number>();
   for (const row of rows.values()) {
     checkedBusinessDate(row.data_cancelamento, period);
-    if (!includeReasons) continue;
     const id = positiveId(row.motivo_cancelamento);
     const reason = id ? reasons?.get(id) ?? 'Motivo não localizado no IXC' : 'Sem motivo';
     groups.set(reason, (groups.get(reason) ?? 0) + 1);

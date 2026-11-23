@@ -33,13 +33,12 @@ export async function GET(request: NextRequest) {
     if (!ixc.hasCredentials) throw new Error('IXC não configurado.');
 
     const isCancellation = request.nextUrl.searchParams.get('section') === 'cancelamentos';
-    const summary = request.nextUrl.searchParams.get('summary') === '1';
+    const summary = !isCancellation && request.nextUrl.searchParams.get('summary') === '1';
     const startedAt = Date.now();
     const recordsDeadline = startedAt + (isCancellation ? 18_000 : 25_000);
     const catalogsDeadline = startedAt + 40_000;
-    const load = isCancellation ? loadCancellationMetrics : loadCommercialMetrics;
     const baseUrl = 'https://' + ixc.cleanDomain + '/webservice/v1/';
-    const metrics = await load(period, async (table, body) => {
+    const list: Parameters<typeof loadCommercialMetrics>[1] = async (table, body) => {
       try {
         // Vendas loads name catalogs after the period records. Give them time even after retries.
         const deadline = !isCancellation && body.qtype === table + '.id' ? catalogsDeadline : recordsDeadline;
@@ -48,12 +47,15 @@ export async function GET(request: NextRequest) {
         console.warn('Leitura comercial do IXC falhou', { table, page: body.page, errorType: error instanceof Error ? error.name : 'Unknown' });
         throw error;
       }
-    }, !summary);
+    };
+    const metrics = isCancellation
+      ? await loadCancellationMetrics(period, list)
+      : await loadCommercialMetrics(period, list, !summary);
 
     if (Object.values(metrics).every((records) => records === null)) throw new Error('IXC indisponível.');
     const result = summary && 'leads' in metrics
       ? { leads: metrics.leads?.length ?? null, sales: metrics.sales?.length ?? null, contracts: metrics.contracts?.length ?? null }
-      : summary && 'total' in metrics ? { total: metrics.total } : metrics;
+      : metrics;
     return NextResponse.json({ metrics: result, readAt: new Date().toISOString() }, { headers });
   } catch {
     return NextResponse.json({ error: 'Não foi possível consultar os indicadores do IXC.' }, {

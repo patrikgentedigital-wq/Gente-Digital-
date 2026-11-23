@@ -1,8 +1,11 @@
 'use client';
 
+import { ArrowDown, ArrowRight, ArrowUp, Check } from 'lucide-react';
 import { useState } from 'react';
-import type { CommercialMetrics, CommercialRecord } from '@/lib/analytics/commercial-ixc';
-import { formatDay, ixcFilterControl, IxcMetricComparison, IxcMetricStatus, IxcPeriodPanel, type IxcPeriodData } from './ixc-period-panel';
+import { sortCommercialRecordsByDate, type CommercialDateOrder } from '@/lib/analytics/commercial-detail';
+import type { CommercialRecord } from '@/lib/analytics/commercial-ixc';
+import { CommercialPeriodPanel, IxcMetricComparison, IxcMetricStatus, type CommercialPeriodData } from './commercial-period-panel';
+import { formatDay, ixcFilterControl } from './ixc-period-panel';
 
 const metrics = [
   { id: 'leads', label: 'Leads recebidos', detail: 'Contatos cadastrados no IXC' },
@@ -36,20 +39,21 @@ type MetricId = (typeof metrics)[number]['id'];
 export function CommercialView() {
   const [selected, setSelected] = useState<MetricId>('leads');
   return (
-    <IxcPeriodPanel<CommercialMetrics> title="Vendas" description="Leads, vendas e contratos criados no IXC.">
-      {(data) => <CommercialDetails data={data} selected={selected} setSelected={setSelected} />}
-    </IxcPeriodPanel>
+    <CommercialPeriodPanel>
+      {(data) => <CommercialDetails key={data.periodKey} data={data} selected={selected} setSelected={setSelected} />}
+    </CommercialPeriodPanel>
   );
 }
 
 function CommercialDetails({ data, selected, setSelected }: {
-  data: IxcPeriodData<CommercialMetrics>;
+  data: CommercialPeriodData;
   selected: MetricId;
   setSelected: (metric: MetricId) => void;
 }) {
   const [channel, setChannel] = useState('');
   const [responsible, setResponsible] = useState('');
   const [page, setPage] = useState(1);
+  const [dateOrder, setDateOrder] = useState<CommercialDateOrder>('descending');
 
   const current = data.metrics[selected];
   const missingNames = current?.some(row => (row.channel && !row.channelName) || (row.responsible && !row.responsibleName));
@@ -60,7 +64,10 @@ function CommercialDetails({ data, selected, setSelected }: {
   const filtered = current?.filter((row) =>
     (!activeChannel || row.channel === activeChannel)
     && (!activeResponsible || row.responsible === activeResponsible)) ?? [];
+  const sorted = sortCommercialRecordsByDate(filtered, dateOrder);
+  const hasFilters = Boolean(activeChannel || activeResponsible);
   const selectedLabel = metrics.find(({ id }) => id === selected)?.label;
+  const SortIcon = dateOrder === 'descending' ? ArrowDown : ArrowUp;
   const responsibleLabel = selected === 'contracts' ? 'Vendedor' : 'Responsável';
   const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visiblePage = Math.min(page, lastPage);
@@ -77,46 +84,74 @@ function CommercialDetails({ data, selected, setSelected }: {
         {metrics.map(({ id, label, detail }) => {
           const records = data.metrics[id];
           const timestamp = data.timestamps[id];
+          const active = selected === id;
           return (
-            <button key={id} type="button" aria-pressed={selected === id}
-              onClick={() => { setSelected(id); resetDetail(); }}
-              className={'rounded-xl border bg-[var(--app-panel)] p-4 text-left outline-offset-2 focus-visible:outline-2 '
-                + (selected === id ? 'border-amber-500 ring-1 ring-amber-500' : 'border-[var(--app-border)]')}>
-              <span className="block text-sm font-semibold">{label}</span>
-              <span className="my-1 block text-2xl font-bold tabular-nums">{records ? numbers.format(records.length) : '—'}</span>
-              <span className="block text-xs text-[var(--app-muted)]">{detail}</span>
-              <IxcMetricComparison current={timestamp === data.readAt ? records?.length : undefined}
-                previous={data.comparison[id]} loading={data.comparisonLoading} />
-              <IxcMetricStatus timestamp={timestamp} readAt={data.readAt} loading={data.loading} />
+            <button key={id} type="button" aria-pressed={active} aria-controls="commercial-detail"
+              onClick={() => {
+                if (!active) {
+                  setSelected(id);
+                  resetDetail();
+                }
+              }}
+              className={'flex min-w-0 flex-col rounded-xl border bg-[var(--app-panel)] p-4 text-left outline-offset-2 transition-colors focus-visible:outline-2 '
+                + (active ? 'border-yellow-500 ring-1 ring-yellow-500' : 'border-[var(--app-border)] hover:border-yellow-500/70')}>
+              <span className="text-sm font-semibold">{label}</span>
+              <span className="my-1 font-display text-4xl font-bold leading-none tabular-nums">
+                {records ? numbers.format(records.length) : '—'}
+              </span>
+              <span className="text-xs text-[var(--app-muted)]">{detail}</span>
+              {data.compared && (
+                <IxcMetricComparison current={timestamp === data.readAt ? records?.length : undefined}
+                  previous={data.comparison[id]} loading={data.comparisonLoading} />
+              )}
+              {(!timestamp || timestamp !== data.readAt) && <IxcMetricStatus timestamp={timestamp} loading={data.loading} />}
+              <span className={'mt-3 inline-flex w-fit items-center gap-1.5 rounded-md text-xs font-semibold '
+                + (active ? 'bg-[#ffe300] px-2 py-1 text-[#0e1b2c]' : 'py-1 text-[var(--app-muted)]')}>
+                {active ? <Check size={14} aria-hidden="true" /> : <ArrowRight size={14} aria-hidden="true" />}
+                {active ? 'Exibindo registros' : 'Ver registros'}
+              </span>
             </button>
           );
         })}
       </div>
 
-      <section aria-labelledby="commercial-detail" className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)]">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--app-border)] p-4">
+      <section id="commercial-detail" aria-labelledby="commercial-detail-title"
+        className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)]">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
           <div>
-            <h3 id="commercial-detail" className="font-semibold">{selectedLabel}</h3>
-            {current && <p className="text-xs text-[var(--app-muted)]">{numbers.format(filtered.length)} de {numbers.format(current.length)} registros</p>}
+            <h3 id="commercial-detail-title" className="font-semibold">{selectedLabel}</h3>
+            {current && (
+              <p aria-live="polite" className="mt-0.5 text-xs text-[var(--app-muted)]">
+                {hasFilters
+                  ? numbers.format(filtered.length) + ' de ' + numbers.format(current.length) + ' registros'
+                  : numbers.format(current.length) + (current.length === 1 ? ' registro' : ' registros')}
+              </p>
+            )}
           </div>
           {current && current.length > 0 && (
-            <div className="flex flex-wrap gap-3">
+            <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto" role="group" aria-label="Filtros do detalhamento">
               {selected !== 'contracts' && (
-                <label className="text-sm">
+                <label className="min-w-0 flex-1 space-y-1 text-xs sm:flex-none">
                   Canal
-                  <select className={ixcFilterControl} value={activeChannel} onChange={(event) => { setChannel(event.target.value); setPage(1); }}>
+                  <select className={ixcFilterControl + ' max-w-full sm:max-w-60'} value={activeChannel} onChange={(event) => { setChannel(event.target.value); setPage(1); }}>
                     <option value="">Todos</option>
                     {channelOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
                 </label>
               )}
-              <label className="text-sm">
+              <label className="min-w-0 flex-1 space-y-1 text-xs sm:flex-none">
                 {responsibleLabel}
-                <select className={ixcFilterControl} value={activeResponsible} onChange={(event) => { setResponsible(event.target.value); setPage(1); }}>
+                <select className={ixcFilterControl + ' max-w-full sm:max-w-60'} value={activeResponsible} onChange={(event) => { setResponsible(event.target.value); setPage(1); }}>
                   <option value="">Todos</option>
                   {responsibleOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </label>
+              {hasFilters && (
+                <button type="button" onClick={resetDetail}
+                  className="min-h-9 rounded-md px-2 text-xs font-semibold underline underline-offset-4 focus-visible:outline-2">
+                  Limpar filtros
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -124,7 +159,7 @@ function CommercialDetails({ data, selected, setSelected }: {
           Alguns nomes de canais ou responsáveis estão indisponíveis no IXC. O total de registros está disponível.
         </p>}
         {!filtered.length ? (
-          <p className="p-4 text-sm text-[var(--app-muted)]">{current ? 'Nenhum registro neste recorte.'
+          <p className="p-4 text-sm text-[var(--app-muted)]">{current ? (hasFilters ? 'Nenhum registro corresponde aos filtros.' : 'Nenhum registro neste período.')
             : data.loading ? 'Aguardando a consulta do IXC.' : 'Este indicador não pôde ser carregado. Consulte o período novamente.'}</p>
         ) : (
           <div className="overflow-x-auto">
@@ -132,13 +167,23 @@ function CommercialDetails({ data, selected, setSelected }: {
               <thead className="bg-[var(--app-canvas)]">
                 <tr>
                   <th scope="col" className="px-4 py-2">ID no IXC</th>
-                  <th scope="col" className="px-4 py-2">Data</th>
+                  <th scope="col" aria-sort={dateOrder} className="whitespace-nowrap px-4 py-2">
+                    <button type="button"
+                      title={dateOrder === 'descending' ? 'Mostrar registros mais antigos primeiro' : 'Mostrar registros mais recentes primeiro'}
+                      onClick={() => {
+                        setDateOrder(order => order === 'descending' ? 'ascending' : 'descending');
+                        setPage(1);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2">
+                      Data <SortIcon size={14} aria-hidden="true" />
+                    </button>
+                  </th>
                   {selected !== 'contracts' && <th scope="col" className="px-4 py-2">Canal</th>}
                   <th scope="col" className="px-4 py-2">{responsibleLabel}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice((visiblePage - 1) * pageSize, visiblePage * pageSize).map((row) => (
+                {sorted.slice((visiblePage - 1) * pageSize, visiblePage * pageSize).map((row) => (
                   <tr key={row.id} className="border-t border-[var(--app-border)] tabular-nums">
                     <td className="px-4 py-2">{row.id}</td>
                     <td className="px-4 py-2">{formatDay(row.date)}</td>
