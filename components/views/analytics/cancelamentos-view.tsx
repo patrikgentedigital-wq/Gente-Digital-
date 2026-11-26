@@ -33,6 +33,12 @@ function CancellationPanorama({ data }: { data: IxcPeriodData<DirectCancellation
 
   const reason = reasons.find(item => item.key === selected);
   const reasonTotal = reasons.reduce((sum, item) => sum + item.count, 0);
+  const reasonDetail = reason && reasonTotal > 0 ? (
+    <p className="text-sm text-[var(--app-muted)] tabular-nums">
+      {numbers.format(reason.count)} de {numbers.format(reasonTotal)} cancelamentos
+      {' '}({percent.format(reason.count / reasonTotal)} na leitura dos motivos).
+    </p>
+  ) : null;
   const reasonsStale = Boolean(timestamps.byReason && timestamps.byReason !== readAt);
   const current = timestamps.total === readAt ? total : undefined;
   const previous = compared && !comparisonLoading ? comparison.total ?? undefined : undefined;
@@ -60,6 +66,7 @@ function CancellationPanorama({ data }: { data: IxcPeriodData<DirectCancellation
           totalLabel="cancelamentos"
           rows={reasonRows}
           selected={reason?.key}
+          selectedRowDetail={reasonDetail}
           onSelect={key => setSelected(previousKey => previousKey === key ? undefined : key)}
           controls={reasons.length > 1 && (
             <div className="w-fit max-w-full">
@@ -79,14 +86,11 @@ function CancellationPanorama({ data }: { data: IxcPeriodData<DirectCancellation
                 </p>
               )}
               {total !== 0 && reasonsStale && <IxcMetricStatus timestamp={timestamps.byReason} loading={loading} />}
-              <div aria-live="polite">
-                {reason && reasonTotal > 0 && (
+              <div aria-live="polite" className="hidden lg:block">
+                {reason && reasonDetail && (
                   <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3">
                     <p className="font-bold break-words">{reason.key}</p>
-                    <p className="text-sm text-[var(--app-muted)] tabular-nums">
-                      {numbers.format(reason.count)} de {numbers.format(reasonTotal)} cancelamentos
-                      {' '}({percent.format(reason.count / reasonTotal)} na leitura dos motivos).
-                    </p>
+                    {reasonDetail}
                   </div>
                 )}
               </div>

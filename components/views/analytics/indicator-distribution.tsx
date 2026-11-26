@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 const numbers = new Intl.NumberFormat('pt-BR');
 const percent = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 });
@@ -12,6 +12,7 @@ interface IndicatorDistributionProps {
   rows: readonly { key: string; label: string; count: number }[];
   selected?: string;
   onSelect?: (key: string) => void;
+  selectedRowDetail?: ReactNode;
   controls?: ReactNode;
   footer?: ReactNode;
   compact?: boolean;
@@ -19,9 +20,16 @@ interface IndicatorDistributionProps {
 }
 
 export function IndicatorDistribution({
-  title, description, totalLabel, rows, selected, onSelect, controls, footer, compact = false, emptyMessage,
+  title, description, totalLabel, rows, selected, onSelect, selectedRowDetail, controls, footer, compact = false, emptyMessage,
 }: IndicatorDistributionProps) {
   const titleId = useId();
+  const detailRef = useRef<HTMLDivElement>(null);
+  const expandable = selectedRowDetail !== undefined;
+  useLayoutEffect(() => {
+    const detail = detailRef.current;
+    if (detail?.getClientRects().length) detail.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
+
   const ranked = [...rows].sort((left, right) => right.count - left.count || left.key.localeCompare(right.key, 'pt-BR'));
   const total = ranked.reduce((sum, row) => sum + row.count, 0);
   const hasTail = ranked.length > colors.length;
@@ -69,6 +77,7 @@ export function IndicatorDistribution({
             <ul className={'divide-y divide-[var(--app-border)]'
               + (compact ? ' xl:max-h-48 xl:overflow-y-auto xl:[scrollbar-width:thin]' : '')}>
               {rows.map(row => {
+                const active = selected === row.key;
                 const content = (
                   <>
                     <span className="size-2 rounded-sm" style={{ backgroundColor: colorByKey.get(row.key) }} aria-hidden="true" />
@@ -81,12 +90,19 @@ export function IndicatorDistribution({
                   <li key={row.key}>
                     {onSelect ? (
                       <button
-                        type="button" onClick={() => onSelect(row.key)} aria-pressed={selected === row.key}
-                        className={rowClass + ' rounded-lg hover:bg-[var(--app-panel-muted)] aria-pressed:bg-[var(--app-panel-muted)] aria-pressed:font-bold focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--app-ink)]'}
+                        type="button" onClick={() => onSelect(row.key)}
+                        aria-pressed={expandable ? undefined : active} aria-expanded={expandable ? active : undefined}
+                        className={rowClass + ' rounded-lg hover:bg-[var(--app-panel-muted)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--app-ink)]'
+                          + (active ? ' bg-[var(--app-panel-muted)] font-bold' : '')}
                       >
                         {content}
                       </button>
                     ) : <div className={rowClass}>{content}</div>}
+                    {active && selectedRowDetail && (
+                      <div ref={detailRef} className="mx-2 mb-2 scroll-mb-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-2 lg:hidden">
+                        {selectedRowDetail}
+                      </div>
+                    )}
                   </li>
                 );
               })}
