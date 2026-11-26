@@ -113,16 +113,16 @@ export function CommercialTrend({ buckets, active, onSelect }: CommercialTrendPr
         {hasPrevious && <li className="flex items-center gap-1.5"><i aria-hidden="true" className="w-4 border-t-2 border-dashed" style={{ borderColor: previousColor }} />Anterior</li>}
         <li className="flex items-center gap-1.5"><i aria-hidden="true" className="w-4 border-t-2" style={{ borderColor: currentColor }} />Atual</li>
       </ul>
-      <div className="mt-6 grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] gap-2">
-        <div className="relative h-40 text-right text-[10px] text-[var(--app-muted)] sm:h-48" aria-hidden="true">
+      <div className="mt-6 grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] gap-2 xl:flex-1">
+        <div className="relative h-40 text-right text-[10px] text-[var(--app-muted)] sm:h-48 xl:mb-8 xl:h-auto" aria-hidden="true">
           {ticks.map((tick, index) => <span key={tick} className="absolute right-0 -translate-y-1/2" style={{ top: index * 25 + '%' }}>{tick}</span>)}
         </div>
         <div className="relative min-w-0">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 flex h-40 flex-col justify-between sm:h-48">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 flex h-40 flex-col justify-between sm:h-48 xl:h-[calc(100%_-_2rem)]">
             {ticks.map(tick => <i key={tick} className="border-t border-[var(--app-border)]" />)}
           </div>
-          <canvas aria-hidden="true" ref={canvas} className="pointer-events-none absolute inset-x-0 top-0 h-40 w-full sm:h-48" />
-          <div className="relative grid min-w-0" style={{ gridTemplateColumns: 'repeat(' + buckets.length + ',minmax(0,1fr))' }}>
+          <canvas aria-hidden="true" ref={canvas} className="pointer-events-none absolute inset-x-0 top-0 h-40 w-full sm:h-48 xl:h-[calc(100%_-_2rem)]" />
+          <div className="relative grid min-w-0 xl:h-full" style={{ gridTemplateColumns: 'repeat(' + buckets.length + ',minmax(0,1fr))' }}>
             {buckets.map((bucket) => {
               const selected = active?.from === bucket.from && active.to === bucket.to;
               const label = formatDay(bucket.from) + ' a ' + formatDay(bucket.to) + ', ' + bucket.current + ' no período atual'
@@ -130,8 +130,8 @@ export function CommercialTrend({ buckets, active, onSelect }: CommercialTrendPr
               return (
                 <button key={bucket.from} type="button" title={label} aria-label={label + '. Ver registros do intervalo atual.'}
                   aria-controls="commercial-detail" aria-pressed={selected} onClick={() => onSelect(bucket)}
-                  className="min-w-0 rounded-2xl text-[var(--app-muted)] outline-offset-1 hover:bg-[var(--app-ink)]/5 focus-visible:outline-2 aria-pressed:bg-[var(--app-ink)]/8">
-                  <span className="relative block h-40 w-full sm:h-48" aria-hidden="true">
+                  className="min-w-0 rounded-2xl text-[var(--app-muted)] outline-offset-1 hover:bg-[var(--app-ink)]/5 focus-visible:outline-2 aria-pressed:bg-[var(--app-ink)]/8 xl:grid xl:grid-rows-[minmax(12rem,1fr)_2rem]">
+                  <span className="relative block h-40 w-full sm:h-48 xl:h-full" aria-hidden="true">
                     <span className="absolute left-1/2 size-2 -translate-x-1/2 translate-y-1/2 rounded-full border-2 bg-[var(--app-panel)]"
                       style={{ borderColor: currentColor, bottom: bucket.current / top * 100 + '%' }}>
                       <strong className="absolute bottom-full left-1/2 -translate-x-1/2 pb-1 text-[11px] text-[var(--app-ink)]">{bucket.current}</strong>
