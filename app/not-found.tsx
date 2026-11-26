@@ -1,8 +1,9 @@
+import { StatusPage } from '@/app/_public-identity/status-page';
+
 export default function NotFound() {
   return (
-    <div>
-      <h2>Not Found</h2>
-      <p>Could not find requested resource</p>
-    </div>
+    <StatusPage title="Página não encontrada">
+      Confira o endereço ou volte ao painel da Gente Digital.
+    </StatusPage>
   );
 }

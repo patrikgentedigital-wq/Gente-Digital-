@@ -1,5 +1,6 @@
 'use client';
 
+import { ProgramMetric } from './program-metric';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownToLine, CalendarDays, CheckCircle2, Loader2, RefreshCw, UserRoundCog, X } from 'lucide-react';
 import { sanitizeCsvField } from '@/lib/utils';
@@ -41,22 +42,6 @@ function downloadCsv(name: string, rows: Array<Array<string | number | null | un
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-}
-
-function MetricCard({ label, value, hint, accent = 'blue' }: { label: string; value: string | number; hint?: string; accent?: 'blue' | 'green' | 'amber' | 'gray' }) {
-  const colors = {
-    blue: 'text-blue-700 dark:text-blue-300',
-    green: 'text-emerald-700 dark:text-emerald-300',
-    amber: 'text-amber-700 dark:text-amber-300',
-    gray: 'text-brand-charcoal dark:text-white',
-  };
-  return (
-    <article className="rounded-2xl border border-brand-border bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-zinc-900 sm:p-5">
-      <p className="text-xs font-extrabold tracking-[0.13em] text-brand-muted dark:text-gray-400">{label}</p>
-      <p className={`mt-2 text-2xl font-black tracking-tight ${colors[accent]}`}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-brand-muted dark:text-gray-500">{hint}</p>}
-    </article>
-  );
 }
 
 function AttributionDialog({
@@ -233,15 +218,15 @@ export function PostSalePanel({ onRequestCollection }: Props) {
       {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/25 dark:text-red-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
 
       {loading && !data ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-zinc-800" /><div className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-zinc-800" /><div className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-zinc-800" /><div className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-zinc-800" /></div> : metrics && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Vendas de origem registradas" value={metrics.registeredOriginSales} hint="no período de coleta" />
-          <MetricCard label="Contatos válidos" value={metrics.validContacts} hint={`${metrics.contactsReceived} recebidos`} accent="blue" />
-          <MetricCard label="Contatos convertidos" value={metrics.convertedContacts} hint={`${conversionRate} dos contatos válidos`} accent="green" />
-          <MetricCard label="Contratos novos confirmados" value={metrics.confirmedContracts} hint="confirmados no IXC" accent="green" />
-          <MetricCard label="Leads em atendimento" value={metrics.leadsInProgress} accent="blue" />
-          <MetricCard label="Duplicados / inválidos" value={`${metrics.duplicateContacts} / ${metrics.invalidContacts}`} hint="atribuições existentes preservadas" accent="amber" />
-          <MetricCard label="Pendentes de revisão" value={metrics.pendingReviews} hint="contrato sem vínculo inequívoco" accent="amber" />
-          <MetricCard label="Tempo até 1º atendimento" value={metrics.averageMinutesToFirstAttendance === null ? 'Não informado' : `${Math.round(metrics.averageMinutesToFirstAttendance)} min`} hint="quando há evento confiável no histórico" accent="gray" />
+        <div className="program-metrics" aria-label="Indicadores de pós-venda">
+          <ProgramMetric label="Vendas de origem registradas" value={metrics.registeredOriginSales} note="no período de coleta" />
+          <ProgramMetric label="Contatos válidos" value={metrics.validContacts} note={`${metrics.contactsReceived} recebidos`} />
+          <ProgramMetric label="Contatos convertidos" value={metrics.convertedContacts} note={`${conversionRate} dos contatos válidos`} />
+          <ProgramMetric label="Contratos novos confirmados" value={metrics.confirmedContracts} note="confirmados no IXC" />
+          <ProgramMetric label="Leads em atendimento" value={metrics.leadsInProgress} />
+          <ProgramMetric label="Duplicados / inválidos" value={`${metrics.duplicateContacts} / ${metrics.invalidContacts}`} note="atribuições existentes preservadas" />
+          <ProgramMetric label="Pendentes de revisão" value={metrics.pendingReviews} note="contrato sem vínculo inequívoco" />
+          <ProgramMetric compact label="Tempo até 1º atendimento" value={metrics.averageMinutesToFirstAttendance === null ? 'Não informado' : `${Math.round(metrics.averageMinutesToFirstAttendance)} min`} note="quando há evento confiável no histórico" />
         </div>
       )}
 

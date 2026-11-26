@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Gestão de Links de Indicação para colaboradores.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#111827',
-    theme_color: '#FFC700',
+    background_color: '#ffffff',
+    theme_color: '#39D3CF',
     icons: [
       {
         src: '/icon-192x192.png',

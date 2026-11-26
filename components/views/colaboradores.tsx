@@ -1,6 +1,7 @@
 'use client';
 
-import { UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
+import { ProgramMetric } from './program-metric';
+import { Target, TrendingUp, UserPlus, Link as LinkIcon, Edit2, HelpCircle, Search, Copy, Trash2, X, Users, QrCode, Upload, MessageCircle, FileText } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase, Colaborador, Lead, isSupabaseConfigured } from '@/lib/supabase';
 import { initialColaboradores, initialLeads } from '@/lib/mock-data';
@@ -529,6 +530,8 @@ export function ColaboradoresView() {
     };
   });
 
+  const referredTotal = colabsWithPeriodMetrics.reduce((total, colab) => total + colab.count, 0);
+  const wonTotal = colabsWithPeriodMetrics.reduce((total, colab) => total + colab.vendasGanhas, 0);
   const filteredColabs = colabsWithPeriodMetrics.filter(c =>
     (c.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (c.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
@@ -540,7 +543,6 @@ export function ColaboradoresView() {
       {/* Header */}
       <div className="workspace-page-heading">
         <div>
-          <p className="workspace-eyebrow">Programa de indicação</p>
           <h2 className="workspace-title mt-1">Colaboradores</h2>
           <p className="workspace-description">Gerencie acessos, links de indicação e atividade por período.</p>
         </div>
@@ -550,7 +552,13 @@ export function ColaboradoresView() {
         </button>
       </div>
 
-      {/* Grid Info Section */}
+      <div className="program-metrics" aria-label="Resumo dos colaboradores">
+        <ProgramMetric icon={Users} label="Colaboradores" value={isLoading ? '—' : colaboradores.length.toLocaleString('pt-BR')} note="No cadastro" />
+        <ProgramMetric icon={LinkIcon} label="Indicações" value={isLoading ? '—' : referredTotal.toLocaleString('pt-BR')} note={getPeriodLabel(dateFilter)} />
+        <ProgramMetric icon={Target} label="Conversões" value={isLoading ? '—' : wonTotal.toLocaleString('pt-BR')} note="Leads ganhos no período" />
+        <ProgramMetric icon={TrendingUp} label="Taxa de conversão" value={!isLoading && referredTotal ? (wonTotal / referredTotal).toLocaleString('pt-BR', { style: 'percent', maximumFractionDigits: 1 }) : '—'} note="Das indicações da equipe" />
+      </div>
+      <details className="program-settings"><summary>Link base e regras de comissão</summary>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="workspace-panel p-5 transition-colors sm:p-6 lg:col-span-2">
           <div className="flex items-center gap-2 mb-4 text-brand-charcoal dark:text-white">
@@ -607,14 +615,14 @@ export function ColaboradoresView() {
           </p>
         </div>
       </div>
-
+      </details>
       {/* Table Section */}
       <div className="workspace-panel overflow-hidden transition-colors">
         <div className="px-6 py-5 border-b border-brand-border dark:border-gray-800 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           <div>
             <h3 className="font-bold text-xl text-brand-charcoal dark:text-white">Colaboradores & Técnicos</h3>
             <p className="text-xs text-brand-muted dark:text-gray-400 mt-0.5">
-              Exibindo contagem de indicações para: <span className="font-semibold text-amber-600 dark:text-amber-400">{getPeriodLabel(dateFilter)}</span>
+              Exibindo contagem de indicações para: <span className="font-semibold text-[var(--app-muted)]">{getPeriodLabel(dateFilter)}</span>
             </p>
           </div>
 
@@ -656,7 +664,7 @@ export function ColaboradoresView() {
                           <img src={colab.photo_url} alt={colab.name} className="w-9 h-9 rounded-full object-cover border border-brand-border" />
                         </>
                       ) : (
-                        <Avatar size={36} name={colab.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
+                        <Avatar size={36} name={colab.name} variant="beam" colors={['#39D3CF', '#FFE708', '#075956', '#167C79', '#DDF7F6']} />
                       )}
                       <div>
                         <p className="font-semibold text-brand-charcoal dark:text-white text-sm">{colab.name}</p>
@@ -785,7 +793,7 @@ export function ColaboradoresView() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={colab.photo_url} alt={colab.name} className="h-10 w-10 shrink-0 rounded-full object-cover border border-[var(--app-border)]" />
                     ) : (
-                      <Avatar size={40} name={colab.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
+                      <Avatar size={40} name={colab.name} variant="beam" colors={['#39D3CF', '#FFE708', '#075956', '#167C79', '#DDF7F6']} />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-semibold text-[var(--app-ink)]">{colab.name}</p>

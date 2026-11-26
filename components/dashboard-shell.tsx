@@ -1,13 +1,15 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
+import { workspaceItems, type WorkspaceItem } from './workspace-navigation';
+import { isAnalyticsTabId } from '@/lib/analytics/navigation';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
-  isTemporarilyHiddenDashboardTab,
   resolveDashboardNavigation,
 } from '@/lib/dashboard-navigation';
 
@@ -57,18 +59,39 @@ const tabNames = {
 
 type TabId = keyof typeof tabNames;
 
-function isTabId(value: string | null): value is TabId {
-  return value !== null && value in tabNames;
+const desktopQuery = '(min-width: 768px)';
+function subscribeToBreakpoint(onChange: () => void) {
+  const media = window.matchMedia(desktopQuery);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
 }
 
 export function DashboardShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const desktop = useSyncExternalStore(subscribeToBreakpoint, () => window.matchMedia(desktopQuery).matches, () => false);
+  const [role, setRole] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const closeMenu = useCallback(() => setIsSidebarOpen(false), []);
   const tabParam = searchParams.get('tab');
   const navigation = resolveDashboardNavigation(tabParam);
   const activeTab: TabId = navigation.activeTab;
   const refParam = searchParams.get('ref');
+  const requestedAnalytics = searchParams.get('indicadores');
+  const analyticId = isAnalyticsTabId(requestedAnalytics) ? requestedAnalytics : 'geral';
+  const activeId = activeTab === 'indicadores' ? 'indicadores-' + analyticId : activeTab;
+  const items = workspaceItems(role === 'admin');
+  const selected = items.find(item => item.id === activeId);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/users/me', { signal: controller.signal })
+      .then(async res => res.ok ? (await res.json()).role : 'vendedor')
+      .then(userRole => { if (!controller.signal.aborted) setRole(userRole ?? 'vendedor'); })
+      .catch(() => { if (!controller.signal.aborted) setRole('vendedor'); });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!navigation.redirectHiddenTab) return;
@@ -83,6 +106,7 @@ export function DashboardShell() {
 
     void supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) router.push('/login');
+      else setEmail(user.email ?? '');
     });
 
     const {
@@ -107,32 +131,30 @@ export function DashboardShell() {
     ].join('; ');
   }, [refParam]);
 
-  const handleTabChange = (tab: string) => {
-    if (!isTabId(tab) || isTemporarilyHiddenDashboardTab(tab)) return;
-
-    setIsSidebarOpen(false);
+  const hrefFor = (item: WorkspaceItem) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tab);
+    params.set('tab', item.tab);
+    if (item.analytics) params.set('indicadores', item.analytics);
+    else params.delete('indicadores');
     params.delete('leadId');
-    router.push(`?${params.toString()}`);
+    return `/?${params.toString()}`;
   };
 
   return (
-    <div className="flex min-h-screen bg-[var(--app-canvas)] text-[var(--app-ink)] transition-colors">
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-[6.5rem] lg:ml-[17.5rem]">
-        <Header activeTabName={tabNames[activeTab]} showLogo={activeTab === 'indicadores'} onMenuClick={() => setIsSidebarOpen(true)} />
+    <div className={`gd-workspace ${compact ? 'rail-collapsed' : ''}`}>
+      <Sidebar activeId={activeId} items={items} hrefFor={hrefFor} email={email} role={role} isOpen={isSidebarOpen} onClose={closeMenu} />
+      <div className="workspace-main">
+        <Header activeName={selected?.label ?? tabNames[activeTab]} section={activeTab === 'indicadores' ? 'Indicadores' : 'Programa'} items={items} hrefFor={hrefFor}
+          expanded={desktop ? !compact : isSidebarOpen} onMenuClick={() => {if(desktop)setCompact(value => !value);else setIsSidebarOpen(value => !value);}} />
 
         <main className="relative flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8 xl:px-10">
           {/* Troca de aba imediata: a espera da animação de saída deixava o painel lento. */}
           <div key={activeTab} className="h-full w-full">
-            <ActiveView tab={activeTab} />
+            <ActiveView tab={activeTab} navigation={activeTab === 'dashboard' && role === 'admin' ? <nav className="dashboard-quick-tabs" aria-label="Visões de desempenho">
+              {items.filter(item => item.tab === 'dashboard' || item.analytics).map(item => <Link key={item.id} href={hrefFor(item)} aria-current={item.tab === 'dashboard' ? 'page' : undefined}>
+                <item.icon size={15}/>{item.tab === 'dashboard' ? 'Visão geral' : item.label}
+              </Link>)}
+            </nav> : undefined} />
           </div>
         </main>
       </div>
@@ -140,10 +162,10 @@ export function DashboardShell() {
   );
 }
 
-function ActiveView({ tab }: { tab: TabId }) {
+function ActiveView({ tab, navigation }: { tab: TabId; navigation?: ReactNode }) {
   switch (tab) {
     case 'dashboard':
-      return <DashboardView />;
+      return <DashboardView navigation={navigation} />;
     case 'leads':
       return <LeadsView />;
     case 'viabilidade':

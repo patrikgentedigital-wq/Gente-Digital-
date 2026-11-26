@@ -1,174 +1,80 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ChartNoAxesColumn, LayoutDashboard, Users, UsersRound, MapPin, LogOut, X, Wallet, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useRef } from 'react';
+import { ExternalLink, LogOut, UserRound, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Avatar from 'boring-avatars';
-import { motion } from 'motion/react';
-import { SIDEBAR_NAV_ITEMS, type SidebarTabId } from '@/lib/dashboard-navigation';
 import { BrandMark } from '@/components/brand-mark';
+import type { WorkspaceItem } from './workspace-navigation';
 
 interface SidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  items: WorkspaceItem[];
+  activeId: string;
+  hrefFor: (item: WorkspaceItem) => string;
+  email: string;
+  role: string | null;
   isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
+  onClose: () => void;
 }
 
-const NAV_ICONS: Record<SidebarTabId, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  leads: Users,
-  viabilidade: MapPin,
-  colaboradores: UsersRound,
-  comissoes: Wallet,
-  indicadores: ChartNoAxesColumn,
-};
-
-export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ items, activeId, hrefFor, email, role, isOpen, onClose }: SidebarProps) {
+  const sidebar = useRef<HTMLElement>(null);
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [userRole, setUserRole] = useState<'admin' | 'vendedor' | null>(null);
-
   useEffect(() => {
-    async function loadUserInfo() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) {
-          setUserEmail(user.email);
-        }
-        // Busca role real do Supabase user_roles
-        const res = await fetch('/api/users/me');
-        if (res.ok) {
-          const data = await res.json();
-          setUserRole(data.role ?? 'vendedor');
-        } else {
-          setUserRole('vendedor');
-        }
-      } catch (e) {
-        setUserRole('vendedor');
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    sidebar.current?.querySelector<HTMLButtonElement>('.rail-close')?.focus();
+    const keys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Tab') return;
+      const links = Array.from(sidebar.current?.querySelectorAll<HTMLElement>('button,a[href]') ?? []).filter(el => el.offsetWidth > 0);
+      const end = event.shiftKey ? links[0] : links.at(-1);
+      if (end && document.activeElement === end) {
+        event.preventDefault();
+        (event.shiftKey ? links.at(-1) : links[0])?.focus();
       }
-    }
-    loadUserInfo();
-  }, []);
+    };
+    const wide = window.matchMedia('(min-width: 768px)');
+    const closeOnDesktop = () => { if (wide.matches) onClose(); };
+    wide.addEventListener('change', closeOnDesktop);
+    document.addEventListener('keydown', keys);
+    return () => {
+      document.removeEventListener('keydown', keys);
+      wide.removeEventListener('change', closeOnDesktop);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [isOpen, onClose]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
-
-  return (
-    <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 md:hidden transition-opacity" 
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      {/* Em tablet (md) o menu vira uma faixa só de ícones; a partir de lg mostra os nomes. */}
-      <aside className={`fixed left-3 top-3 z-50 flex h-[calc(100vh-1.5rem)] w-64 flex-col rounded-[28px] bg-[var(--app-sidebar)] py-5 text-[#0e1b2c] shadow-xl transition-transform duration-300 md:w-[5.5rem] lg:w-64 ${isOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
-        {/* Mobile close button */}
-        <button
-          type="button"
-          aria-label="Fechar menu de navegação"
-          className="md:hidden absolute top-5 right-5 text-[#0e1b2c]/70 hover:text-[#0e1b2c] transition-colors"
-          onClick={() => setIsOpen(false)}
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="mb-8 mt-1 px-5 md:hidden lg:block">
-          <BrandMark showTagline tone="onYellow" showLogo={activeTab === 'indicadores'} />
-        </div>
-        <div className="mb-8 mt-1 hidden justify-center md:flex lg:hidden" aria-label="Gente Digital">
-          {activeTab === 'indicadores' ? <BrandMark compact showLogo tone="onYellow" />
-            : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0e1b2c] font-display text-lg font-extrabold text-[#ffe300]">GD</span>}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1.5 px-3 overflow-y-auto relative">
-          {SIDEBAR_NAV_ITEMS.filter(({ id }) => id !== 'indicadores' || userRole === 'admin').map(({ id, label }) => (
-            <NavItem
-              key={id}
-              id={id}
-              icon={NAV_ICONS[id]}
-              label={label}
-              active={activeTab === id}
-              onClick={() => setActiveTab(id)}
-            />
-          ))}
-        </nav>
-
-        {/* User Profile Card */}
-        <div className="mt-auto flex flex-col gap-2 px-3 pt-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2.5 md:justify-center lg:justify-start" title={userEmail || undefined}>
-            <Avatar size={32} name={userEmail || 'Gente Digital'} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
-            <div className="flex flex-col min-w-0 flex-1 md:hidden lg:flex">
-              <span className="text-sm font-semibold text-[#0e1b2c] truncate" title={userEmail || 'Usuário Autenticado'}>
-                {userEmail ? userEmail.split('@')[0] : 'Administrador'}
-              </span>
-              <div className="flex items-center gap-1 mt-0.5">
-                {userRole === 'admin' ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 bg-[#0e1b2c] text-[#ffe300] rounded-full">
-                    <ShieldCheck className="w-3 h-3" /> Admin
-                  </span>
-                ) : userRole === 'vendedor' ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 border border-[#0e1b2c] text-[#0e1b2c] rounded-full">
-                    <UserIcon className="w-3 h-3" /> Vendedor
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 border border-[#0e1b2c]/40 text-[#0e1b2c]/60 rounded-full">
-                    <UserIcon className="w-3 h-3" /> ...
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <motion.button
-            whileHover={{ x: 2 }}
-            onClick={handleLogout}
-            type="button"
-            aria-label="Sair do sistema"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full transition-colors text-[#0e1b2c]/80 hover:text-[#0e1b2c] hover:bg-[#0e1b2c]/10 text-sm font-semibold md:justify-center lg:justify-start"
-            title="Sair do sistema"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="md:sr-only lg:not-sr-only">Sair do sistema</span>
-          </motion.button>
-        </div>
-
-      </aside>
-    </>
-  );
-}
-
-interface NavItemProps {
-  id: string;
-  icon: LucideIcon;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
-  return (
-    <button
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      title={label}
-      className={`w-full flex items-center gap-3 py-3 px-4 rounded-full transition-colors duration-150 group relative text-sm md:justify-center md:px-0 lg:justify-start lg:px-4 ${
-        active
-          ? 'bg-[#0e1b2c] font-bold text-[#ffe300] shadow-md'
-          : 'font-semibold text-[#0e1b2c] hover:bg-white/50'
-      }`}
-    >
-      <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#ffe300]' : 'text-[#0e1b2c]'}`} />
-      <span className="truncate md:sr-only lg:not-sr-only">{label}</span>
-    </button>
-  );
+  async function logout() {
+    const { error } = await supabase.auth.signOut();
+    if (!error) { router.push('/login'); router.refresh(); }
+  }
+  return <>
+    {isOpen && <button type="button" className="rail-backdrop" tabIndex={-1} aria-label="Fechar navegação" onClick={onClose} />}
+    <aside ref={sidebar} id="workspace-navigation" className={`workspace-rail ${isOpen ? 'is-open' : ''}`} aria-label="Navegação do sistema">
+      <div className="rail-brand"><Link href="/?tab=dashboard" onClick={onClose} aria-label="Gente Digital, página inicial"><BrandMark /></Link>
+        <button className="rail-close" type="button" aria-label="Fechar menu" onClick={onClose}><X size={18}/></button>
+      </div>
+      <nav className="rail-nav" aria-label="Menu principal">
+        {(['Programa','Indicadores'] as const).map(section => {
+          const group = items.filter(item => item.section === section);
+          if (!group.length) return null;
+          return <div key={section} className="rail-group"><p className="rail-label">{section}</p>
+            {group.map(item => <Link key={item.id} href={hrefFor(item)} prefetch={false} onClick={onClose}
+              className="rail-item" title={item.label} aria-current={activeId === item.id ? 'page' : undefined}>
+              <item.icon size={18} aria-hidden="true"/><span>{item.label}</span>
+            </Link>)}
+          </div>;
+        })}
+      </nav>
+      <div className="rail-bottom">
+        <Link href="/indicar" className="rail-item" title="Página de indicação" onClick={onClose}><ExternalLink size={16}/><span>Página de indicação</span></Link>
+        <button type="button" className="rail-item" onClick={logout} title="Sair do sistema" aria-label="Sair do sistema"><LogOut size={16}/><span>Sair do sistema</span></button>
+        <div className="rail-account" title={email || 'Minha conta'}><i><UserRound size={16}/></i><div>
+          <strong>{email ? email.split('@')[0] : 'Minha conta'}</strong>{role && <small>{role === 'admin' ? 'Administrador' : 'Vendedor'}</small>}
+        </div></div>
+      </div>
+    </aside>
+  </>;
 }

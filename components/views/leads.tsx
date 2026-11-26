@@ -800,8 +800,7 @@ export function LeadsView() {
     <div className="workspace-page leads-page relative flex w-full max-w-full flex-col gap-5 pb-20 animate-in fade-in duration-300">
       <div className="workspace-page-heading shrink-0">
         <div>
-          <p className="workspace-eyebrow">Marketing de indicações</p>
-          <h2 className="workspace-title mt-1">{activeSection === 'post-sale' ? 'Indicadores de pós-venda' : 'Acompanhamento de leads'}</h2>
+          <h2 className="workspace-title mt-1">{activeSection === 'post-sale' ? 'Indicadores de pós-venda' : 'Leads & Funil'}</h2>
           <p className="workspace-description">{activeSection === 'post-sale' ? 'Registre as indicações coletadas e acompanhe as conversões por responsável.' : 'Organize o funil, acompanhe contatos e avance oportunidades.'}</p>
         </div>
         {activeSection === 'leads' && <button type="button" onClick={openCreateModal} className="gd-button gd-button--primary shrink-0">
@@ -811,8 +810,7 @@ export function LeadsView() {
       </div>
 
       <div className="workspace-toolbar shrink-0 flex-wrap">
-        {/* Seção (Leads / Pós-venda) é a escolha principal: pílula marinho preenchida, distinta da troca Kanban/Lista. */}
-        <div className="flex shrink-0 gap-1 rounded-full bg-[var(--app-panel)] p-1 shadow-sm">
+        <div className="program-section-tabs flex shrink-0 gap-1 rounded-full p-1">
           {([['leads', 'Leads'], ['post-sale', 'Pós-venda']] as const).map(([section, label]) => (
             <button
               key={section}
@@ -1093,7 +1091,7 @@ export function LeadsView() {
             ) : pageLeads.map(lead => (
               <article key={lead.id} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <Avatar size={36} name={lead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
+                  <Avatar size={36} name={lead.name} variant="beam" colors={['#39D3CF', '#075956', '#FFE708', '#167C79', '#DDF7F6']} />
                   <div className="min-w-0 flex-1">
                     <button
                       type="button"
@@ -1182,7 +1180,7 @@ export function LeadsView() {
                    >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <Avatar size={32} name={lead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
+                        <Avatar size={32} name={lead.name} variant="beam" colors={['#39D3CF', '#075956', '#FFE708', '#167C79', '#DDF7F6']} />
                         <span className="font-semibold text-brand-charcoal dark:text-white">{lead.name}</span>
                       </div>
                     </td>
@@ -1243,7 +1241,7 @@ export function LeadsView() {
                 key={status} 
                 onDrop={(e) => handleDrop(e, status)}
                 onDragOver={handleDragOver}
-                className="flex-shrink-0 w-[280px] lg:w-[310px] snap-start flex flex-col bg-[var(--app-panel-muted)] dark:bg-zinc-900 border border-[var(--app-border)] dark:border-gray-800 rounded-[22px] p-4 max-h-[calc(100vh-220px)] min-h-[480px] shadow-sm"
+                className="program-lane flex-shrink-0 w-[280px] lg:w-[310px] snap-start flex flex-col bg-[var(--app-panel-muted)] dark:bg-zinc-900 border border-[var(--app-border)] dark:border-gray-800 rounded-[22px] p-4 max-h-[calc(100vh-220px)] min-h-[480px] shadow-sm"
               >
                 <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                   <div className="flex items-center gap-2">
@@ -1335,7 +1333,7 @@ export function LeadsView() {
 
                           <div className="flex items-center justify-between gap-2 border-t border-[var(--app-border)] pt-2.5 text-sm">
                             <span className="flex min-w-[40%] items-center gap-1.5 font-bold text-[var(--app-ink)]" title="Responsável">
-                              <Avatar size={20} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} className="shrink-0" />
+                              <Avatar size={20} name={lead.responsible || lead.ref || 'Admin'} variant="beam" colors={['#39D3CF', '#075956', '#FFE708', '#167C79', '#DDF7F6']} className="shrink-0" />
                               <span className="truncate">{lead.responsible || lead.ref || 'Admin'}</span>
                             </span>
                             {lead.ref && lead.ref !== lead.responsible && (
@@ -1538,7 +1536,7 @@ export function LeadsView() {
             {/* Sidebar Header */}
             <div className="flex items-start justify-between p-6 border-b border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-zinc-800/50">
               <div className="flex items-center gap-4">
-                <Avatar size={48} name={currentLead.name} variant="beam" colors={['#FFE300', '#0E1B2C', '#1F6FD6', '#1FA855', '#F28A1E']} />
+                <Avatar size={48} name={currentLead.name} variant="beam" colors={['#39D3CF', '#075956', '#FFE708', '#167C79', '#DDF7F6']} />
                 <div>
                   <h3 className="font-display text-2xl font-bold text-brand-charcoal dark:text-white">{currentLead.name}</h3>
                   <a href={`?tab=viabilidade&leadId=${currentLead.id}`} className="mt-3 inline-flex text-sm font-semibold text-[#0b4fa8] underline dark:text-[#a9cdf7]">Consultar viabilidade de instalação</a>
@@ -1546,7 +1544,7 @@ export function LeadsView() {
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(currentLead.status)}`}>{currentLead.status}</span>
                     <span className="text-xs font-medium text-brand-muted dark:text-gray-300 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full"><Phone className="w-3.5 h-3.5"/> {currentLead.phone}</span>
                     <span className="text-xs font-semibold text-brand-charcoal dark:text-white flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-brand-border dark:border-gray-700 px-3 py-1 rounded-full">
-                      <Avatar size={14} name={currentLead.responsible || currentLead.ref || 'Admin'} variant="beam" colors={['#FFE300', '#1F6FD6', '#1FA855', '#F28A1E', '#7A3FC4']} />
+                      <Avatar size={14} name={currentLead.responsible || currentLead.ref || 'Admin'} variant="beam" colors={['#39D3CF', '#075956', '#FFE708', '#167C79', '#DDF7F6']} />
                       {currentLead.responsible || currentLead.ref || 'Admin'}
                     </span>
                     <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full">

@@ -1,5 +1,6 @@
 'use client';
 
+import { ProgramMetric } from './program-metric';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, CheckCircle2, Clock, Search, Download, Wallet, Check, Sparkles, Award, Tag, UserCheck, Users, Loader2, Calendar } from 'lucide-react';
 import { supabase, isSupabaseConfigured, Lead, Colaborador } from '@/lib/supabase';
@@ -434,8 +435,7 @@ export function ComissoesView() {
       {/* Header */}
       <div className="workspace-page-heading">
         <div>
-          <p className="workspace-eyebrow">Fechamento do programa</p>
-          <h2 className="workspace-title mt-1">Comissões & recompensas</h2>
+          <h2 className="workspace-title mt-1">Comissões &amp; PIX</h2>
           <p className="workspace-description">Acompanhe os valores devidos, baixados e as regras de pagamento.</p>
         </div>
 
@@ -457,8 +457,20 @@ export function ComissoesView() {
           </div>
         )}
 
+      <div className="program-metrics" aria-label="Resumo de comissões">
+        <ProgramMetric icon={Clock} label="Total pendente" value={isLoading || loadError ? '—' : totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} compact note="Aguardando baixa ou desconto" />
+        <ProgramMetric icon={CheckCircle2} label="Total baixado" value={isLoading || loadError ? '—' : totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} compact note="PIX e descontos aplicados" />
+        <ProgramMetric icon={Wallet} label="Contratos instalados" value={isLoading || loadError ? '—' : totalConversoes.toLocaleString('pt-BR')} note="Leads com status Ganho" />
+        <ProgramMetric icon={Award} label="Top colaborador do mês" compact value={isLoading || loadError ? '—' : topColaborador?.name ?? 'Sem líder'}
+          note={topColaborador
+            ? topColaborador.count >= PROGRAM_RULES.bonusTop.minimoIndicacoes
+              ? topColaborador.count + ' instalações · bônus de R$ ' + PROGRAM_RULES.bonusTop.valor + ' liberado'
+              : topColaborador.count + '/' + PROGRAM_RULES.bonusTop.minimoIndicacoes + ' instalações para o bônus de R$ ' + PROGRAM_RULES.bonusTop.valor
+            : 'Mínimo de ' + PROGRAM_RULES.bonusTop.minimoIndicacoes + ' vendas para o bônus'} />
+      </div>
+
         {/* Regras Comerciais Banner */}
-      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-[var(--app-border)] border-l-4 border-l-[var(--app-accent)] bg-[var(--app-panel)] p-5 shadow-level-1 md:grid-cols-2 xl:grid-cols-4">
+      <div className="program-rules-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-panel-muted)] text-[var(--app-muted)]">
             <UserCheck className="w-5 h-5" />
@@ -517,67 +529,6 @@ export function ComissoesView() {
           {RULES_COPY.prazoPagamento} O desconto do cliente indicador é aplicado na primeira fatura após a instalação.
           O bônus de top indicador é calculado sobre as vendas do mês atual.
         </p>
-      </div>
-
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="workspace-metric">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
-              <Clock className="w-5 h-5" />
-            </div>
-             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Total pendente</span>
-          </div>
-          <p className="font-display text-3xl font-extrabold text-[var(--app-ink)]">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPendente)}
-          </p>
-          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Aguardando baixa / desconto</p>
-        </div>
-
-        <div className="workspace-metric">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Total baixado</span>
-          </div>
-          <p className="font-display text-3xl font-extrabold text-[var(--app-ink)]">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPago)}
-          </p>
-          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">PIX e descontos aplicados</p>
-        </div>
-
-        <div className="workspace-metric">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="rounded-xl bg-[var(--app-panel-muted)] p-2.5 text-[var(--app-muted)]">
-              <Wallet className="w-5 h-5" />
-            </div>
-             <span className="text-sm font-semibold text-brand-muted dark:text-gray-400">Contratos instalados</span>
-          </div>
-          <p className="font-display text-3xl font-extrabold text-brand-charcoal dark:text-white">
-            {totalConversoes}
-          </p>
-          <p className="text-xs text-brand-muted dark:text-gray-400 mt-1">Leads no status &quot;Ganho&quot;</p>
-        </div>
-
-        <div className="workspace-metric workspace-metric--highlight flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--app-muted)]">Top colaborador do mês</span>
-            <Award className="h-5 w-5 text-[#9b8200]" />
-          </div>
-          <div className="mt-2">
-            <p className="font-display text-lg font-bold text-slate-900 dark:text-white truncate">
-              {topColaborador ? topColaborador.name : 'Nenhum líder'}
-            </p>
-            <p className="mt-0.5 text-xs font-semibold text-[var(--app-muted)]">
-              {topColaborador ? (
-                topColaborador.count >= PROGRAM_RULES.bonusTop.minimoIndicacoes
-                  ? `${topColaborador.count} instalações (Bônus R$ ${PROGRAM_RULES.bonusTop.valor} Liberado! 🎉)`
-                  : `${topColaborador.count}/${PROGRAM_RULES.bonusTop.minimoIndicacoes} instalações (Faltam ${PROGRAM_RULES.bonusTop.minimoIndicacoes - topColaborador.count} p/ bônus R$ ${PROGRAM_RULES.bonusTop.valor})`
-              ) : `Mínimo de ${PROGRAM_RULES.bonusTop.minimoIndicacoes} indicações p/ bônus`}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Filter and Table Container */}
@@ -710,7 +661,7 @@ export function ComissoesView() {
                           🏆
                         </div>
                       ) : (
-                        <Avatar size={30} name={comm.lead_name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB']} />
+                        <Avatar size={30} name={comm.lead_name} variant="beam" colors={['#39D3CF', '#FFE708', '#075956', '#DDF7F6']} />
                       )}
                       <div>
                         <p className={`font-semibold ${comm.isBonus ? 'text-amber-600 dark:text-amber-400 font-extrabold' : 'text-brand-charcoal dark:text-white'}`}>

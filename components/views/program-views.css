@@ -1,0 +1,89 @@
+/* Shared presentation for the referral and operations views. */
+.program-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding-block: 5px 25px;
+  border-bottom: 1px solid var(--app-border);
+}
+.program-metric { min-width: 0; padding: 4px clamp(12px, 1.8vw, 29px); border-inline-start: 1px solid var(--app-border) }
+.program-metric:nth-child(4n + 1) { border-inline-start: 0; padding-inline-start: 0 }
+.program-metric h3 { display: flex; align-items: center; gap: 8px; color: var(--app-muted); font-size: 14px; line-height: 1.4; font-weight: 400; margin: 0 }
+.program-metric h3 svg { flex: none; color: var(--gd-teal-mid) }
+.program-value { margin: 9px 0; font-size: clamp(32px, 3.15vw, 48px); font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1.12; color: var(--app-ink); overflow-wrap: anywhere }
+.program-value--compact { font-size: clamp(20px, 2.2vw, 33px) }
+.program-note,.referral-ranking small { color: var(--app-muted); font-size: 12px; line-height: 1.45 }
+.referral-overview { display: grid; grid-template-columns: minmax(0,1.23fr) minmax(0,1fr); gap: 34px clamp(28px,3.5vw,56px) }
+.referral-overview section { min-width: 0 }
+.referral-overview h3 { color: var(--app-ink); font-size: clamp(19px,1.7vw,25px); font-weight: 500; line-height: 1.28 }
+.referral-overview h3 + p { margin-top: 6px }
+.referral-chart-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 14px }
+.referral-chart-toolbar p { color: var(--app-muted); font-size: 13px }
+.referral-chart-toolbar strong { color: var(--app-ink); font-size: clamp(29px,2.65vw,40px); font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums }
+.program-switch { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border-radius: 8px; background: var(--app-panel-muted) }
+.program-switch button { min-height: 30px; padding: 4px 9px; border: 1px solid transparent; border-radius: 6px; color: var(--app-muted); font-size: 12px; cursor: pointer }
+.program-switch button[aria-pressed="true"] { border-color: var(--app-border); background: var(--app-panel); color: var(--app-ink) }
+.referral-plot { display: grid; grid-template-columns: max-content repeat(6,minmax(0,1fr)); column-gap: clamp(3px,.7vw,12px); min-width: 0 }
+.referral-axis { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; font-size: 11px; color: var(--app-muted); margin-bottom: 24px }
+.referral-column { display: grid; grid-template-rows: clamp(170px,15vw,235px) auto; gap: 6px; min-width: 0; color: var(--app-muted); font-size: 11px; cursor: pointer }
+.referral-track { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 10px 10px 3px 3px; background: var(--app-panel-muted) }
+.referral-fill { position: relative; display: flex; justify-content: center; align-items: flex-start; width: 100%; border-radius: inherit; background: repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--gd-teal-mid) 42%,transparent) 5px 6px) }
+.referral-fill b { margin-top: 4px; padding: 2px 3px; background: var(--app-panel); color: var(--app-ink); border-radius: 4px; font-size: clamp(9px,1.1vw,12px); font-weight: 500; white-space: nowrap; line-height: 1.2 }
+.referral-fill[data-low] b { position: absolute; bottom: calc(100% + 2px); margin: 0 }
+.referral-column[aria-pressed="true"] .referral-fill { background: linear-gradient(var(--gd-turquoise),#b2ebe8) }
+.referral-column[aria-pressed="true"] .referral-fill b { color: white; background: #075956 }
+.referral-column[aria-pressed="true"] > span:last-child { color: var(--app-ink); font-weight: 500 }
+.referral-column:focus-visible,.program-switch button:focus-visible { outline: 2px solid var(--gd-teal-mid); outline-offset: 2px }
+.referral-ranking-switch { margin-block: 17px 6px }
+.referral-ranking { list-style: none; padding: 0; margin: 0 }
+.referral-ranking li { display: grid; grid-template-columns: auto auto minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--app-border) }
+.referral-ranking li p { font-size: 14px; font-weight: 500; overflow-wrap: anywhere }
+.referral-ranking b { font-size: 17px; font-weight: 500 }
+.referral-ranking small { font-size: 11px; font-weight: 400 }
+.referral-initial { display: grid; place-items: center; height: 32px; width: 32px; border-radius: 50%; font-size: 11px; font-weight: 500; color: #075956; background: #ddf7f6 }
+.referral-ranking li:nth-child(2) .referral-initial { color:#514900; background:#fff4a8 }
+.referral-ranking li:nth-child(3) .referral-initial { color:#254c49; background:#e4eeec }
+.referral-key { margin-top: 14px }
+.referral-stack { display: flex; width: 100%; height: 13px; gap: 3px; overflow: hidden; margin: 20px 0 15px; border-radius: 8px }
+.referral-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 16px; margin-top: 15px }
+.referral-breakdown li { display: flex; align-items: center; gap: 6px; font-size: 12px }
+.referral-breakdown i { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50% }
+.referral-breakdown b { margin-inline-start: auto; font-weight: 500 }
+.workspace-page .referral-comparison { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 13px }
+.workspace-page .referral-comparison :is(td,th) { padding: 10px 0 10px 4px; text-align: end; font-weight: 400; border-bottom: 1px solid var(--app-border) }
+.workspace-page .referral-comparison th:first-child { padding-left: 0; text-align: start }
+.program-settings { padding-bottom: 12px; border-bottom: 1px solid var(--app-border) }
+.program-settings > summary { width: fit-content; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--app-ink) }
+.program-settings[open] > summary { margin-bottom: 15px }
+.program-rules-grid { border-bottom: 1px solid var(--app-border); padding-bottom: 20px }
+.workspace-page:is(.collaborators-page,.commissions-page,.leads-page) .workspace-panel,
+.viability-page :is(.viability-form,.viability-section) { border: 0; border-radius: 0; box-shadow: none; background: var(--app-panel) }
+.workspace-page:is(.collaborators-page,.commissions-page,.leads-page) .workspace-panel > :first-child { padding-inline: 0 }
+.workspace-page:is(.collaborators-page,.commissions-page,.leads-page) .workspace-note { background: var(--app-panel-muted); border: 0; border-inline-start: 2px solid var(--gd-teal-mid); border-radius: 0; box-shadow: none }
+.leads-page .workspace-toolbar { padding-inline: 0; background: transparent; border: 0; border-radius: 0 }
+.leads-page .leads-mobile-list { padding-inline: 0 }
+.leads-page .program-section-tabs { background: var(--app-panel-muted); box-shadow: none }
+.leads-page .program-section-tabs button[aria-pressed="true"] { background: var(--gd-yellow); color: #172623 }
+.leads-page .program-lane { box-shadow: none; border-radius: 10px; background: var(--app-panel-muted) }
+.viability-page .viability-form { padding: 0 }
+.viability-page .viability-section { border-top: 1px solid var(--app-border); padding-inline: 0 }
+.viability-page .source-availability { border: 0; border-inline-start: 2px solid var(--gd-teal-mid); background: var(--app-panel-muted); color: var(--app-ink); border-radius: 0 }
+@media (min-width: 901px) {
+  .referral-overview section:nth-child(even) { position: relative }
+  .referral-overview section:nth-child(even)::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(clamp(28px,3.5vw,56px) * -.5); border-left: 1px solid var(--app-border) }
+  .referral-overview section:nth-child(n + 3) { padding-top: 22px; border-top: 1px solid var(--app-border) }
+}
+@media (max-width: 900px) {
+  .referral-overview { grid-template-columns: 1fr; row-gap: 23px }
+  .referral-overview section + section { padding-top: 22px; border-top: 1px solid var(--app-border) }
+}
+@media (max-width: 760px) {
+  .program-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); row-gap: 18px; padding-block: 0 20px }
+  .program-metric { padding: 3px 10px }
+  .program-metric:nth-child(odd) { border-inline-start: 0; padding-inline-start: 0 }
+  .program-metric h3 { gap: 5px; font-size: 12px }
+  .program-metric h3 svg { width: 14px; height: 14px }
+  .program-note { font-size: 11.5px }
+  .program-value { font-size: 32px }
+  .program-value--compact { font-size: clamp(17px,5vw,25px) }
+}

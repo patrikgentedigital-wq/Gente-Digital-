@@ -1,0 +1,69 @@
+/* Navegação comum do painel comercial. A superfície turquesa usa a arte RGB oficial. */
+.brand-mark { display:block; width:104px; max-width:100%; height:auto }
+.brand-mark--compact { width:66px }
+.gd-workspace { --rail-size:218px; min-height:100dvh; color:var(--app-ink); background:var(--app-canvas) }
+.gd-workspace.rail-collapsed { --rail-size:72px }
+.workspace-main { min-width:0; margin-inline-start:var(--rail-size) }
+.workspace-rail { position:fixed; inset:0 auto 0 0; z-index:50; width:var(--rail-size); display:flex; flex-direction:column; height:100dvh; padding:0 14px 15px; overflow-y:auto; color:#122f2d; background:var(--gd-turquoise); border-inline-end:1px solid #28bcb8 }
+.rail-brand { display:flex; align-items:center; justify-content:space-between; flex:none; height:85px; padding:0 10px; margin-bottom:24px }
+.rail-brand a,.topbar-brand { display:flex; align-items:center; min-height:44px }
+.rail-nav,.rail-group { display:flex; flex-direction:column }
+.rail-group { gap:4px }
+.rail-group+.rail-group { margin-top:23px }
+.rail-label { margin:0 11px 6px; font-size:10px; font-weight:650; letter-spacing:.12em; text-transform:uppercase; color:#193f3e }
+.rail-item { display:flex; align-items:center; gap:11px; min-height:40px; padding:9px 11px; width:100%; color:#193937; text-align:start; border-radius:20px; font-size:13px; font-weight:450; line-height:1.3 }
+.rail-item svg { flex:none; color:#254c49 }
+.rail-item:hover { background:#ffffff58 }
+.rail-item[aria-current=page] { background:var(--gd-yellow); color:#111918; font-weight:550 }
+.rail-item[aria-current=page] svg { color:inherit }
+.rail-bottom { margin-top:auto; padding-top:24px }
+.rail-bottom .rail-item { font-size:12px; min-height:36px }
+.rail-account { display:flex; align-items:center; gap:9px; margin-top:10px; padding:16px 6px 0; border-top:1px solid #21aaa7; font-size:12px }
+.rail-account>i { border-radius:50%; display:grid; place-items:center; width:31px; height:31px; flex:none; background:#8ce9e5 }
+.rail-account>div { min-width:0 }
+.rail-account strong,.rail-account small { display:block; overflow:hidden; text-overflow:ellipsis }
+.rail-account strong { font-weight:550 }
+.rail-account small { font-size:11px }
+.rail-close,.rail-backdrop,.topbar-brand { display:none }
+.workspace-topbar { position:sticky; top:0; z-index:35; display:flex; align-items:center; justify-content:space-between; gap:12px; height:63px; padding:0 clamp(16px,2.5vw,42px); border-bottom:1px solid var(--app-border); background:var(--app-panel); color:var(--app-ink) }
+.topbar-tools,.topbar-location,.topbar-breadcrumb { display:flex; align-items:center; gap:12px }
+.topbar-breadcrumb { font-size:13px; color:var(--app-muted); gap:8px }
+.topbar-breadcrumb strong { font-weight:500; color:var(--app-ink) }
+.topbar-icon,.rail-close { display:inline-grid; place-items:center; border:0; border-radius:8px; background:transparent; width:36px; height:36px; color:inherit }
+.rail-close { display:none }
+.topbar-icon:hover { background:var(--app-panel-muted) }
+.topbar-search,.search-field { display:flex; align-items:center; gap:9px; border-radius:8px; border:1px solid var(--app-border); color:var(--app-muted); background:var(--app-panel-muted) }
+.topbar-search { padding:7px 10px; font-size:12px; min-width:190px }
+.topbar-search kbd { margin-left:auto; padding:1px 4px; border:1px solid var(--app-border); border-radius:4px; font:inherit; font-size:10px; background:var(--app-panel) }
+.workspace-search-dialog { position:fixed; inset:0; margin:auto; width:min(440px,calc(100% - 28px)); max-height:min(78dvh,600px); padding:0; overflow:auto; border:1px solid var(--app-border); border-radius:14px; background:var(--app-panel); color:var(--app-ink); box-shadow:0 18px 70px #14272538 }
+.workspace-search-dialog::backdrop { background:#12252470 }
+.search-heading { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--app-border) }
+.search-heading h2 { font-size:19px; font-weight:500 }
+.search-field { padding:0 10px; margin:14px 14px 4px }
+.search-field input { min-width:0; width:100%; height:40px; background:transparent; color:var(--app-ink) }
+.search-results { display:grid; padding:7px 14px 14px }
+.search-results a { display:flex; align-items:center; gap:10px; padding:10px; border-radius:6px; font-size:14px }
+.search-results a:hover { background:var(--app-panel-muted) }
+.search-results p { color:var(--app-muted); padding:10px }
+.dashboard-quick-tabs { display:flex; flex-wrap:wrap; gap:1.15rem; border-bottom:1px solid var(--app-border) }
+.dashboard-quick-tabs a { display:inline-flex; align-items:center; gap:7px; padding:9px 0; border-bottom:2px solid transparent; font-size:13px; color:var(--app-muted) }
+.dashboard-quick-tabs a[aria-current=page] { color:var(--gd-teal-ink); border-color:var(--gd-teal-mid); font-weight:500 }
+@media(min-width:768px){
+  .rail-collapsed .workspace-rail {padding-inline:8px}
+  .rail-collapsed .rail-item,.rail-collapsed .rail-account,.rail-collapsed .rail-brand {justify-content:center;padding-inline:0}
+  .rail-collapsed .rail-item span,.rail-collapsed .rail-label,.rail-collapsed .rail-account>div {display:none}
+  .rail-collapsed .rail-brand img {width:46px}
+}
+@media(min-width:768px) and (max-width:1080px){.gd-workspace:not(.rail-collapsed){--rail-size:177px}.workspace-rail{padding-inline:8px}}
+@media(max-width:767px){
+  .gd-workspace,.gd-workspace.rail-collapsed {--rail-size:0px}
+  .workspace-rail {width:min(288px,86vw); visibility:hidden; transform:translateX(-101%)}
+  .workspace-rail.is-open {visibility:visible;transform:none}
+  .rail-backdrop {display:block;position:fixed;inset:0;z-index:45;background:#10272455}
+  .rail-close,.topbar-brand {display:inline-grid}
+  .topbar-breadcrumb,.topbar-search span,.topbar-search kbd {display:none}
+  .workspace-topbar {height:54px;padding:0 12px;background:var(--gd-turquoise);border-color:var(--gd-turquoise);color:#173b38}
+  .topbar-tools,.topbar-location {gap:5px}
+  .topbar-icon,.topbar-search {width:40px;height:42px;min-width:0;justify-content:center;background:transparent;border:0;color:inherit}
+  .topbar-icon:hover,.topbar-search:hover {background:#ffffff5c}
+}

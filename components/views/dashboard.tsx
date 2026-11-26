@@ -1,8 +1,8 @@
 'use client';
 
-import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Trophy, Medal, Download, Sparkles, X, FileText } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import Avatar from 'boring-avatars';
+import { Users as UsersIcon, Target, MousePointerClick, TrendingUp, Download, Sparkles, X, FileText } from 'lucide-react';
+import { ProgramMetric } from './program-metric';
+import { ReferralCharts } from './referral-charts';
 import { useState, useEffect } from 'react';
 import { ExecutiveReportModal } from '@/components/reports/executive-modal';
 import { supabase, Lead, Colaborador, isSupabaseConfigured } from '@/lib/supabase';
@@ -11,21 +11,10 @@ import { PROGRAM_RULES } from '@/lib/rules';
 import { sanitizeCsvField } from '@/lib/utils';
 import { DateFilterState, matchesDateFilter, parseFlexibleDate } from '@/lib/date-filters';
 
-// Lazy load recharts para reduzir bundle inicial
-const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
-const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
-const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false });
-
-const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const normalizeStr = (str: string) =>
   str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-export function DashboardView() {
+export function DashboardView({ navigation }: { navigation?: React.ReactNode }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -156,7 +145,6 @@ export function DashboardView() {
     }
   }, []);
 
-  const now = new Date();
   const filterState: DateFilterState = {
     period: dateFilter as any,
     month: specificMonth,
@@ -166,7 +154,7 @@ export function DashboardView() {
 
   const totalLeads = filteredLeads.length;
   const conversoesCount = filteredLeads.filter(l => l.status === 'Ganho').length;
-  const conversionRate = totalLeads > 0 ? ((conversoesCount / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
+  const conversionRate = (totalLeads ? conversoesCount / totalLeads : 0).toLocaleString('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // Cliques reais nos links de indicação (somente refs que pertencem a colaboradores cadastrados)
   const clicks = colaboradores.reduce((acc, c) => {
@@ -203,62 +191,47 @@ export function DashboardView() {
     const curLeadsCount = currentMonthLeads.length;
     const prevLeadsCount = prevMonthLeads.length;
     let leadsTrend = '0% este mês';
-    let leadsTrendUp = true;
     if (prevLeadsCount > 0) {
       const diff = ((curLeadsCount - prevLeadsCount) / prevLeadsCount) * 100;
-      leadsTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
-      leadsTrendUp = diff >= 0;
+      leadsTrend = `${diff >= 0 ? '+' : ''}${diff.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% este mês`;
     } else if (curLeadsCount > 0) {
       leadsTrend = `+100% este mês`;
-      leadsTrendUp = true;
     }
 
     const curConvs = currentMonthLeads.filter(l => l.status === 'Ganho').length;
     const prevConvs = prevMonthLeads.filter(l => l.status === 'Ganho').length;
     let convsTrend = '0% este mês';
-    let convsTrendUp = true;
     if (prevConvs > 0) {
       const diff = ((curConvs - prevConvs) / prevConvs) * 100;
-      convsTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
-      convsTrendUp = diff >= 0;
+      convsTrend = `${diff >= 0 ? '+' : ''}${diff.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% este mês`;
     } else if (curConvs > 0) {
       convsTrend = `+100% este mês`;
-      convsTrendUp = true;
     }
 
     // Tendência REAL de cliques (mês atual vs mês anterior) calculada no servidor
     let clicksTrend = '0% este mês';
-    let clicksTrendUp = true;
     const curClicks = monthClickStats.current;
     const prevClicks = monthClickStats.previous;
     if (prevClicks > 0) {
       const diff = ((curClicks - prevClicks) / prevClicks) * 100;
-      clicksTrend = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% este mês`;
-      clicksTrendUp = diff >= 0;
+      clicksTrend = `${diff >= 0 ? '+' : ''}${diff.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% este mês`;
     } else if (curClicks > 0) {
       clicksTrend = '+100% este mês';
-      clicksTrendUp = true;
     }
 
     const curRate = curLeadsCount > 0 ? (curConvs / curLeadsCount) * 100 : 0;
     const prevRate = prevLeadsCount > 0 ? (prevConvs / prevLeadsCount) * 100 : 0;
-    let rateTrend = '0.0% vs mês ant.';
-    let rateTrendUp = true;
+    let rateTrend = '0,0 p.p. este mês';
     const diffRate = curRate - prevRate;
     if (diffRate !== 0) {
-      rateTrend = `${diffRate >= 0 ? '+' : ''}${diffRate.toFixed(1)}% vs mês ant.`;
-      rateTrendUp = diffRate >= 0;
+      rateTrend = `${diffRate >= 0 ? '+' : ''}${diffRate.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p. este mês`;
     }
 
     return {
       leadsTrend,
-      leadsTrendUp,
       convsTrend,
-      convsTrendUp,
       clicksTrend,
-      clicksTrendUp,
       rateTrend,
-      rateTrendUp
     };
   };
 
@@ -332,42 +305,6 @@ export function DashboardView() {
     }
   };
 
-  const getDynamicChartData = () => {
-    const baseData: any[] = [];
-    const d = new Date();
-    
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
-      baseData.push({
-        name: months[monthDate.getMonth()],
-        month: monthDate.getMonth(),
-        year: monthDate.getFullYear(),
-        pendente: 0,
-        contatoInicial: 0,
-        emNegociacao: 0,
-        ganho: 0,
-        errado: 0
-      });
-    }
-
-    filteredLeads.forEach(lead => {
-      const date = parseFlexibleDate(lead.created_at) || new Date();
-      const chartMonth = baseData.find(d => d.month === date.getMonth() && d.year === date.getFullYear());
-      if (chartMonth) {
-        const status = lead.status;
-        if (status === 'Pendente') chartMonth.pendente++;
-        else if (status === 'Contato inicial') chartMonth.contatoInicial++;
-        else if (status === 'Em negociação') chartMonth.emNegociacao++;
-        else if (status === 'Ganho') chartMonth.ganho++;
-        else if (status === 'Errado') chartMonth.errado++;
-      }
-    });
-
-    return baseData;
-  };
-
-  const chartData = getDynamicChartData();
-
   const getTopColaboradores = () => {
     return colaboradores
       .map(colab => {
@@ -393,18 +330,7 @@ export function DashboardView() {
         };
       })
       .sort((a, b) => b.points - a.points)
-      .slice(0, 3)
-      .map((colab, index) => {
-        const ranks = [
-          { rank: 1, color: 'text-amber-500', bg: 'bg-amber-100' },
-          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
-          { rank: 3, color: 'text-amber-700', bg: 'bg-amber-50' }
-        ];
-        return {
-          ...colab,
-          ...ranks[index]
-        };
-      });
+      .slice(0, 3);
   };
 
   const getTopClientes = () => {
@@ -439,18 +365,7 @@ export function DashboardView() {
     })
     .filter(client => client.points > 0)
     .sort((a, b) => b.points - a.points)
-    .slice(0, 3)
-    .map((client, index) => {
-        const ranks = [
-          { rank: 1, color: 'text-blue-500', bg: 'bg-blue-100' },
-          { rank: 2, color: 'text-gray-400', bg: 'bg-gray-100' },
-          { rank: 3, color: 'text-blue-700', bg: 'bg-blue-50' }
-        ];
-        return {
-          ...client,
-          ...ranks[index]
-        };
-    });
+    .slice(0, 3);
   };
 
   const topColaboradores = getTopColaboradores();
@@ -468,16 +383,14 @@ export function DashboardView() {
     <div className="workspace-page dashboard-page space-y-8 animate-in fade-in duration-300 pb-12">
       <div className="workspace-page-heading">
         <div>
-          <p className="workspace-eyebrow">Visão comercial</p>
-          <h2 className="workspace-title mt-1">Dashboard</h2>
-          <p className="workspace-description">Desempenho de indicações e leads no período selecionado.</p>
+          <h2 className="workspace-title">Painel de indicações</h2>
         </div>
         
         <div className="workspace-page-actions">
           <button
             onClick={() => setShowExecutiveModal(true)}
             aria-label="Gerar Relatório PDF"
-            className="gd-button gd-button--secondary cursor-pointer"
+            className="gd-button gd-button--primary cursor-pointer"
           >
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Relatório PDF</span>
@@ -549,129 +462,14 @@ export function DashboardView() {
         </div>
       </div>
       
-      {/* Conversões são o resultado do programa; as demais métricas explicam esse número. */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-[1.6fr_1fr_1fr_1fr]">
-        <StatCard
-          featured
-          icon={Target}
-          title="Conversões"
-          value={conversoesCount.toString()}
-          detail={`de ${totalLeads} ${totalLeads === 1 ? 'lead' : 'leads'} no período`}
-          trend={trends.convsTrend}
-          trendUp={trends.convsTrendUp}
-        />
-        <StatCard icon={UsersIcon} title="Total de leads" value={totalLeads.toString()} trend={trends.leadsTrend} trendUp={trends.leadsTrendUp} />
-        <StatCard icon={MousePointerClick} title="Cliques em links" value={clicks.toString()} trend={trends.clicksTrend} trendUp={trends.clicksTrendUp} />
-        <StatCard icon={TrendingUp} title="Taxa de conversão" value={conversionRate} trend={trends.rateTrend} trendUp={trends.rateTrendUp} />
+      {navigation}
+      <div className="program-metrics" aria-label="Indicadores do programa">
+        <ProgramMetric icon={Target} label="Conversões" value={conversoesCount.toLocaleString('pt-BR')} note={trends.convsTrend} />
+        <ProgramMetric icon={UsersIcon} label="Total de leads" value={totalLeads.toLocaleString('pt-BR')} note={trends.leadsTrend} />
+        <ProgramMetric icon={MousePointerClick} label="Cliques em links" value={clicks.toLocaleString('pt-BR')} note={'Acumulado · ' + trends.clicksTrend} />
+        <ProgramMetric icon={TrendingUp} label="Taxa de conversão" value={conversionRate} note={trends.rateTrend} />
       </div>
-
-      <div className="workspace-panel flex min-h-[420px] flex-col p-5 sm:p-6">
-        <div className="mb-6">
-          <h3 className="font-display text-lg font-bold tracking-tight text-brand-charcoal dark:text-white">Desempenho de Leads por Mês</h3>
-          <p className="text-sm text-brand-muted dark:text-gray-400">
-            {dateFilter === 'all' ? 'Comparativo de status de conversão ao longo do tempo.' : 'Comparativo filtrado pelo período selecionado.'}
-          </p>
-        </div>
-        <div className="flex-1 w-full h-full min-h-[300px]">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-gray-200 dark:stroke-zinc-700" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#83868C', fontSize: 12 }} />
-              <Tooltip 
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontWeight: 500 }}
-              />
-              <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px', fontWeight: 500 }} />
-              <Bar dataKey="pendente" name="Pendente" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="contatoInicial" name="Contato Inicial" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="emNegociacao" name="Em Negociação" fill="#67e8f9" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="ganho" name="Ganho" fill="#4ade80" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="errado" name="Errado" fill="#f87171" radius={[4, 4, 0, 0]} maxBarSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Leaderboard - Top Colaboradores */}
-        <div className="workspace-panel flex h-[420px] flex-col p-5 transition-colors sm:p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2.5 bg-brand-yellow/20 rounded-xl text-brand-charcoal dark:text-brand-yellow">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-brand-charcoal dark:text-white leading-tight">Top Colaboradores</h3>
-              <p className="text-xs text-brand-muted dark:text-gray-400">Ranking interno de indicações</p>
-            </div>
-          </div>
-          
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
-            {topColaboradores.map((colab) => (
-              <div key={colab.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-[#27272a]/50 hover:bg-gray-50 dark:hover:bg-[#27272a] transition-colors">
-                <div className="relative">
-                  <Avatar size={40} name={colab.name} variant="beam" colors={['#FFC700', '#2E2D32', '#F9FAFB', '#D1D5DB', '#9CA3AF']} />
-                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${colab.bg} ${colab.color} border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold shadow-sm`}>
-                    {colab.rank}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-brand-charcoal dark:text-white text-sm truncate">{colab.name}</p>
-                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">
-                    {colab.conversions} {colab.conversions === 1 ? 'conversão' : 'conversões'} ({colab.totalReferred || colab.conversions} {colab.totalReferred === 1 ? 'indicação' : 'indicações'})
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="font-bold text-brand-charcoal dark:text-white text-sm">{colab.points}</p>
-                   <p className="text-[11px] text-brand-muted dark:text-gray-400 font-medium">pontos</p>
-                </div>
-              </div>
-            ))}
-            {topColaboradores.length === 0 && (
-              <div className="flex-1 flex items-center justify-center text-sm text-brand-muted">Nenhum colaborador ranqueado.</div>
-            )}
-          </div>
-        </div>
-
-        {/* Leaderboard - Top Clientes */}
-        <div className="workspace-panel flex h-[420px] flex-col p-5 transition-colors sm:p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="workspace-metric-icon rounded-xl p-2.5 text-[var(--app-muted)]">
-              <Medal className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-brand-charcoal dark:text-white leading-tight">Top Clientes</h3>
-              <p className="text-xs text-brand-muted dark:text-gray-400">Clientes que mais indicaram</p>
-            </div>
-          </div>
-          
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1">
-            {topClientes.map((cliente: any) => (
-              <div key={cliente.id} className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-gray-800 bg-gray-50/50 dark:bg-[#27272a]/50 hover:bg-gray-50 dark:hover:bg-[#27272a] transition-colors">
-                <div className="relative">
-                  <Avatar size={40} name={cliente.name} variant="marble" colors={['#3B82F6', '#2563EB', '#60A5FA', '#93C5FD', '#BFDBFE']} />
-                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${cliente.bg} ${cliente.color} border-2 border-white dark:border-gray-800 flex items-center justify-center text-[10px] font-bold shadow-sm`}>
-                    {cliente.rank}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-brand-charcoal dark:text-white text-sm truncate capitalize">{cliente.name}</p>
-                  <p className="text-xs text-brand-muted dark:text-gray-400 truncate">
-                    {cliente.conversions} {cliente.conversions === 1 ? 'conversão' : 'conversões'} ({cliente.totalReferred || cliente.conversions} {cliente.totalReferred === 1 ? 'indicação' : 'indicações'})
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="font-bold text-brand-charcoal dark:text-white text-sm">{cliente.points}</p>
-                   <p className="text-[11px] text-brand-muted dark:text-gray-400 font-medium">pontos</p>
-                </div>
-              </div>
-            ))}
-            {topClientes.length === 0 && (
-              <div className="flex-1 flex items-center justify-center text-sm text-brand-muted">Nenhum cliente ranqueado.</div>
-            )}
-          </div>
-        </div>
-      </div>
+      <ReferralCharts leads={leads} filtered={filteredLeads} period={filterState} team={topColaboradores} clients={topClientes} />
 
       {showAiModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="ai-summary-title">
@@ -717,45 +515,6 @@ export function DashboardView() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-interface StatCardProps {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  value: string;
-  trend: string;
-  trendUp: boolean;
-  featured?: boolean;
-  detail?: string;
-}
-
-function StatCard({ icon: Icon, title, value, trend, trendUp, featured = false, detail }: StatCardProps) {
-  // No cartão amarelo a tendência usa tinta marinho; nos demais, verde/vermelho.
-  const trendClass = featured
-    ? 'border-[#0e1b2c]/25 bg-white/50 text-[#0e1b2c]'
-    : trendUp
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-      : 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400';
-
-  return (
-    <div
-      className={`workspace-metric flex min-h-[130px] flex-col justify-between sm:min-h-[150px] ${featured ? 'workspace-metric--highlight col-span-2 xl:col-span-1' : ''}`}
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className={`rounded-full p-2.5 ${featured ? 'bg-[#0e1b2c] text-[#ffe300]' : 'workspace-metric-icon text-[var(--app-muted)]'}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${trendClass}`}>
-          {trend}
-        </span>
-      </div>
-      <div>
-        <h3 className={`mb-1 text-sm font-bold ${featured ? 'text-[#0e1b2c]/80' : 'text-[var(--app-muted)]'}`}>{title}</h3>
-        <p className={`font-display font-extrabold tabular-nums leading-none tracking-tight ${featured ? 'text-6xl text-[#0e1b2c]' : 'text-3xl text-[var(--app-ink)]'}`}>{value}</p>
-        {detail && <p className="mt-2 text-sm font-semibold text-[#0e1b2c]/80">{detail}</p>}
-      </div>
     </div>
   );
 }

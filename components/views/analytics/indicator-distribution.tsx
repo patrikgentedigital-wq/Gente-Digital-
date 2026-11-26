@@ -1,9 +1,8 @@
-import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 const numbers = new Intl.NumberFormat('pt-BR');
 const percent = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 });
-const colors = ['#e6b416', 'var(--distribution-navy)', '#6a8196', '#acbac8', '#50657a', '#d5dee7'];
-const rowClass = 'grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 py-2 text-left text-sm';
+const colors = ['var(--gd-turquoise)', 'var(--gd-yellow)', '#697e7d', '#116e6b', '#5b7470', '#9aaead'];
 
 interface IndicatorDistributionProps {
   title: string;
@@ -22,7 +21,7 @@ interface IndicatorDistributionProps {
 export function IndicatorDistribution({
   title, description, totalLabel, rows, selected, onSelect, selectedRowDetail, controls, footer, compact = false, emptyMessage,
 }: IndicatorDistributionProps) {
-  const titleId = useId();
+  const titleId = compact ? 'commercial-distribution' : 'cancellation-reasons';
   const detailRef = useRef<HTMLDivElement>(null);
   const expandable = selectedRowDetail !== undefined;
   useLayoutEffect(() => {
@@ -30,91 +29,51 @@ export function IndicatorDistribution({
     if (detail?.getClientRects().length) detail.scrollIntoView({ block: 'nearest' });
   }, [selected]);
 
-  const ranked = [...rows].sort((left, right) => right.count - left.count || left.key.localeCompare(right.key, 'pt-BR'));
+  const ranked = [...rows].sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'pt-BR', { numeric: true }));
   const total = ranked.reduce((sum, row) => sum + row.count, 0);
-  const hasTail = ranked.length > colors.length;
+  const max = ranked[0]?.count ?? 0;
   const colorByKey = new Map(ranked.map((row, index) => [row.key, colors[Math.min(index, colors.length - 1)]]));
   const segments = ranked.slice(0, colors.length).map((row, index) => ({
     color: colors[index],
-    count: hasTail && index === colors.length - 1
-      ? ranked.slice(index).reduce((sum, item) => sum + item.count, 0)
-      : row.count,
+    count: index === colors.length - 1 ? ranked.slice(index).reduce((sum, item) => sum + item.count, 0) : row.count,
   }));
-  let offset = 0;
-  const stops = total > 0 ? segments.map(({ color, count }, index) => {
-    const start = offset / total * 100;
-    offset += count;
-    const end = index === segments.length - 1 ? 100 : offset / total * 100;
-    return color + ' ' + start + '% ' + end + '%';
-  }).join(', ') : '';
 
   return (
-    <section
-      className="h-full min-w-0 rounded-[25px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-[var(--app-shadow)] [--distribution-navy:#20374f] dark:[--distribution-navy:#8da6ca] sm:p-5"
-      aria-labelledby={titleId}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 id={titleId} className="text-base font-extrabold">{title}</h3>
-          {description && <p className="mt-0.5 text-sm text-[var(--app-muted)]">{description}</p>}
-        </div>
+    <section className="ix-pane ix-distribution" aria-labelledby={titleId}>
+      <header className="ix-pane-head">
+        <div><h3 id={titleId}>{title}</h3>{description && <p>{description}</p>}</div>
         {controls}
-      </div>
-      {total > 0 ? (
-        <div className={'mt-4 gap-x-6 gap-y-4 ' + (compact ? 'grid' : 'flex flex-wrap items-center')}>
-          <div className={'min-w-0 flex-[1_0_10rem] ' + (hasTail ? 'self-start sm:pt-5' : '')}>
-            <div
-              className={'mx-auto grid aspect-square w-full place-items-center rounded-full ' + (compact ? 'max-w-36' : 'max-w-52')}
-              style={{ background: segments.length === 1 ? segments[0].color : 'conic-gradient(' + stops + ')' }}
-            >
-              <div className="grid aspect-square w-[68%] content-center justify-items-center rounded-full bg-[var(--app-panel)] px-2 text-center">
-                <strong className="font-display text-4xl leading-none font-bold tracking-tight tabular-nums">{numbers.format(total)}</strong>
-                <span className="mt-1 text-xs leading-tight text-[var(--app-muted)]">{totalLabel}</span>
-              </div>
-            </div>
+      </header>
+      {total > 0 ? <>
+        {compact && <>
+          <p className="ix-total"><strong>{numbers.format(total)}</strong> {totalLabel}</p>
+          <div className="ix-mix" aria-hidden="true">
+            {segments.filter(item => item.count).map(item => <span key={item.color} style={{ flexGrow: item.count, background: item.color }} />)}
           </div>
-          <div className="min-w-0 flex-[2_1_15rem]">
-            <ul className={'divide-y divide-[var(--app-border)]'
-              + (compact ? ' xl:max-h-48 xl:overflow-y-auto xl:[scrollbar-width:thin]' : '')}>
-              {rows.map(row => {
-                const active = selected === row.key;
-                const content = (
-                  <>
-                    <span className="size-2 rounded-sm" style={{ backgroundColor: colorByKey.get(row.key) }} aria-hidden="true" />
-                    <span className="min-w-0 break-words">{row.label}</span>
-                    <strong className="text-right font-bold tabular-nums">{numbers.format(row.count)}</strong>
-                    <span className="w-[4.5ch] text-right text-[var(--app-muted)] tabular-nums">{percent.format(row.count / total)}</span>
-                  </>
-                );
-                return (
-                  <li key={row.key}>
-                    {onSelect ? (
-                      <button
-                        type="button" onClick={() => onSelect(row.key)}
-                        aria-pressed={expandable ? undefined : active} aria-expanded={expandable ? active : undefined}
-                        className={rowClass + ' rounded-lg hover:bg-[var(--app-panel-muted)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--app-ink)]'
-                          + (active ? ' bg-[var(--app-panel-muted)] font-bold' : '')}
-                      >
-                        {content}
-                      </button>
-                    ) : <div className={rowClass}>{content}</div>}
-                    {active && selectedRowDetail && (
-                      <div ref={detailRef} className="mx-2 mb-2 scroll-mb-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-2 lg:hidden">
-                        {selectedRowDetail}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {hasTail && (
-              <p className="mt-2 px-2 text-xs text-[var(--app-muted)]">
-                A fatia cinza-clara reúne os grupos menores. A lista mostra todos separadamente.
-              </p>
-            )}
-          </div>
-        </div>
-      ) : <p className="mt-4 text-sm text-[var(--app-muted)]">{emptyMessage}</p>}
+        </>}
+        <ul className={compact ? 'ix-ranking compact' : 'ix-ranking reasons'}>
+          {rows.map(row => {
+            const active = selected === row.key;
+            const color = colorByKey.get(row.key);
+            const content = <>
+              {compact && <i className="ix-dot" style={{ background: color }} aria-hidden="true" />}
+              <span className="ix-category">{row.label}</span>
+              <span className="ix-count">{numbers.format(row.count)}</span>
+              <span className="ix-share">{percent.format(row.count / total)}</span>
+              {!compact && <span className="ix-reason-track" aria-hidden="true"><i style={{ width: row.count / max * 100 + '%', background: color }} /></span>}
+            </>;
+            return <li key={row.key}>
+              {onSelect ? <button type="button" onClick={() => onSelect(row.key)}
+                aria-pressed={expandable ? undefined : active} aria-expanded={expandable ? active : undefined}
+                className="ix-rank-row">{content}</button> : <div className="ix-rank-row">{content}</div>}
+              {active && selectedRowDetail && <div ref={detailRef} className="ix-reason-detail lg:hidden">
+                {selectedRowDetail}
+              </div>}
+            </li>;
+          })}
+        </ul>
+        {compact && ranked.length > colors.length && <p className="ix-caption">O último segmento reúne as demais categorias, detalhadas na lista.</p>}
+      </> : <p className="ix-empty">{emptyMessage}</p>}
       {footer}
     </section>
   );

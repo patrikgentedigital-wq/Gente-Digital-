@@ -1,22 +1,24 @@
 'use client';
 
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, FileText, Target, Users } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sortCommercialRecordsByDate, type CommercialDateOrder } from '@/lib/analytics/commercial-detail';
 import type { CommercialMetrics, CommercialRecord } from '@/lib/analytics/commercial-ixc';
 import { commercialTrendBuckets, countCommercialDays } from '@/lib/analytics/commercial-panorama';
 import { CommercialTrend, type TrendBucket } from './commercial-trend';
+import { IndicatorMetric } from './indicator-metric';
 import { IndicatorDistribution } from './indicator-distribution';
 import { formatDay, ixcFilterControl, IxcMetricComparison, IxcMetricStatus, IxcPeriodPanel, type IxcPeriodData } from './ixc-period-panel';
 
 const metrics = [
-  { id: 'leads', label: 'Leads recebidos', detail: 'Contatos cadastrados no IXC' },
-  { id: 'sales', label: 'Vendas fechadas', detail: 'Negociações pela data de vitória' },
-  { id: 'contracts', label: 'Contratos criados', detail: 'Contratos pela data de cadastro no IXC' },
+  { id: 'leads', icon: Users, label: 'Leads recebidos', detail: 'Contatos cadastrados no IXC' },
+  { id: 'sales', icon: Target, label: 'Vendas fechadas', detail: 'Negociações pela data de vitória' },
+  { id: 'contracts', icon: FileText, label: 'Contratos criados', detail: 'Contratos pela data de cadastro no IXC' },
 ] as const;
 
 const pageSize = 25;
 const numbers = new Intl.NumberFormat('pt-BR');
+const dailyAverage = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
 
 type NameField = 'channel' | 'responsible';
 
@@ -52,7 +54,7 @@ const trendNames = { leads: 'leads', sales: 'vendas', contracts: 'contratos' } a
 export function CommercialView() {
   const [selected, setSelected] = useState<MetricId>('sales');
   return (
-    <IxcPeriodPanel<CommercialMetrics> title="Vendas" description="Leads, vendas e contratos criados no IXC.">
+    <IxcPeriodPanel<CommercialMetrics> title="Indicadores de vendas" description="Leads, vendas fechadas e contratos criados no IXC.">
       {(data) => <CommercialDetails key={data.periodKey} data={data} selected={selected} setSelected={setSelected} />}
     </IxcPeriodPanel>
   );
@@ -101,7 +103,7 @@ function CommercialDetails({ data, selected, setSelected }: {
     && (!interval || (row.date >= interval.from && row.date <= interval.to))) ?? [];
   const sorted = sortCommercialRecordsByDate(filtered, dateOrder);
   const hasFilters = Boolean(activeChannel || activeResponsible || interval);
-  const selectedLabel = metrics.find(({ id }) => id === selected)?.label;
+  const days = (Date.parse(data.period.to) - Date.parse(data.period.from)) / 86_400_000 + 1;
   const SortIcon = dateOrder === 'descending' ? ArrowDown : ArrowUp;
   const responsibleLabel = selected === 'contracts' ? 'Vendedor' : 'Responsável';
   const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -134,32 +136,30 @@ function CommercialDetails({ data, selected, setSelected }: {
             resetDetail();
           }
         }}
-        className={'flex min-w-0 flex-col items-start justify-center p-2.5 text-left outline-offset-2 focus-visible:outline-2 sm:p-3.5 '
-          + (active ? 'rounded-[24px] border border-yellow-500/50 bg-[#ffe300]/18' : 'rounded-[19px] hover:bg-[var(--app-canvas)]')}>
-        <span className="text-xs font-bold leading-tight sm:text-sm">{metric.label}</span>
-        <span className={'my-1 font-display font-bold leading-none tabular-nums ' + (active ? 'text-3xl md:text-5xl' : 'text-xl sm:text-2xl')}>
-          {records ? numbers.format(records.length) : '—'}
-        </span>
-        {active && <span className="text-xs text-[var(--app-muted)]">{metric.detail}</span>}
-        {data.compared && <IxcMetricComparison current={timestamp === data.readAt ? records?.length : undefined}
-          previous={data.comparison[id]} loading={data.comparisonLoading} />}
-        {(!timestamp || timestamp !== data.readAt) && <IxcMetricStatus timestamp={timestamp} loading={data.loading} />}
+        className="ix-kpi" title={metric.detail}>
+        <IndicatorMetric icon={metric.icon} label={metric.label} value={records ? numbers.format(records.length) : '—'}>
+          {data.compared && <IxcMetricComparison current={timestamp === data.readAt ? records?.length : undefined}
+            previous={data.comparison[id]} loading={data.comparisonLoading} />}
+          {(!timestamp || timestamp !== data.readAt) && <IxcMetricStatus timestamp={timestamp} loading={data.loading} />}
+        </IndicatorMetric>
       </button>
     );
   }
 
   return (
     <>
-      <div className="grid min-w-0 items-stretch gap-3 md:grid-cols-[minmax(8rem,1fr)_minmax(0,2.4fr)] xl:grid-cols-[minmax(9rem,.82fr)_minmax(0,2.2fr)_minmax(12rem,1.05fr)]">
-        <section className="grid min-w-0 grid-cols-[1.15fr_1.85fr] gap-2 sm:gap-3 md:grid-cols-1 md:grid-rows-[1.15fr_1fr]" aria-label="Totais do período">
-          {renderMetric(selected)}
-          <div className="grid min-w-0 grid-cols-2 divide-x divide-[var(--app-border)] rounded-[22px] border border-[var(--app-border)] bg-[var(--app-panel)] p-1 md:grid-cols-1 md:divide-x-0 md:divide-y">
-            {metrics.filter(metric => metric.id !== selected).map(metric => renderMetric(metric.id))}
-          </div>
-        </section>
-
-        <section aria-labelledby="commercial-trend" className="flex min-w-0 flex-col justify-center rounded-[25px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm sm:p-5 xl:justify-start">
-          <h3 id="commercial-trend" className="font-display text-base font-semibold">Evolução de {trendNames[selected]}</h3>
+      <section className="ix-metrics" aria-label="Totais do período">
+        {metrics.map(({ id }) => renderMetric(id))}
+        <div className="ix-kpi">
+          <IndicatorMetric label="Média diária" icon={Activity} value={current && Number.isInteger(days) && days > 0 ? dailyAverage.format(current.length / days) : '—'}>
+            {trendNames[selected]} por dia
+            {(!data.timestamps[selected] || data.timestamps[selected] !== data.readAt) && <IxcMetricStatus timestamp={data.timestamps[selected]} loading={data.loading} />}
+          </IndicatorMetric>
+        </div>
+      </section>
+      <div className="ix-split">
+        <section aria-labelledby="commercial-trend" className="ix-pane">
+          <h3 id="commercial-trend">Evolução de {trendNames[selected]}</h3>
           {buckets.length ? (
             <>
               <p className="mb-2 text-xs text-[var(--app-muted)]">Selecione um intervalo para ver os registros.</p>
@@ -171,7 +171,7 @@ function CommercialDetails({ data, selected, setSelected }: {
           ) : <p className="mt-3 text-sm text-[var(--app-muted)]">{data.loading ? 'Aguardando a consulta do IXC.' : 'Série indisponível.'}</p>}
         </section>
 
-        <div className="min-w-0 md:col-span-2 xl:col-span-1">
+        <div className="ix-distribution-wrap">
           <IndicatorDistribution
             compact
             title={'Distribuição por ' + (rankingField === 'channel' ? 'canal' : responsibleLabel.toLowerCase())}
@@ -199,10 +199,10 @@ function CommercialDetails({ data, selected, setSelected }: {
       </div>
 
       <section id="commercial-detail" aria-labelledby="commercial-detail-title"
-        className="min-w-0 overflow-hidden rounded-[25px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
+        className="ix-detail">
+        <div className="ix-detail-head flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 ref={detailHeading} id="commercial-detail-title" tabIndex={-1} className="scroll-mt-24 font-semibold">{selectedLabel}</h3>
+            <h3 ref={detailHeading} id="commercial-detail-title" tabIndex={-1} className="scroll-mt-24">Detalhamento de {trendNames[selected]}</h3>
             {interval && <p className="mt-0.5 text-xs text-[var(--app-muted)]">{formatDay(interval.from)} a {formatDay(interval.to)}</p>}
             {current && (
               <p aria-live="polite" className="mt-0.5 text-xs text-[var(--app-muted)]">
