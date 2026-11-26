@@ -14,6 +14,38 @@
 .ix-page-head h2 { font-size: clamp(1.7rem, 2.6vw, 2.35rem); font-weight: 500; line-height: 1.15; }
 .ix-page-head p, .ix-pane-head p, .ix-caption, .ix-empty { color: var(--ix-muted); font-size: .82rem; line-height: 1.5; margin-top: .3rem; }
 .ix-period-menu { position: relative; }
+.ix-period-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.ix-report-action, .ix-report-formats button {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  border-radius: .6rem; font-size: .85rem; font-weight: 550; cursor: pointer;
+}
+.ix-report-action { min-height: 38px; padding: .5rem .85rem; border: 1px solid transparent; background: var(--gd-yellow); color: #111918; }
+.ix-report-action:disabled { opacity: .65; cursor: wait; }
+.ix-report-dialog {
+  position: fixed; inset: 0; margin: auto; width: min(28rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem);
+  padding: 1.35rem; border: 1px solid var(--ix-line); border-radius: 1.15rem; overflow: auto;
+  color: var(--app-ink); background: var(--app-panel); box-shadow: 0 1.5rem 5rem #101d1d26;
+}
+.ix-report-dialog::backdrop { background: #0b242370; }
+.ix-report-dialog header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.ix-report-dialog header h2 { font-size: 1.4rem; font-weight: 550; }
+.ix-report-close { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .5rem; cursor: pointer; }
+.ix-report-close:hover, .ix-report-formats button:hover { background: var(--app-panel-muted); }
+.ix-report-dialog .ix-report-period { margin-top: .15rem; font-variant-numeric: tabular-nums; }
+.ix-report-scope { display: grid; gap: .4rem; margin-top: 1.3rem; font-size: .86rem; font-weight: 550; }
+.ix-report-scope select { padding: .65rem .7rem; font: inherit; font-weight: 450; border-radius: .55rem; border: 1px solid var(--ix-line); background: var(--app-panel); }
+.ix-report-dialog .ix-report-hint { margin-top: .6rem; }
+.ix-report-formats { display: flex; gap: .55rem; margin-top: 1.3rem; }
+.ix-report-formats button { flex: 1; min-height: 44px; border: 1px solid var(--ix-line); padding: .55rem; }
+.ix-report-formats button:disabled, .ix-report-scope select:disabled { opacity: .6; cursor: wait; }
+.ix-report-dialog .ix-report-status:not(:empty), .ix-report-dialog .ix-report-error { margin-top: .7rem; }
+.ix-report-status:empty { margin: 0; }
+.ix-report-dialog .ix-report-error { color: var(--app-ink); border-inline-start: 3px solid #c14942; padding-inline-start: .6rem; }
+@media (max-width: 640px) {
+  .ix-period-actions { width: 100%; }
+  .ix-period-actions .ix-period-popup { left: 0; right: auto; }
+  .ix-report-action, .ix-period-actions summary { min-height: 44px; }
+}
 .ix-period-menu summary { display: flex; width: fit-content; align-items: center; gap: .5rem; padding: .55rem .8rem; min-height: 38px; font-size: .85rem; border: 1px solid var(--ix-line); border-radius: .6rem; cursor: pointer; }
 .ix-period-menu summary::-webkit-details-marker { display: none; }
 .ix-period-menu[open] summary svg:last-child { transform: rotate(180deg); }

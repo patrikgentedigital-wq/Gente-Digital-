@@ -182,20 +182,28 @@ export interface DirectCancellationMetrics {
   byReason: { key: string; count: number }[] | null;
 }
 
-export async function loadCancellationMetrics(period: CommercialPeriod, list: List, includeReasons = true): Promise<DirectCancellationMetrics> {
+export interface CancellationRecord {
+  id: string;
+  date: string;
+  reason: string;
+}
+
+export async function loadCancellationMetrics(period: CommercialPeriod, list: List, includeReasons = true, includeRecords = false) {
   const [rows, reasons] = await Promise.all([
     loadRowsInPeriod('cliente_contrato', 'data_cancelamento', period, list),
     includeReasons ? loadCatalog(cancellationReasonCatalog, list).catch(() => null) : null,
   ]);
   const groups = new Map<string, number>();
-  for (const row of rows.values()) {
-    checkedBusinessDate(row.data_cancelamento, period);
+  const records: CancellationRecord[] | undefined = includeReasons && includeRecords ? [] : undefined;
+  for (const [contractId, row] of rows) {
+    const date = checkedBusinessDate(row.data_cancelamento, period);
     if (!includeReasons) continue;
     const id = positiveId(row.motivo_cancelamento);
     const reason = id ? reasons?.get(id) ?? 'Motivo não localizado no IXC' : 'Sem motivo';
     groups.set(reason, (groups.get(reason) ?? 0) + 1);
+    records?.push({ id: contractId, date, reason });
   }
   const byReason = Array.from(groups, ([key, count]) => ({ key, count }))
     .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key, 'pt-BR'));
-  return { total: rows.size, byReason: reasons || !rows.size ? byReason : null };
+  return { total: rows.size, byReason: reasons || !rows.size ? byReason : null, ...(records && { records }) };
 }

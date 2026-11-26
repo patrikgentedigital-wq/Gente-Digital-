@@ -8,6 +8,7 @@ import type { CommercialDailyTotals } from '@/lib/analytics/commercial-panorama'
 import { businessToday, comparisonPeriod, presetPeriod, saveIxcSnapshot, type IxcSnapshot, type PeriodPreset } from '@/lib/analytics/ixc-period';
 import { startIxcRefresh } from '@/lib/analytics/ixc-refresh';
 import { IndicatorTabs } from './indicator-tabs';
+import { IndicatorReportAction } from './indicator-report-action';
 
 export const ixcFilterControl = 'block w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-sm outline-offset-2 focus-visible:outline-2';
 
@@ -213,57 +214,60 @@ export function IxcPeriodPanel<Metrics extends object>({ title, description, sec
           <h2 id="ixc-period-title">{title}</h2>
           <p>{description}</p>
         </div>
-        <details ref={periodMenu} className="ix-period-menu"
-          onKeyDown={event => { if (event.key === 'Escape') closePeriodMenu(); }}
-          onBlur={event => {
-            if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) {
-              event.currentTarget.open = false;
-            }
-          }}>
-          <summary><CalendarDays size={16} aria-hidden="true" /><span>{periodLabel(reference.period)}</span><ChevronDown size={14} aria-hidden="true" /></summary>
-          <div className="ix-period-popup">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Atalhos de período">
-                {presets.map(([id, label]) => {
-                  const active = keyOf(presetPeriod(id, today)) === keyOf(reference.period);
-                  return (
-                    <button key={id} type="button" aria-pressed={active} onClick={() => choosePreset(id)}
-                      className={'min-h-9 rounded-lg border px-2.5 text-sm font-medium outline-offset-2 focus-visible:outline-2 '
-                        + (active ? 'border-[var(--app-border)] bg-[var(--app-panel-muted)]' : 'border-[var(--app-border)] hover:border-[var(--app-muted)]')}>
-                      {label}
-                    </button>
-                  );
-                })}
-                <button type="button" aria-expanded={customOpen} aria-controls="commercial-custom-period"
-                  onClick={() => setCustomOpen(open => !open)}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2.5 text-sm font-medium outline-offset-2 hover:border-[var(--app-muted)] focus-visible:outline-2">
-                  Personalizado <ChevronDown size={14} aria-hidden="true" className={customOpen ? 'rotate-180' : undefined} />
-                </button>
+        <div className="ix-period-actions">
+          <details ref={periodMenu} className="ix-period-menu"
+            onKeyDown={event => { if (event.key === 'Escape') closePeriodMenu(); }}
+            onBlur={event => {
+              if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.open = false;
+              }
+            }}>
+            <summary><CalendarDays size={16} aria-hidden="true" /><span>{periodLabel(reference.period)}</span><ChevronDown size={14} aria-hidden="true" /></summary>
+            <div className="ix-period-popup">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Atalhos de período">
+                  {presets.map(([id, label]) => {
+                    const active = keyOf(presetPeriod(id, today)) === keyOf(reference.period);
+                    return (
+                      <button key={id} type="button" aria-pressed={active} onClick={() => choosePreset(id)}
+                        className={'min-h-9 rounded-lg border px-2.5 text-sm font-medium outline-offset-2 focus-visible:outline-2 '
+                          + (active ? 'border-[var(--app-border)] bg-[var(--app-panel-muted)]' : 'border-[var(--app-border)] hover:border-[var(--app-muted)]')}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <button type="button" aria-expanded={customOpen} aria-controls="commercial-custom-period"
+                    onClick={() => setCustomOpen(open => !open)}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2.5 text-sm font-medium outline-offset-2 hover:border-[var(--app-muted)] focus-visible:outline-2">
+                    Personalizado <ChevronDown size={14} aria-hidden="true" className={customOpen ? 'rotate-180' : undefined} />
+                  </button>
+                </div>
+                {!customOpen && (
+                  <button type="button" className={consultClass} onClick={() => consult(request.period)}>Consultar período</button>
+                )}
               </div>
-              {!customOpen && (
-                <button type="button" className={consultClass} onClick={() => consult(request.period)}>Consultar período</button>
-              )}
+              <div id="commercial-custom-period" hidden={!customOpen}>
+                <form className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--app-border)] pt-3"
+                  onSubmit={event => { event.preventDefault(); consult(period); }}>
+                  <label className="space-y-1 text-xs font-medium">
+                    <span>De</span>
+                    <input type="date" required value={period.from} max={period.to || undefined} className={ixcFilterControl}
+                      onChange={event => { setPeriod({ ...period, from: event.target.value }); setFormError(null); }} />
+                  </label>
+                  <label className="space-y-1 text-xs font-medium">
+                    <span>Até</span>
+                    <input type="date" required value={period.to} min={period.from || undefined} className={ixcFilterControl}
+                      onChange={event => { setPeriod({ ...period, to: event.target.value }); setFormError(null); }} />
+                  </label>
+                  <button type="submit" className={consultClass}>Consultar período</button>
+                  <p className="self-center text-xs text-[var(--app-muted)]">Até 92 dias por consulta</p>
+                </form>
+                {formError && <p role="alert" className="mt-2 text-sm font-medium">{formError}</p>}
+              </div>
             </div>
-            <div id="commercial-custom-period" hidden={!customOpen}>
-              <form className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--app-border)] pt-3"
-                onSubmit={event => { event.preventDefault(); consult(period); }}>
-                <label className="space-y-1 text-xs font-medium">
-                  <span>De</span>
-                  <input type="date" required value={period.from} max={period.to || undefined} className={ixcFilterControl}
-                    onChange={event => { setPeriod({ ...period, from: event.target.value }); setFormError(null); }} />
-                </label>
-                <label className="space-y-1 text-xs font-medium">
-                  <span>Até</span>
-                  <input type="date" required value={period.to} min={period.from || undefined} className={ixcFilterControl}
-                    onChange={event => { setPeriod({ ...period, to: event.target.value }); setFormError(null); }} />
-                </label>
-                <button type="submit" className={consultClass}>Consultar período</button>
-                <p className="self-center text-xs text-[var(--app-muted)]">Até 92 dias por consulta</p>
-              </form>
-              {formError && <p role="alert" className="mt-2 text-sm font-medium">{formError}</p>}
-            </div>
-          </div>
-        </details>
+          </details>
+          <IndicatorReportAction key={keyOf(reference.period)} period={reference.period} disabled={loading && (!snapshot || !samePeriod)} />
+        </div>
       </header>
       <IndicatorTabs cancellation={section === 'cancelamentos'} />
       <div className="ix-read-status">

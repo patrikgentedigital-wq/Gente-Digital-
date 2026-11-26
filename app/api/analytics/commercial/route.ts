@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       }
     };
     const metrics = isCancellation
-      ? await loadCancellationMetrics(period, list, !summary)
+      ? await loadCancellationMetrics(period, list, !summary, !summary && request.nextUrl.searchParams.get('details') === '1')
       : await loadCommercialMetrics(period, list, !summary);
 
     if (Object.values(metrics).every((records) => records === null)) throw new Error('IXC indisponível.');
