@@ -66,7 +66,8 @@ export function IndicatorDistribution({
             </div>
           </div>
           <div className="min-w-0 flex-[2_1_15rem]">
-            <ul className="divide-y divide-[var(--app-border)]">
+            <ul className={'divide-y divide-[var(--app-border)]'
+              + (compact ? ' xl:max-h-48 xl:overflow-y-auto xl:[scrollbar-width:thin]' : '')}>
               {rows.map(row => {
                 const content = (
                   <>

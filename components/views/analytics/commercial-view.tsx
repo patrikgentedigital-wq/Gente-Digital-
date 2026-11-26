@@ -158,7 +158,7 @@ function CommercialDetails({ data, selected, setSelected }: {
           </div>
         </section>
 
-        <section aria-labelledby="commercial-trend" className="flex min-w-0 flex-col justify-center rounded-[25px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm sm:p-5">
+        <section aria-labelledby="commercial-trend" className="flex min-w-0 flex-col justify-center rounded-[25px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 shadow-sm sm:p-5 xl:justify-start">
           <h3 id="commercial-trend" className="font-display text-base font-semibold">Evolução de {trendNames[selected]}</h3>
           {buckets.length ? (
             <>
