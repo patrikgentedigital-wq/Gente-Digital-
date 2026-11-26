@@ -76,12 +76,21 @@ export function CommercialTrend({ buckets, active, onSelect }: CommercialTrendPr
         context.globalAlpha = 1;
       }
 
+      const previous = points('previous');
       context.beginPath();
-      trace(points('previous'));
+      trace(previous);
       context.strokeStyle = previousColor;
       context.lineWidth = 1.8;
       context.setLineDash([5, 5]);
       context.stroke();
+      const priorPoints = previous.filter(point => point !== null);
+      if (priorPoints.length === 1) {
+        context.beginPath();
+        context.setLineDash([]);
+        context.arc(priorPoints[0].x, priorPoints[0].y, 5, 0, 2 * Math.PI);
+        context.stroke();
+      }
+
       context.beginPath();
       trace(current);
       context.strokeStyle = currentColor;

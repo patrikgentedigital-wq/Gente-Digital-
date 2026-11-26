@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sortCommercialRecordsByDate, type CommercialDateOrder } from '@/lib/analytics/commercial-detail';
 import type { CommercialMetrics, CommercialRecord } from '@/lib/analytics/commercial-ixc';
 import { commercialTrendBuckets, countCommercialDays } from '@/lib/analytics/commercial-panorama';
@@ -70,6 +70,15 @@ function CommercialDetails({ data, selected, setSelected }: {
   const [interval, setInterval] = useState<TrendBucket | null>(null);
   const [rankBy, setRankBy] = useState<NameField>('channel');
   const detailHeading = useRef<HTMLHeadingElement>(null);
+  const selectedMetricButton = useRef<HTMLButtonElement>(null);
+  const restoreMetricFocus = useRef(false);
+
+  useLayoutEffect(() => {
+    if (restoreMetricFocus.current) {
+      selectedMetricButton.current?.focus({ preventScroll: true });
+      restoreMetricFocus.current = false;
+    }
+  }, [selected]);
 
   const current = data.metrics[selected];
   const missingNames = current?.some(row => (row.channel && !row.channelName) || (row.responsible && !row.responsibleName));
@@ -117,9 +126,10 @@ function CommercialDetails({ data, selected, setSelected }: {
     const timestamp = data.timestamps[id];
     const active = selected === id;
     return (
-      <button key={id} type="button" aria-pressed={active} aria-controls="commercial-detail"
-        onClick={() => {
+      <button key={id} type="button" ref={active ? selectedMetricButton : undefined} aria-pressed={active} aria-controls="commercial-detail"
+        onClick={event => {
           if (!active) {
+            restoreMetricFocus.current = document.activeElement === event.currentTarget;
             setSelected(id);
             resetDetail();
           }
