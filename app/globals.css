@@ -20,8 +20,9 @@
   --radius-3xl: 26px;
 }
 @theme inline {
-  --font-sans: var(--font-dm-sans), 'Segoe UI', Arial, sans-serif;
-  --font-display: var(--font-dm-sans), 'Segoe UI', Arial, sans-serif;
+  --font-mono: var(--font-inter), 'Segoe UI', Arial, sans-serif;
+  --font-sans: var(--font-inter), 'Segoe UI', Arial, sans-serif;
+  --font-display: var(--font-inter), 'Segoe UI', Arial, sans-serif;
 }
 :root {
   color-scheme: light;
@@ -31,7 +32,7 @@
   --app-ink: var(--gd-ink); --app-muted: #4f6664; --app-border: var(--gd-line);
   --app-sidebar: var(--gd-turquoise); --app-sidebar-border:#29b9b5; --app-accent: var(--gd-yellow);
   --app-accent-ink: #111918; --app-shadow:none; --app-radius:14px;
-  --font-display:var(--font-dm-sans), 'Segoe UI', Arial, sans-serif;
+  --font-display:var(--font-inter), 'Segoe UI', Arial, sans-serif;
 }
 .dark {
   color-scheme:dark;

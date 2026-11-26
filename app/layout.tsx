@@ -4,7 +4,7 @@ import './globals.css';
 import './workspace-shell.css';
 import { Providers } from './providers';
 
-const dmSans = localFont({ src: './fonts/dm-sans-latin.woff2', weight: '100 900', display: 'swap', variable: '--font-dm-sans' });
+const inter = localFont({ src: './fonts/inter-latin.woff2', weight: '400 700', display: 'swap', variable: '--font-inter' });
 export const viewport: Viewport = { themeColor: '#39D3CF' };
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className={dmSans.variable} suppressHydrationWarning>
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <body className="font-sans antialiased min-h-screen bg-[var(--app-canvas)] text-[var(--app-ink)] selection:bg-brand-yellow selection:text-brand-charcoal" suppressHydrationWarning>
         <Providers>
           {children}
