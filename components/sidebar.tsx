@@ -82,10 +82,11 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </button>
 
         <div className="mb-8 mt-1 px-5 md:hidden lg:block">
-          <BrandMark showTagline tone="onYellow" />
+          <BrandMark showTagline tone="onYellow" showLogo={activeTab === 'indicadores'} />
         </div>
         <div className="mb-8 mt-1 hidden justify-center md:flex lg:hidden" aria-label="Gente Digital">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0e1b2c] font-display text-lg font-extrabold text-[#ffe300]">GD</span>
+          {activeTab === 'indicadores' ? <BrandMark compact showLogo tone="onYellow" />
+            : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0e1b2c] font-display text-lg font-extrabold text-[#ffe300]">GD</span>}
         </div>
 
         {/* Navigation */}

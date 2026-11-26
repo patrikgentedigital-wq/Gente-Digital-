@@ -27,7 +27,7 @@ export function AnalyticsView() {
         {ANALYTICS_TABS.map(({ id, label }) => (
           <button key={id} type="button" aria-current={id === activeTab ? 'page' : undefined}
             onClick={() => setActiveTab(id)}
-            className={'rounded-lg px-4 py-2 text-sm font-semibold outline-offset-2 focus-visible:outline-2 '
+            className={'rounded-full px-4 py-2 text-sm font-semibold outline-offset-2 focus-visible:outline-2 '
               + (id === activeTab ? 'bg-[#ffe300] text-[#0e1b2c]' : 'text-[var(--app-ink)] hover:bg-[var(--app-panel)]')}>
             {label}
           </button>

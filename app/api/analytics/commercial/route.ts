@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { loadCancellationMetrics, loadCommercialMetrics, parseCommercialPeriod } from '@/lib/analytics/commercial-ixc';
+import { countCommercialDays, type CommercialDailyTotals } from '@/lib/analytics/commercial-panorama';
 import { readCommercialIxcPage } from '@/lib/analytics/commercial-ixc-read';
 import { verifyAuth } from '@/lib/auth-server';
 import { getIxcCredentials } from '@/lib/ixc';
@@ -56,7 +57,12 @@ export async function GET(request: NextRequest) {
     const result = summary && 'leads' in metrics
       ? { leads: metrics.leads?.length ?? null, sales: metrics.sales?.length ?? null, contracts: metrics.contracts?.length ?? null }
       : summary && 'total' in metrics ? { total: metrics.total } : metrics;
-    return NextResponse.json({ metrics: result, readAt: new Date().toISOString() }, { headers });
+    const series: CommercialDailyTotals | undefined = summary && 'leads' in metrics ? {
+      leads: metrics.leads && countCommercialDays(metrics.leads),
+      sales: metrics.sales && countCommercialDays(metrics.sales),
+      contracts: metrics.contracts && countCommercialDays(metrics.contracts),
+    } : undefined;
+    return NextResponse.json({ metrics: result, series, readAt: new Date().toISOString() }, { headers });
   } catch {
     return NextResponse.json({ error: 'Não foi possível consultar os indicadores do IXC.' }, {
       status: 503, headers,

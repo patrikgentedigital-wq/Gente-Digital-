@@ -127,7 +127,7 @@ export function DashboardShell() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col transition-all duration-300 md:ml-[6.5rem] lg:ml-[17.5rem]">
-        <Header activeTabName={tabNames[activeTab]} onMenuClick={() => setIsSidebarOpen(true)} />
+        <Header activeTabName={tabNames[activeTab]} showLogo={activeTab === 'indicadores'} onMenuClick={() => setIsSidebarOpen(true)} />
 
         <main className="relative flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8 xl:px-10">
           {/* Troca de aba imediata: a espera da animação de saída deixava o painel lento. */}

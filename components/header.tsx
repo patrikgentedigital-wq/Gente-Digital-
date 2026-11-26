@@ -8,12 +8,13 @@ import { BrandMark } from '@/components/brand-mark';
 
 interface HeaderProps {
   activeTabName: string;
+  showLogo?: boolean;
   onMenuClick: () => void;
 }
 
 const emptySubscribe = () => () => {};
 
-export function Header({ activeTabName, onMenuClick }: HeaderProps) {
+export function Header({ activeTabName, showLogo, onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(
     emptySubscribe,
@@ -34,7 +35,7 @@ export function Header({ activeTabName, onMenuClick }: HeaderProps) {
         </button>
         <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--app-muted)]">
           <span className="inline-flex shrink-0 items-center rounded-full bg-[#ffe300] px-3 py-1.5 md:hidden">
-            <BrandMark compact tone="onYellow" />
+            <BrandMark compact tone="onYellow" showLogo={showLogo} />
           </span>
           <ChevronRight className="h-3.5 w-3.5 opacity-50 md:hidden" />
           {/* No celular o nome da seção orienta; no desktop o título grande da página já faz isso, então mostramos a data. */}
